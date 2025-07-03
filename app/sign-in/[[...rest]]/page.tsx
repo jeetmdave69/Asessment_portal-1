@@ -67,13 +67,13 @@ export default function SignInPage() {
         </h2>
         {/* Tagline */}
         <div style={{
-          color: '#444',
-          fontWeight: 400,
+          color: '#fff',
+          fontWeight: 700,
           marginBottom: 18,
-          fontSize: '1.05rem',
+          fontSize: '1.15rem',
           letterSpacing: 0.2,
           textAlign: 'center',
-          textShadow: '0 1px 8px rgba(255,255,255,0.18)',
+          textShadow: '0 2px 12px rgba(0,0,0,0.25), 0 1px 0 #fff',
         }}>
           Your gateway to smarter testing and learning.
         </div>
