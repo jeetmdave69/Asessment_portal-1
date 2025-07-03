@@ -302,7 +302,7 @@ function TeacherDashboardPage() {
   };
 
   const handleEditExam = (quizId: number, nq: number) => {
-    setEditExam({ quizId, nq });
+    router.push(`/edit-quiz/${quizId}`);
   };
 
   const handleDeleteExam = async (quizId: number) => {
@@ -989,7 +989,7 @@ function ExamResultsTable() {
                   <TableCell>Score</TableCell>
                   <TableCell>Started At</TableCell>
                   <TableCell>End time</TableCell>
-                  <TableCell>Duration (min)</TableCell>
+                  <TableCell>Duration</TableCell>
                   <TableCell>Marked for Review</TableCell>
                 </TableRow>
               </TableHead>
@@ -997,7 +997,12 @@ function ExamResultsTable() {
                 {paginatedResults.map((row, i) => {
                   const startedAt = row.start_time ? new Date(row.start_time) : null;
                   const submittedAt = row.submitted_at ? new Date(row.submitted_at) : null;
-                  const duration = startedAt && submittedAt ? Math.round((submittedAt.getTime() - startedAt.getTime()) / 60000) : '-';
+                  let duration = '-';
+                  if (startedAt && submittedAt && !isNaN(startedAt.getTime()) && !isNaN(submittedAt.getTime())) {
+                    let diffMin = Math.floor((submittedAt.getTime() - startedAt.getTime()) / 60000);
+                    if (diffMin < 0) diffMin = 0;
+                    duration = `${diffMin} min`;
+                  }
                   return (
                     <TableRow key={row.id}>
                       <TableCell>{row.quizzes?.quiz_title || 'Untitled Quiz'}</TableCell>
