@@ -70,7 +70,8 @@ import {
   TextFields as TextFieldsIcon,
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
-  WifiOff as WifiOffIcon
+  WifiOff as WifiOffIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon
 } from '@mui/icons-material'
 import debounce from 'lodash.debounce'
 import { throttle } from 'lodash'
@@ -79,10 +80,12 @@ import { throttle } from 'lodash'
 interface Option {
   text: string
   isCorrect: boolean
+  image?: string | null
 }
 interface Question {
   id: number
   question_text: string
+  image?: string | null
   options: Option[]
   section_id: number
   marks?: number
@@ -342,9 +345,11 @@ export default function AttemptQuizPage() {
         const parsedQuestions = (questionData || []).map(q => ({
           id: q.id,
           question_text: q.question_text,
+          image: q.image_url || q.image || null,
           options: q.options.map((opt: any) => ({
             text: opt.text,
-            isCorrect: opt.is_correct
+            isCorrect: opt.is_correct,
+            image: opt.image || null
           })),
           section_id: q.section_id,
           marks: q.marks || 1,
@@ -783,9 +788,13 @@ export default function AttemptQuizPage() {
           answersText[q.id] = (arr as number[]).map(idx => q.options[idx]?.text ?? '');
         }
       });
+      // Debug logs
+      console.log('DEBUG: answers at submit:', answers);
+      console.log('DEBUG: questions at submit:', questions);
       // Calculate extra fields
       const totalQuestions = questions.length;
       const scoreObj = calculateScore();
+      console.log('DEBUG: scoreObj at submit:', scoreObj);
       const correctCount = scoreObj.score;
       const obtainedMarks = scoreObj.obtainedMarks;
       const totalMarks = scoreObj.totalMarks;
@@ -826,19 +835,43 @@ export default function AttemptQuizPage() {
         answers: answersText,
         correct_answers: correctAnswers,
         submitted_at: new Date().toISOString(),
-        score: obtainedMarks,
-        total_questions: totalQuestions,
-        total_marks: totalMarks,
-        correct_count: correctCount,
+        score: Math.round(obtainedMarks),
+        total_questions: Math.round(totalQuestions),
+        total_marks: Math.round(totalMarks),
+        correct_count: Math.round(correctCount),
         percentage,
-        status,
+        status: Math.round(status),
         marked_for_review: markedForReview
       }
+      // Debug log for user ID and payload
+      console.log('DEBUG: submitting as user_id:', user?.id);
+      console.log('DEBUG: submissionData:', submissionData);
       // Save to database
       const { error } = await supabase
         .from('attempts')
         .insert([submissionData])
-      if (error) throw error
+      if (error) {
+        // Enhanced error handling for RLS and other errors
+        console.error('Submission error:', error, JSON.stringify(error, null, 2));
+        if (
+          error.message &&
+          error.message.toLowerCase().includes('row-level security')
+        ) {
+          setErrorPopup(
+            "You do not have permission to submit this quiz. Please make sure you are logged in with the correct account, and contact support if the problem persists."
+          );
+        } else if (error.details) {
+          setErrorPopup("Failed to submit: " + error.details);
+        } else if (error.message) {
+          setErrorPopup("Failed to submit: " + error.message);
+        } else if (error.code) {
+          setErrorPopup("Failed to submit. Error code: " + error.code);
+        } else {
+          setErrorPopup("Failed to submit. Please check your network connection or try again.");
+        }
+        setSubmitted(false);
+        return;
+      }
       // After successful submission, delete progress
       await fetch('/api/quiz-progress', {
         method: 'DELETE',
@@ -852,17 +885,17 @@ export default function AttemptQuizPage() {
         router.push('/dashboard/student')
       }, 3500)
     } catch (error) {
-      console.error('Submission error:', JSON.stringify(error, null, 2))
-      setErrorPopup('Failed to submit. Please try again.')
-      setSubmitted(false)
+      setErrorPopup("An unexpected error occurred. Please try again.");
+      console.error('Submission error:', error, JSON.stringify(error, null, 2));
+      setSubmitted(false);
     }
   }
 
   // Score calculation
   const calculateScore = () => {
-    let score = 0
-    let totalMarks = 0
-    let obtainedMarks = 0
+    let score = 0;
+    let totalMarks = 0;
+    let obtainedMarks = 0;
 
     questions.forEach(q => {
       const userAnswer: number[] = answers[q.id] || [];
@@ -872,20 +905,26 @@ export default function AttemptQuizPage() {
       const questionMarks = q.marks || 1;
       totalMarks += questionMarks;
 
-      // Check if answer is correct (indices match)
-      if (
-        userAnswer.length === correctIndices.length &&
-        userAnswer.every(a => correctIndices.includes(a))
-      ) {
-        score += 1;
-        obtainedMarks += questionMarks;
+      // PARTIAL CREDIT: count number of correct options selected
+      const correctSelected = userAnswer.filter(a => correctIndices.includes(a)).length;
+      const totalCorrect = correctIndices.length;
+      // Optionally, subtract for incorrect options selected
+      // const incorrectSelected = userAnswer.filter(a => !correctIndices.includes(a)).length;
+
+      // Award partial marks (proportional)
+      if (totalCorrect > 0) {
+        const partialMark = (correctSelected / totalCorrect) * questionMarks;
+        obtainedMarks += partialMark;
+        if (correctSelected === totalCorrect && userAnswer.length === totalCorrect) {
+          score += 1; // full correct
+        }
       }
-    })
+    });
 
-    const percentage = Math.round((obtainedMarks / totalMarks) * 100)
-    const passed = quiz?.passing_score ? obtainedMarks >= quiz.passing_score : percentage >= 60
+    const percentage = Math.round((obtainedMarks / totalMarks) * 100);
+    const passed = quiz?.passing_score ? obtainedMarks >= quiz.passing_score : percentage >= 60;
 
-    return { score, totalMarks, obtainedMarks, percentage, passed }
+    return { score, totalMarks, obtainedMarks, percentage, passed };
   }
 
   // Handle online/offline events for timer pause/resume
@@ -1383,6 +1422,29 @@ export default function AttemptQuizPage() {
                 Q-{questions.findIndex(q => q.id === currentQuestion.id) + 1}
               </Typography>
 
+              {/* Question Image */}
+              {currentQuestion.image && (
+                <Box display="flex" justifyContent="center" mb={2}>
+                  <img
+                    src={currentQuestion.image}
+                    alt="Question visual"
+                    style={{
+                      width: '100%',
+                      maxWidth: 300,
+                      height: 'auto',
+                      borderRadius: 20,
+                      boxShadow: '0 6px 32px rgba(0,0,0,0.13)',
+                      objectFit: 'contain',
+                      background: '#f8fafc',
+                      padding: 12,
+                      border: '2.5px solid #e0e0e0',
+                      display: 'block',
+                      margin: '0 auto'
+                    }}
+                  />
+                </Box>
+              )}
+
               {/* Question controls */}
               <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
                 <Box>
@@ -1462,52 +1524,104 @@ export default function AttemptQuizPage() {
                   onChange={(e) => handleOptionSelect(currentQuestion.id, Number(e.target.value), currentQuestion.question_type)}
                 >
                   {currentQuestion.options.map((opt: Option, optIdx: number) => (
-                    <FormControlLabel
-                      key={optIdx}
-                      value={optIdx}
-                      control={<Radio color="primary" />}
-                      label={opt.text}
-                      sx={{
-                        mb: 1,
-                        p: 1,
-                        borderRadius: 1,
-                        backgroundColor: answers[currentQuestion.id]?.includes(optIdx) 
-                          ? `${currentTheme.primary}20` 
-                          : 'transparent',
-                        '&:hover': {
-                          backgroundColor: `${currentTheme.primary}10`
-                        }
-                      }}
-                      disabled={submitted}
-                    />
+                    <Box key={optIdx} display="flex" alignItems="center" mb={2} flexDirection="row" justifyContent="space-between">
+                      <FormControlLabel
+                        value={optIdx}
+                        control={<Radio color="primary" />}
+                        label={opt.text}
+                        sx={{
+                          mb: 1,
+                          p: 1,
+                          borderRadius: 1,
+                          backgroundColor: answers[currentQuestion.id]?.includes(optIdx)
+                            ? `${currentTheme.primary}20`
+                            : 'transparent',
+                          '&:hover': {
+                            backgroundColor: `${currentTheme.primary}10`
+                          },
+                          flex: 1,
+                          mr: 2
+                        }}
+                        disabled={submitted}
+                      />
+                      {opt.image && (
+                        <img
+                          src={opt.image}
+                          alt={`Option ${optIdx + 1}`}
+                          style={{
+                            width: 320,
+                            height: 320,
+                            minWidth: 220,
+                            minHeight: 220,
+                            maxWidth: 400,
+                            maxHeight: 400,
+                            borderRadius: 16,
+                            boxShadow: '0 2px 16px rgba(0,0,0,0.10)',
+                            objectFit: 'contain',
+                            background: '#f8fafc',
+                            padding: 12,
+                            border: '2px solid #e0e0e0',
+                            display: 'block',
+                            flexShrink: 0,
+                            marginLeft: 16
+                          }}
+                        />
+                      )}
+                    </Box>
                   ))}
                 </RadioGroup>
               ) : (
                 <FormGroup>
                   {currentQuestion.options.map((opt: Option, optIdx: number) => (
-                    <FormControlLabel
-                      key={optIdx}
-                      control={
-                        <Checkbox
-                          checked={answers[currentQuestion.id]?.includes(optIdx) || false}
-                          onChange={() => handleOptionSelect(currentQuestion.id, optIdx, currentQuestion.question_type)}
-                          color="primary"
-                        />
-                      }
-                      label={opt.text}
-                      sx={{
-                        mb: 1,
-                        p: 1,
-                        borderRadius: 1,
-                        backgroundColor: answers[currentQuestion.id]?.includes(optIdx) 
-                          ? `${currentTheme.primary}20` 
-                          : 'transparent',
-                        '&:hover': {
-                          backgroundColor: `${currentTheme.primary}10`
+                    <Box key={optIdx} display="flex" alignItems="center" mb={2} flexDirection="row" justifyContent="space-between">
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={answers[currentQuestion.id]?.includes(optIdx) || false}
+                            onChange={() => handleOptionSelect(currentQuestion.id, optIdx, currentQuestion.question_type)}
+                            color="primary"
+                          />
                         }
-                      }}
-                      disabled={submitted}
-                    />
+                        label={opt.text}
+                        sx={{
+                          mb: 1,
+                          p: 1,
+                          borderRadius: 1,
+                          backgroundColor: answers[currentQuestion.id]?.includes(optIdx)
+                            ? `${currentTheme.primary}20`
+                            : 'transparent',
+                          '&:hover': {
+                            backgroundColor: `${currentTheme.primary}10`
+                          },
+                          flex: 1,
+                          mr: 2
+                        }}
+                        disabled={submitted}
+                      />
+                      {opt.image && (
+                        <img
+                          src={opt.image}
+                          alt={`Option ${optIdx + 1}`}
+                          style={{
+                            width: 320,
+                            height: 320,
+                            minWidth: 220,
+                            minHeight: 220,
+                            maxWidth: 400,
+                            maxHeight: 400,
+                            borderRadius: 16,
+                            boxShadow: '0 2px 16px rgba(0,0,0,0.10)',
+                            objectFit: 'contain',
+                            background: '#f8fafc',
+                            padding: 12,
+                            border: '2px solid #e0e0e0',
+                            display: 'block',
+                            flexShrink: 0,
+                            marginLeft: 16
+                          }}
+                        />
+                      )}
+                    </Box>
                   ))}
                 </FormGroup>
               )}
@@ -1805,17 +1919,41 @@ export default function AttemptQuizPage() {
         </Alert>
       </Snackbar>
 
-      {/* Thank You Snackbar after submission */}
-      <Snackbar
-        open={showSubmitThankYou}
-        autoHideDuration={4000}
-        onClose={() => setShowSubmitThankYou(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert severity="success" sx={{ width: '100%' }}>
-          Thank you for submitting your quiz!
-        </Alert>
-      </Snackbar>
+      {/* Thank You Card after submission */}
+      {showSubmitThankYou && (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh" position="fixed" top={0} left={0} width="100vw" height="100vh" zIndex={3000} bgcolor="rgba(255,255,255,0.85)">
+          <Paper
+            elevation={6}
+            sx={{
+              p: 5,
+              borderRadius: 4,
+              maxWidth: 420,
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #e3f2fd 0%, #fce4ec 100%)',
+            }}
+          >
+            <CheckCircleOutlineIcon sx={{ fontSize: 64, color: '#43a047', mb: 2 }} />
+            <Typography variant="h4" fontWeight="bold" gutterBottom>
+              Thank You!
+            </Typography>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Your quiz has been submitted successfully.
+            </Typography>
+            <Typography variant="body1" sx={{ mt: 2, mb: 3 }}>
+              You can view your results in the dashboard once they are available.
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              sx={{ borderRadius: 2, fontWeight: 600 }}
+              onClick={() => router.push('/dashboard/student')}
+            >
+              Go to Dashboard
+            </Button>
+          </Paper>
+        </Box>
+      )}
     </Box>
   )
 }

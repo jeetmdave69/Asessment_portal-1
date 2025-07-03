@@ -46,3 +46,39 @@ export async function initializeQuizImageBucket() {
     throw error;
   }
 }
+
+/*
+-- DROP ALL EXISTING POLICIES ON storage.objects
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (SELECT policyname FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage') LOOP
+        EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON storage.objects;';
+    END LOOP;
+END $$;
+
+-- ENABLE RLS
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- ALLOW AUTHENTICATED USERS TO UPLOAD TO profile-pictures
+CREATE POLICY "Allow profile picture upload"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'profile-pictures' AND auth.role() = 'authenticated'
+);
+
+-- ALLOW AUTHENTICATED USERS TO UPDATE/DELETE THEIR OWN FILES (optional, for profile picture changes)
+CREATE POLICY "Allow profile picture update/delete"
+ON storage.objects FOR UPDATE, DELETE
+USING (
+  bucket_id = 'profile-pictures' AND auth.role() = 'authenticated'
+);
+
+-- ALLOW ANYONE TO READ FROM profile-pictures (public read)
+CREATE POLICY "Allow read access to profile pictures"
+ON storage.objects FOR SELECT
+USING (
+  bucket_id = 'profile-pictures'
+);
+*/
