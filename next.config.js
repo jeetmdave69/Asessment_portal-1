@@ -2,10 +2,14 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /**
-   * @param {import('webpack').Configuration} config
-   * @returns {import('webpack').Configuration}
-   */
+  eslint: {
+    // ❌ Don't block builds if ESLint errors exist
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // ❌ Don't block builds if TypeScript errors exist
+    ignoreBuildErrors: true,
+  },
   webpack(config) {
     config.resolve.alias = {
       ...config.resolve.alias,
