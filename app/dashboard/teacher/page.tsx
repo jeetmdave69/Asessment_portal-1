@@ -302,7 +302,7 @@ function TeacherDashboardPage() {
   };
 
   const handleEditExam = (quizId: number, nq: number) => {
-    router.push(`/edit-quiz/${quizId}`);
+    setEditExam({ quizId, nq });
   };
 
   const handleDeleteExam = async (quizId: number) => {
@@ -567,6 +567,21 @@ function TeacherDashboardPage() {
 
         {currentTab === 'dashboard' && (
           <>
+            {/* Greeting Section */}
+            <Box display="flex" alignItems="center" gap={2} mb={3}>
+              {/* Simple icon based on time of day */}
+              <Box>
+                {(() => {
+                  const hour = new Date().getHours();
+                  if (hour < 12) return <span role="img" aria-label="sun" style={{fontSize: 40}}>🌞</span>;
+                  if (hour < 17) return <span role="img" aria-label="afternoon" style={{fontSize: 40}}>🌤️</span>;
+                  return <span role="img" aria-label="moon" style={{fontSize: 40}}>🌙</span>;
+                })()}
+              </Box>
+              <Typography variant="h5" fontWeight={700} color="#002366">
+                {getGreeting()}, {user?.firstName || user?.fullName || 'Teacher'}!
+              </Typography>
+            </Box>
             {/* Overview Boxes Row */}
             <Grid container spacing={3} mb={4}>
               <Grid item xs={12} sm={6} md={3}>
