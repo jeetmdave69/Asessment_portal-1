@@ -60,6 +60,7 @@ import IconButton from '@mui/material/IconButton';
 import Iconify from '@/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
+import Tooltip from '@mui/material/Tooltip';
 
 const formatDateTime = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -138,6 +139,9 @@ export default function StudentDashboardPage() {
 
   // Add a new state for code error Snackbar
   const [showCodeErrorSnackbar, setShowCodeErrorSnackbar] = useState(false);
+
+  // After fetching results, fetch questions for each quiz and store in a map
+  const [questionsMap, setQuestionsMap] = useState<Record<number, any[]>>({});
 
   const now = new Date();
   const classify = (q: any): 'live' | 'upcoming' | 'completed' | 'expired' => {
@@ -334,6 +338,25 @@ export default function StudentDashboardPage() {
     fetchProgress();
     return () => { isMounted = false; };
   }, [user, liveQuizzes]);
+
+  // After fetching results, fetch questions for each quiz and store in a map
+  useEffect(() => {
+    if (!results || results.length === 0) return;
+    const fetchAllQuestions = async () => {
+      const quizIds = Array.from(new Set(results.map(r => r.quiz_id || r.quizzes?.id).filter(Boolean)));
+      const map: Record<number, any[]> = {};
+      await Promise.all(quizIds.map(async (quizId) => {
+        const { data } = await supabase
+          .from('questions')
+          .select('id, question_text')
+          .eq('quiz_id', quizId)
+          .order('id', { ascending: true });
+        if (data) map[quizId] = data;
+      }));
+      setQuestionsMap(map);
+    };
+    fetchAllQuestions();
+  }, [results]);
 
   const fetchQuizzes = async () => {
     if (!user) return;
@@ -779,6 +802,12 @@ export default function StudentDashboardPage() {
                   timeTaken
                 });
                 
+                const markedForReview = row.marked_for_review || row.marked_questions || {};
+                const questionList = row.questions || row.quiz_questions || [];
+                const questionOrderMap = Array.isArray(questionList)
+                  ? questionList.reduce((acc, q, i) => { acc[q.id] = { order: i + 1, text: q.question_text }; return acc; }, {})
+                  : {};
+                
                 return (
                   <TableRow key={idx}>
                     <TableCell>{studentName}</TableCell>
@@ -800,6 +829,24 @@ export default function StudentDashboardPage() {
                       >
                         Review
                       </Button>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const markedForReview = row.marked_for_review || row.marked_questions || {};
+                        const quizId = row.quiz_id || row.quizzes?.id;
+                        const questions = questionsMap[quizId] || [];
+                        const questionOrderMap = questions.reduce((acc, q, i) => { acc[q.id] = { order: i + 1, text: q.question_text }; return acc; }, {});
+                        const marked = Object.keys(markedForReview).filter(qid => markedForReview[qid]);
+                        if (marked.length === 0) return 'None';
+                        return marked.map(qid => {
+                          const qInfo = questionOrderMap[qid];
+                          return qInfo ? (
+                            <Tooltip key={qid} title={qInfo.text} arrow>
+                              <span style={{ marginRight: 8 }}>{`Q${qInfo.order}`}</span>
+                            </Tooltip>
+                          ) : null;
+                        });
+                      })()}
                     </TableCell>
                   </TableRow>
                 );
