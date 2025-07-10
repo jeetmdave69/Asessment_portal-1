@@ -1,7 +1,5 @@
-import { Clerk } from "@clerk/clerk-sdk-node";
+import { users } from "@clerk/clerk-sdk-node";
 import { NextRequest, NextResponse } from "next/server";
-
-const clerk = new Clerk({ secretKey: process.env.CLERK_SECRET_KEY! });
 
 export async function POST(req: NextRequest) {
   const { email, password, role, firstName, lastName, username } = await req.json();
@@ -11,7 +9,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const user = await clerk.users.createUser({
+    const user = await users.createUser({
       emailAddress: [email],
       password,
       firstName,
@@ -20,7 +18,7 @@ export async function POST(req: NextRequest) {
       publicMetadata: { role },
     });
     // Optionally, send invitation email:
-    // await clerk.users.sendEmailInvitation({ userId: user.id });
+    // await users.sendEmailInvitation({ userId: user.id });
     return NextResponse.json({ message: "User created successfully", user });
   } catch (error: any) {
     // Log and return detailed error info
