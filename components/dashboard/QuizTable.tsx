@@ -32,6 +32,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useState, useEffect } from "react";
 import { supabase } from "src/lib/supabaseClient";
 
@@ -171,10 +172,12 @@ export default function QuizTable({ quizzes = [] }: { quizzes?: Quiz[] }) {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Quiz Title</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Timing</TableCell>
-              <TableCell>Attempts</TableCell>
+              <TableCell>Exam no.</TableCell>
+              <TableCell>Exam name</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell>No. of questions</TableCell>
+              <TableCell>Exam time</TableCell>
+              <TableCell>End time</TableCell>
               <TableCell>Access Code</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -182,54 +185,57 @@ export default function QuizTable({ quizzes = [] }: { quizzes?: Quiz[] }) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={8} align="center">
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : getCurrentPageQuizzes().length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={8} align="center">
                   No quizzes found. Create your first quiz to get started.
                 </TableCell>
               </TableRow>
             ) : (
-              getCurrentPageQuizzes().map((quiz) => (
+              getCurrentPageQuizzes().map((quiz, idx) => (
                 <TableRow key={quiz.id} hover>
+                  <TableCell>{quiz.id}</TableCell>
                   <TableCell>
-                    <Typography fontWeight={500}>
-                      {quiz.title || "Untitled Quiz"}
-                    </Typography>
-                    {quiz.description && (
-                      <Typography variant="body2" color="text.secondary">
-                        {quiz.description.length > 50
-                          ? `${quiz.description.substring(0, 50)}...`
-                          : quiz.description}
-                      </Typography>
-                    )}
+                    <Typography fontWeight={500}>{quiz.title || "Untitled Quiz"}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography color={getStatusColor(quiz.status)}>
-                      {quiz.status || "-"}
+                    <Typography variant="body2" color="text.secondary">
+                      {quiz.description && quiz.description.length > 50
+                        ? `${quiz.description.substring(0, 50)}...`
+                        : quiz.description || '—'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{quiz.attempts || 0}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {quiz.start_time ? new Date(quiz.start_time).toLocaleString() : "—"}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {quiz.start_time
-                        ? new Date(quiz.start_time).toLocaleString()
-                        : "—"}
+                      {quiz.end_time ? new Date(quiz.end_time).toLocaleString() : "—"}
                     </Typography>
-                    {quiz.end_time && (
-                      <Typography variant="body2" color="text.secondary">
-                        to {new Date(quiz.end_time).toLocaleString()}
-                      </Typography>
-                    )}
                   </TableCell>
-                  <TableCell>{quiz.attempts || 0}</TableCell>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={1}>
-                      <Typography fontFamily="monospace">
-                        {quiz.access_code || "—"}
-                      </Typography>
+                      <Typography fontFamily="monospace">{quiz.access_code || "—"}</Typography>
+                      <Tooltip title="Copy Access Code">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            if (quiz.access_code) {
+                              navigator.clipboard.writeText(quiz.access_code);
+                            }
+                          }}
+                          disabled={!quiz.access_code}
+                        >
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Regenerate Code">
                         <IconButton
                           size="small"

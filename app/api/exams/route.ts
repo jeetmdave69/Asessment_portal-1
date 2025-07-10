@@ -6,10 +6,10 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Missing user_id' }, { status: 400 });
 
   const { data, error } = await supabase
-    .from('exm_list')
+    .from('quizzes')
     .select('*')
     .eq('user_id', userId)
-    .order('exid');
+    .order('created_at', { ascending: false });
   if (error) return NextResponse.json({ error: 'Failed to fetch exams.' }, { status: 500 });
   return NextResponse.json({ exams: data });
 } 

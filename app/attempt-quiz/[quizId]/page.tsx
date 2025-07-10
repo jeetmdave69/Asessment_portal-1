@@ -365,11 +365,12 @@ export default function AttemptQuizPage() {
         setTotalTime(durationInSeconds)
         let startTime = localStorage.getItem(`quiz-${quizId}-startTime`)
         if (!startTime) {
-          startTime = Date.now().toString()
+          // Store as minutes since epoch
+          startTime = Math.floor(Date.now() / 60000).toString();
           localStorage.setItem(`quiz-${quizId}-startTime`, startTime)
         }
-        const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000)
-        const remaining = durationInSeconds - elapsed
+        const elapsed = Math.floor((Date.now() / 60000) - parseInt(startTime, 10))
+        const remaining = Math.floor(durationInSeconds / 60) - elapsed
         setTimeLeft(remaining > 0 ? remaining : 0)
 
         // Load saved state
@@ -643,7 +644,11 @@ export default function AttemptQuizPage() {
           setBookmarked(data.bookmarked || {});
           setMarkedForReview(data.marked_for_review || {});
           if (data.start_time) {
-            localStorage.setItem(`quiz-${quizId}-startTime`, new Date(data.start_time).getTime().toString());
+            // Only set start_time in localStorage if it does not already exist
+            const key = `quiz-${quizId}-startTime`;
+            if (!localStorage.getItem(key)) {
+              localStorage.setItem(key, Math.floor(new Date(data.start_time).getTime() / 60000).toString());
+            }
           }
           // Set current question to first answered or first question
           const answeredQ = Object.keys(fixedAnswers);
@@ -678,7 +683,7 @@ export default function AttemptQuizPage() {
             flagged: flagged || {},
             bookmarked: bookmarked || {},
             marked_for_review: markedForReview || {},
-            start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`))).toISOString() : undefined,
+            start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
           })
         });
       } catch (e) {
@@ -702,7 +707,7 @@ export default function AttemptQuizPage() {
           flagged: progress.flagged,
           bookmarked: progress.bookmarked,
           marked_for_review: progress.markedForReview,
-          start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`))).toISOString() : undefined,
+          start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
         })
       });
     }, 5000)
@@ -725,7 +730,7 @@ export default function AttemptQuizPage() {
         flagged: flagged || {},
         bookmarked: bookmarked || {},
         marked_for_review: markedForReview || {},
-        start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`))).toISOString() : undefined,
+        start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
       };
       console.log('Saving quiz progress:', payload);
       fetch('/api/quiz-progress', {
@@ -754,7 +759,7 @@ export default function AttemptQuizPage() {
         flagged: flagged || {},
         bookmarked: bookmarked || {},
         marked_for_review: markedForReview || {},
-        start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`))).toISOString() : undefined,
+        start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
       };
       console.log('Saving quiz progress (unload):', payload);
       fetch('/api/quiz-progress', {
@@ -787,6 +792,11 @@ export default function AttemptQuizPage() {
         if (q) {
           answersText[q.id] = (arr as number[]).map(idx => q.options[idx]?.text ?? '');
         }
+      });
+      // Save answers as indices for review page
+      const answersIndices: Record<number, number[]> = {};
+      Object.entries(answers).forEach(([qid, arr]) => {
+        answersIndices[qid] = (arr as number[]).map(Number);
       });
       // Debug logs
       console.log('DEBUG: answers at submit:', answers);
@@ -828,11 +838,17 @@ export default function AttemptQuizPage() {
         return;
       }
       // Prepare submission data
+      const startTimeStr = localStorage.getItem(`quiz-${quizId}-startTime`);
+      const start_time = startTimeStr ? new Date(Number(startTimeStr) * 60000).toISOString() : undefined;
+      // Debug logs for timing
+      console.log('DEBUG: start_time in localStorage:', startTimeStr, 'as ISO:', start_time);
+      console.log('DEBUG: submitted_at:', new Date().toISOString());
       const submissionData = {
         quiz_id: Number(quizId),
         user_id: user?.id,
         user_name: user?.fullName || 'Anonymous',
-        answers: answersText,
+        answers: answersIndices,
+        answers_text: answersText,
         correct_answers: correctAnswers,
         submitted_at: new Date().toISOString(),
         score: Math.round(obtainedMarks),
@@ -841,7 +857,8 @@ export default function AttemptQuizPage() {
         correct_count: Math.round(correctCount),
         percentage,
         status: Math.round(status),
-        marked_for_review: markedForReview
+        marked_for_review: markedForReview,
+        start_time
       }
       // Debug log for user ID and payload
       console.log('DEBUG: submitting as user_id:', user?.id);
@@ -903,7 +920,7 @@ export default function AttemptQuizPage() {
         .map((o, idx) => (o.isCorrect ? idx : -1))
         .filter(idx => idx !== -1);
       const questionMarks = q.marks || 1;
-      totalMarks += questionMarks;
+      totalMarks += questionMarks || 0;
 
       // PARTIAL CREDIT: count number of correct options selected
       const correctSelected = userAnswer.filter(a => correctIndices.includes(a)).length;
@@ -913,7 +930,7 @@ export default function AttemptQuizPage() {
 
       // Award partial marks (proportional)
       if (totalCorrect > 0) {
-        const partialMark = (correctSelected / totalCorrect) * questionMarks;
+        const partialMark = (correctSelected / totalCorrect) * (questionMarks || 0);
         obtainedMarks += partialMark;
         if (correctSelected === totalCorrect && userAnswer.length === totalCorrect) {
           score += 1; // full correct
@@ -921,8 +938,8 @@ export default function AttemptQuizPage() {
       }
     });
 
-    const percentage = Math.round((obtainedMarks / totalMarks) * 100);
-    const passed = quiz?.passing_score ? obtainedMarks >= quiz.passing_score : percentage >= 60;
+    const percentage = Math.round((obtainedMarks / (totalMarks || 1)) * 100);
+    const passed = quiz?.passing_score ? obtainedMarks >= (quiz.passing_score || 0) : percentage >= 60;
 
     return { score, totalMarks, obtainedMarks, percentage, passed };
   }
@@ -981,7 +998,7 @@ export default function AttemptQuizPage() {
       const pausedDurStr = localStorage.getItem(`quiz-${quizId}-pausedDuration`);
       const pausedDur = pausedDurStr ? parseInt(pausedDurStr, 10) : pausedDuration;
       if (startTime) {
-        const elapsed = Math.floor((Date.now() - parseInt(startTime, 10) - pausedDur) / 1000);
+        const elapsed = Math.floor((Date.now() / 60000) - parseInt(startTime, 10) - pausedDur);
         const remaining = totalTime - elapsed;
         setTimeLeft(remaining > 0 ? remaining : 0);
       }
@@ -1021,6 +1038,16 @@ export default function AttemptQuizPage() {
       }
     }
   }, [questions, answers]);
+
+  // Ensure start_time is set in localStorage only once when quiz is started
+  useEffect(() => {
+    if (typeof window !== 'undefined' && quizId) {
+      const key = `quiz-${quizId}-startTime`;
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, Math.floor(Date.now() / 60000).toString());
+      }
+    }
+  }, [quizId]);
 
   if (loading) {
     return (

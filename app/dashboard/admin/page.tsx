@@ -16,6 +16,12 @@ import {
 } from '@mui/icons-material';
 import { supabase } from '@/utils/supabaseClient';
 import TablePagination from '@mui/material/TablePagination';
+import { SettingsDrawer } from '@/components/settings/SettingsDrawer';
+import { useSettingsContext } from '@/context/settings-context';
+import IconButton from '@mui/material/IconButton';
+import { Iconify } from '@/components/iconify/Iconify';
+import { useTheme } from '@mui/material/styles';
+import dayjs from 'dayjs';
 
 const sidebarLinks = [
   { text: 'Dashboard', icon: <DashboardIcon />, tab: 'dashboard' },
@@ -67,6 +73,9 @@ export default function AdminDashboardPage() {
   const [message, setMessage] = useState("");
   const [creating, setCreating] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
+
+  const settings = useSettingsContext();
+  const theme = useTheme();
 
   // Fetch counts and lists from Clerk API and quizzes from Supabase
   const fetchCountsAndLists = async () => {
@@ -177,18 +186,18 @@ export default function AdminDashboardPage() {
 
   // New: Render user management table
   const renderUserManagementTable = () => (
-    <Box>
-      <Typography variant="h6" fontWeight={700} mb={2}>Manage Users</Typography>
+    <Box sx={{ background: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
+      <Typography variant="h6" fontWeight={700} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Manage Users</Typography>
       <TableContainer component={Paper} sx={{ maxHeight: 500 }}>
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Created At</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell sx={{ color: theme.palette.text.primary }}>ID</TableCell>
+              <TableCell sx={{ color: theme.palette.text.primary }}>Name</TableCell>
+              <TableCell sx={{ color: theme.palette.text.primary }}>Email</TableCell>
+              <TableCell sx={{ color: theme.palette.text.primary }}>Role</TableCell>
+              <TableCell sx={{ color: theme.palette.text.primary }}>Created At</TableCell>
+              <TableCell sx={{ color: theme.palette.text.primary }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -201,9 +210,9 @@ export default function AdminDashboardPage() {
             ) : (
               [...students, ...teachers, ...admins].map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell>{user.id}</TableCell>
-                  <TableCell>{user.fname || user.firstName} {user.lname || user.lastName}</TableCell>
-                  <TableCell>{user.email}</TableCell>
+                  <TableCell sx={{ color: theme.palette.text.primary }}>{user.id}</TableCell>
+                  <TableCell sx={{ color: theme.palette.text.primary }}>{user.fname || user.firstName} {user.lname || user.lastName}</TableCell>
+                  <TableCell sx={{ color: theme.palette.text.primary }}>{user.email}</TableCell>
                   <TableCell>
                     <TextField
                       select
@@ -219,25 +228,17 @@ export default function AdminDashboardPage() {
                         setUserTableLoading(false);
                       }}
                       size="small"
-                      sx={{ minWidth: 100 }}
+                      sx={{ minWidth: 100, color: theme.palette.text.primary }}
                     >
                       {userRoleOptions.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                        <MenuItem key={option.value} value={option.value} sx={{ color: theme.palette.text.primary }}>{option.label}</MenuItem>
                       ))}
                     </TextField>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ color: theme.palette.text.primary }}>
                     {user.created_at ? (
-                      <span style={{ color: '#222', fontWeight: 500 }}>
-                        {new Date(user.created_at).toLocaleString('en-IN', {
-                          timeZone: 'Asia/Kolkata',
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: true,
-                        })}
+                      <span style={{ color: theme.palette.text.primary, fontWeight: 500 }}>
+                        {dayjs(user.created_at).format('YYYY-MM-DD HH:mm')}
                       </span>
                     ) : '-'}
                   </TableCell>
@@ -320,7 +321,7 @@ export default function AdminDashboardPage() {
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: '#f5f5f5', fontFamily: 'Poppins, sans-serif' }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Poppins, sans-serif' }}>
         {/* Top Bar */}
         <Box
           display="flex"
@@ -330,14 +331,14 @@ export default function AdminDashboardPage() {
           p={2}
           borderRadius={2}
           sx={{
-            background: '#fff',
-            color: '#002366',
+            background: theme.palette.background.paper,
+            color: theme.palette.text.primary,
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             border: 'none',
             fontFamily: 'Poppins, sans-serif',
           }}
         >
-          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: '#002366', fontFamily: 'Poppins, sans-serif' }}>Admin Dashboard</Typography>
+          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Admin Dashboard</Typography>
           <Box display="flex" alignItems="center" gap={2}>
             <Typography variant="subtitle1" fontWeight={500}>
               {getGreeting()}, {getUserDisplayName()}
@@ -349,7 +350,7 @@ export default function AdminDashboardPage() {
         {/* Summary Cards */}
         <Grid container spacing={3} mb={4}>
           <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 4, background: '#e3f2fd', border: '3px solid #1976d2' }}>
+            <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 4, background: theme.palette.primary.light, border: '3px solid #1976d2' }}>
               <GroupIcon sx={{ color: '#1976d2', fontSize: 40, mb: 1 }} />
               <Typography variant="subtitle1" fontWeight={700} color="#1976d2">Students</Typography>
               <Typography variant="h2" fontWeight={900} color="#1976d2">{loading ? <CircularProgress size={32} /> : studentCount}</Typography>
@@ -357,7 +358,7 @@ export default function AdminDashboardPage() {
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 4, background: '#f3e5f5', border: '3px solid #7b1fa2' }}>
+            <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 4, background: theme.palette.secondary.light, border: '3px solid #7b1fa2' }}>
               <GroupIcon sx={{ color: '#7b1fa2', fontSize: 40, mb: 1 }} />
               <Typography variant="subtitle1" fontWeight={700} color="#7b1fa2">Teachers</Typography>
               <Typography variant="h2" fontWeight={900} color="#7b1fa2">{loading ? <CircularProgress size={32} /> : teacherCount}</Typography>
@@ -365,7 +366,7 @@ export default function AdminDashboardPage() {
             </Card>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 4, background: '#fffde7', border: '3px solid #fbc02d' }}>
+            <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 4, background: theme.palette.warning.light, border: '3px solid #fbc02d' }}>
               <GroupIcon sx={{ color: '#fbc02d', fontSize: 40, mb: 1 }} />
               <Typography variant="subtitle1" fontWeight={700} color="#fbc02d">Admins</Typography>
               <Typography variant="h2" fontWeight={900} color="#fbc02d">{loading ? <CircularProgress size={32} /> : adminCount}</Typography>
@@ -384,14 +385,14 @@ export default function AdminDashboardPage() {
 
         {/* Main Section Content */}
         {selectedTab === 'dashboard' && (
-          <Box>
-            <Typography variant="h6" fontWeight={700} mb={2}>Welcome to the Admin Dashboard!</Typography>
-            <Typography>Use the sidebar to manage users, view results, send announcements, and more.</Typography>
+          <Box sx={{ background: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
+            <Typography variant="h6" fontWeight={700} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Welcome to the Admin Dashboard!</Typography>
+            <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Poppins, sans-serif' }}>Use the sidebar to manage users, view results, send announcements, and more.</Typography>
           </Box>
         )}
         {selectedTab === 'users' && (
           <Box maxWidth={1100} mx="auto">
-            <Typography variant="h6" fontWeight={700} mb={2}>Create New User</Typography>
+            <Typography variant="h6" fontWeight={700} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Create New User</Typography>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div style={{ display: 'flex', gap: 16 }}>
                 <TextField
@@ -401,6 +402,7 @@ export default function AdminDashboardPage() {
                   onChange={handleChange}
                   required
                   fullWidth
+                  sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
                 />
                 <TextField
                   name="lastName"
@@ -409,6 +411,7 @@ export default function AdminDashboardPage() {
                   onChange={handleChange}
                   required
                   fullWidth
+                  sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
                 />
               </div>
               <TextField
@@ -417,6 +420,7 @@ export default function AdminDashboardPage() {
                 value={formData.username}
                 onChange={handleChange}
                 fullWidth
+                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               />
               <TextField
                 name="email"
@@ -426,6 +430,7 @@ export default function AdminDashboardPage() {
                 onChange={handleChange}
                 required
                 fullWidth
+                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               />
               <TextField
                 name="password"
@@ -435,8 +440,9 @@ export default function AdminDashboardPage() {
                 onChange={handleChange}
                 required
                 fullWidth
+                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               />
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, mt: -2 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, mt: -2, color: theme.palette.text.secondary }}>
                 Password must be at least 8 characters, include 1 uppercase, 1 lowercase, 1 number, 1 special character, and must not be a commonly breached password.
               </Typography>
               <TextField
@@ -447,49 +453,50 @@ export default function AdminDashboardPage() {
                 onChange={handleChange}
                 required
                 fullWidth
+                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               >
-                <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="teacher">Teacher</MenuItem>
-                <MenuItem value="student">Student</MenuItem>
+                <MenuItem value="admin" sx={{ color: theme.palette.text.primary }}>Admin</MenuItem>
+                <MenuItem value="teacher" sx={{ color: theme.palette.text.primary }}>Teacher</MenuItem>
+                <MenuItem value="student" sx={{ color: theme.palette.text.primary }}>Student</MenuItem>
               </TextField>
-              <Button type="submit" variant="contained" color="primary" size="large" sx={{ fontWeight: 700, py: 1.5 }} disabled={creating}>
-                {creating ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Create User'}
+              <Button type="submit" variant="contained" color="primary" size="large" sx={{ fontWeight: 700, py: 1.5, color: theme.palette.text.primary, background: theme.palette.primary.main, '&:hover': { background: theme.palette.primary.dark } }} disabled={creating}>
+                {creating ? <CircularProgress size={20} sx={{ color: theme.palette.text.primary }} /> : 'Create User'}
               </Button>
             </form>
             {message && <Typography mt={3} align="center" color={message.startsWith("✅") ? "success.main" : "error.main"}>{message}</Typography>}
             {errorDetails.length > 0 && (
-              <Box mt={2}>
-                <Typography color="error" fontWeight={600} mb={1}>Please fix the following:</Typography>
+              <Box mt={2} sx={{ background: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
+                <Typography color="error" fontWeight={600} mb={1} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Please fix the following:</Typography>
                 <ul style={{ color: '#d32f2f', margin: 0, paddingLeft: 20 }}>
                   {errorDetails.map((err, idx) => (
-                    <li key={idx}>{err}</li>
+                    <li key={idx} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{err}</li>
                   ))}
                 </ul>
               </Box>
             )}
             <Box mt={6}>
               <Tabs value={0} aria-label="user type tabs" sx={{ mb: 2 }}>
-                <Tab label="Students" />
-                <Tab label="Teachers" />
+                <Tab label="Students" sx={{ color: theme.palette.text.primary }} />
+                <Tab label="Teachers" sx={{ color: theme.palette.text.primary }} />
               </Tabs>
               <Grid container spacing={4}>
                 <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle1" fontWeight={700} mb={1}>Student List</Typography>
+                  <Typography variant="subtitle1" fontWeight={700} mb={1} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Student List</Typography>
                   <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>ID</TableCell>
-                          <TableCell>Name</TableCell>
-                          <TableCell>Email</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>ID</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>Name</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>Email</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {students.map((student) => (
                           <TableRow key={student.id}>
-                            <TableCell>{student.id}</TableCell>
-                            <TableCell>{student.fname || student.firstName} {student.lname || student.lastName}</TableCell>
-                            <TableCell>{student.email}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary }}>{student.id}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary }}>{student.fname || student.firstName} {student.lname || student.lastName}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary }}>{student.email}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -497,22 +504,22 @@ export default function AdminDashboardPage() {
                   </TableContainer>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle1" fontWeight={700} mb={1}>Teacher List</Typography>
+                  <Typography variant="subtitle1" fontWeight={700} mb={1} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Teacher List</Typography>
                   <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>ID</TableCell>
-                          <TableCell>Name</TableCell>
-                          <TableCell>Email</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>ID</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>Name</TableCell>
+                          <TableCell sx={{ color: theme.palette.text.primary }}>Email</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {teachers.map((teacher) => (
                           <TableRow key={teacher.id}>
-                            <TableCell>{teacher.id}</TableCell>
-                            <TableCell>{teacher.fname || teacher.firstName} {teacher.lname || teacher.lastName}</TableCell>
-                            <TableCell>{teacher.email}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary }}>{teacher.id}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary }}>{teacher.fname || teacher.firstName} {teacher.lname || teacher.lastName}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary }}>{teacher.email}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -525,44 +532,44 @@ export default function AdminDashboardPage() {
         )}
         {selectedTab === 'manage-users' && renderUserManagementTable()}
         {selectedTab === 'results' && (
-          <Box>
-            <Typography variant="h6" fontWeight={700} mb={2}>Results Section</Typography>
-            <Typography>Results management coming soon.</Typography>
+          <Box sx={{ background: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
+            <Typography variant="h6" fontWeight={700} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Results Section</Typography>
+            <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Poppins, sans-serif' }}>Results management coming soon.</Typography>
           </Box>
         )}
         {selectedTab === 'announcements' && (
-          <Box>
-            <Typography variant="h6" fontWeight={700} mb={2}>Announcements Section</Typography>
-            <Typography>Announcements management coming soon.</Typography>
+          <Box sx={{ background: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
+            <Typography variant="h6" fontWeight={700} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Announcements Section</Typography>
+            <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Poppins, sans-serif' }}>Announcements management coming soon.</Typography>
           </Box>
         )}
         {selectedTab === 'settings' && (
-          <Box>
-            <Typography variant="h6" fontWeight={700} mb={2}>Settings Section</Typography>
-            <Typography>Settings management coming soon.</Typography>
+          <Box sx={{ background: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
+            <Typography variant="h6" fontWeight={700} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Settings Section</Typography>
+            <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Poppins, sans-serif' }}>Settings management coming soon.</Typography>
           </Box>
         )}
         {selectedTab === 'help' && (
-          <Box>
-            <Typography variant="h6" fontWeight={700} mb={2}>Help Section</Typography>
-            <Typography>Help content coming soon.</Typography>
+          <Box sx={{ background: theme.palette.background.paper, borderRadius: 2, boxShadow: 1 }}>
+            <Typography variant="h6" fontWeight={700} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Help Section</Typography>
+            <Typography sx={{ color: theme.palette.text.secondary, fontFamily: 'Poppins, sans-serif' }}>Help content coming soon.</Typography>
           </Box>
         )}
 
         {/* Logout Confirmation Dialog */}
         <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
           <Card sx={{ minWidth: 340, p: 2, boxShadow: 0 }}>
-            <DialogTitle sx={{ fontWeight: 700, fontSize: 22, textAlign: 'center' }}>Log Out</DialogTitle>
+            <DialogTitle sx={{ fontWeight: 700, fontSize: 22, textAlign: 'center', color: theme.palette.text.primary }}>Log Out</DialogTitle>
             <DialogContent>
-              <Typography variant="body1" sx={{ textAlign: 'center', mb: 2 }}>
+              <Typography variant="body1" sx={{ textAlign: 'center', mb: 2, color: theme.palette.text.primary }}>
                 Are you sure you want to log out?
               </Typography>
             </DialogContent>
             <DialogActions sx={{ justifyContent: 'center', pb: 2 }}>
-              <Button onClick={() => setLogoutDialogOpen(false)} variant="outlined" color="primary">
+              <Button onClick={() => setLogoutDialogOpen(false)} variant="outlined" color="primary" sx={{ color: theme.palette.text.primary, borderColor: theme.palette.text.primary }}>
                 Cancel
               </Button>
-              <Button onClick={() => { setLogoutDialogOpen(false); signOut({ redirectUrl: "/sign-in" }); }} variant="contained" color="error" sx={{ ml: 2 }}>
+              <Button onClick={() => { setLogoutDialogOpen(false); signOut({ redirectUrl: "/sign-in" }); }} variant="contained" color="error" sx={{ ml: 2, color: theme.palette.text.primary, background: theme.palette.error.main, '&:hover': { background: theme.palette.error.dark } }}>
                 Log Out
               </Button>
             </DialogActions>
@@ -571,13 +578,13 @@ export default function AdminDashboardPage() {
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Delete User</DialogTitle>
+          <DialogTitle sx={{ color: theme.palette.text.primary }}>Delete User</DialogTitle>
           <DialogContent>
-            <Typography color="error" fontWeight={600} mb={2}>
+            <Typography color="error" fontWeight={600} mb={2} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>
               Are you sure you want to delete this user? This action cannot be undone.
             </Typography>
             {userToDelete && (
-              <Typography variant="body2">
+              <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>
                 <strong>ID:</strong> {userToDelete.id}<br/>
                 <strong>Name:</strong> {userToDelete.fname || userToDelete.firstName} {userToDelete.lname || userToDelete.lastName}<br/>
                 <strong>Email:</strong> {userToDelete.email}
@@ -585,7 +592,7 @@ export default function AdminDashboardPage() {
             )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)} color="primary">
+            <Button onClick={() => setDeleteDialogOpen(false)} color="primary" sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>
               Cancel
             </Button>
             <Button
@@ -608,6 +615,24 @@ export default function AdminDashboardPage() {
           </DialogActions>
         </Dialog>
       </Box>
+      {/* Floating Settings Button */}
+      <IconButton
+        color="primary"
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 1300,
+          bgcolor: 'background.paper',
+          boxShadow: 3,
+          '&:hover': { bgcolor: 'primary.light' },
+        }}
+        onClick={settings.onOpenDrawer}
+        aria-label="Open settings"
+      >
+        <Iconify icon="solar:settings-bold" width={28} height={28} />
+      </IconButton>
+      <SettingsDrawer />
     </Box>
   );
 }

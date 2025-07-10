@@ -38,9 +38,11 @@ import {
   Paper,
   CardHeader,
   Divider,
-  IconButton,
   MenuItem,
-  TablePagination
+  TablePagination,
+  IconButton,
+  Tooltip,
+  Snackbar
 } from '@mui/material';
 import { useClerk, useUser } from '@clerk/nextjs';
 import { ThemeToggleButton } from '@/components/ThemeToggleButton';
@@ -59,7 +61,9 @@ import {
   Send as PaperPlaneIcon,
   ShowChart as LineAxisIcon,
   Edit as EditIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Visibility as VisibilityIcon,
+  ContentCopy as ContentCopyIcon
 } from '@mui/icons-material';
 import AddExamForm from '../../../components/dashboard/AddExamForm';
 import AddQuestionsForm from '../../../components/dashboard/AddQuestionsForm';
@@ -70,6 +74,11 @@ import dayjs from 'dayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { withRole } from "../../../components/withRole";
+import { SettingsDrawer } from '../../../components/settings/SettingsDrawer';
+import { useSettingsContext } from '@/context/settings-context';
+import Iconify from '@/components/iconify/Iconify';
+import { useTheme } from '@mui/material/styles';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Lazy load components
 const QuizTable = lazy(() => import('@/components/dashboard/QuizTable'));
@@ -115,6 +124,8 @@ function TeacherDashboardPage() {
   const { signOut } = useClerk();
   const { user, isLoaded } = useUser();
   const searchParams = useSearchParams();
+  const settings = useSettingsContext();
+  const theme = useTheme();
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,7 +182,7 @@ function TeacherDashboardPage() {
   const examPageCount = Math.ceil(quizzes.length / examsPerPage);
 
   const [dashboardExamPage, setDashboardExamPage] = useState(1);
-  const dashboardExamsPerPage = 10;
+  const [dashboardExamsPerPage, setDashboardExamsPerPage] = useState(10);
   const dashboardPageCount = Math.ceil(exams.length / dashboardExamsPerPage);
   const paginatedDashboardExams = exams.slice(
     (dashboardExamPage - 1) * dashboardExamsPerPage,
@@ -179,6 +190,7 @@ function TeacherDashboardPage() {
   );
 
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
 
   const fetchQuizzes = async () => {
     if (!user?.id) return;
@@ -302,7 +314,7 @@ function TeacherDashboardPage() {
   };
 
   const handleEditExam = (quizId: number, nq: number) => {
-    setEditExam({ quizId, nq });
+    router.push(`/edit-quiz/${quizId}`);
   };
 
   const handleDeleteExam = async (quizId: number) => {
@@ -454,12 +466,12 @@ function TeacherDashboardPage() {
   ];
 
   const helpContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: '#fff', maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: '#002366', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
         About & Help
       </Typography>
       <Box mt={3}>
-        <Typography variant="h6" sx={{ color: '#002366', fontWeight: 600, mb: 2 }}>How to use</Typography>
+        <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontWeight: 600, mb: 2 }}>How to use</Typography>
         <Box component="ol" sx={{ pl: 3 }}>
           <li><Typography variant="subtitle1" fontWeight={600}>How to logout?</Typography>
             <Typography variant="body2">Click on the logout button at the left bottom on the navigation bar.</Typography></li>
@@ -506,8 +518,8 @@ function TeacherDashboardPage() {
           [`& .MuiDrawer-paper`]: {
             width: 240,
             boxSizing: 'border-box',
-            background: '#002366',
-            color: '#fff',
+            background: theme.palette.background.paper,
+            color: theme.palette.text.primary,
             border: 'none',
             minHeight: '100vh',
             boxShadow: '2px 0 8px 0 rgba(0,0,0,0.04)',
@@ -516,8 +528,8 @@ function TeacherDashboardPage() {
         }}
       >
         <Box display="flex" alignItems="center" p={2} mb={1}>
-          <DashboardIcon sx={{ mr: 1, color: '#fff', fontSize: 32 }} />
-          <Typography variant="h6" sx={{ color: '#fff', fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
+          <DashboardIcon sx={{ mr: 1, color: theme.palette.text.primary, fontSize: 32 }} />
+          <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
         </Box>
         <List sx={{ mt: 2 }}>
           {sidebarLinks.map((link, idx) => (
@@ -526,18 +538,18 @@ function TeacherDashboardPage() {
               key={link.text}
               onClick={link.onClick}
               sx={{
-                color: link.logout ? '#ff5252' : '#fff',
-                background: link.tab && link.tab === currentTab ? '#001b4e' : 'none',
+                color: link.logout ? '#ff5252' : theme.palette.text.primary,
+                background: link.tab && link.tab === currentTab ? theme.palette.action.selected : 'none',
                 borderRadius: '30px 0 0 30px',
                 mb: 1,
                 fontWeight: link.tab && link.tab === currentTab ? 600 : 400,
                 pl: 2,
                 pr: 1,
-                '&:hover': { background: '#001b4e' },
+                '&:hover': { background: theme.palette.action.selected },
                 transition: 'all 0.4s',
               }}
             >
-              <ListItemIcon sx={{ color: '#fff', minWidth: 40 }}>{link.icon}</ListItemIcon>
+              <ListItemIcon sx={{ color: theme.palette.text.primary, minWidth: 40 }}>{link.icon}</ListItemIcon>
               <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500 } }} />
             </ListItem>
           ))}
@@ -545,7 +557,7 @@ function TeacherDashboardPage() {
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: '#f5f5f5', fontFamily: 'Poppins, sans-serif' }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Poppins, sans-serif' }}>
         {/* Top Bar */}
         <Box
           display="flex"
@@ -555,26 +567,44 @@ function TeacherDashboardPage() {
           p={2}
           borderRadius={2}
           sx={{
-            background: '#fff',
-            color: '#002366',
+            background: theme.palette.background.paper,
+            color: theme.palette.text.primary,
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             border: 'none',
             fontFamily: 'Poppins, sans-serif',
           }}
         >
-          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: '#002366', fontFamily: 'Poppins, sans-serif' }}>Teacher's Dashboard</Typography>
+          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Teacher's Dashboard</Typography>
+          <Box>
+            <ThemeToggleButton />
+          </Box>
         </Box>
 
         {currentTab === 'dashboard' && (
           <>
+            {/* Greeting Section */}
+            <Box display="flex" alignItems="center" gap={2} mb={3}>
+              {/* Simple icon based on time of day */}
+              <Box>
+                {(() => {
+                  const hour = new Date().getHours();
+                  if (hour < 12) return <span role="img" aria-label="sun" style={{fontSize: 40}}>🌞</span>;
+                  if (hour < 17) return <span role="img" aria-label="afternoon" style={{fontSize: 40}}>🌤️</span>;
+                  return <span role="img" aria-label="moon" style={{fontSize: 40}}>🌙</span>;
+                })()}
+              </Box>
+              <Typography variant="h5" fontWeight={700} color={theme.palette.text.primary}>
+                {getGreeting()}, {user?.firstName || user?.fullName || 'Teacher'}!
+              </Typography>
+            </Box>
             {/* Overview Boxes Row */}
             <Grid container spacing={3} mb={4}>
               <Grid item xs={12} sm={6} md={3}>
                 <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
-                  <PersonIcon sx={{ color: '#002366', fontSize: 32, mb: 1 }} />
-                  <Typography variant="subtitle1" fontWeight={600} color="#002366">Records</Typography>
-                  <Typography variant="h4" fontWeight={800} color="#002366">{statsLoading ? <CircularProgress size={24} /> : studentCount}</Typography>
-                  <Typography sx={{ opacity: 0.8, color: '#555', fontSize: 15 }}>Total number of students</Typography>
+                  <PersonIcon sx={{ color: theme.palette.text.primary, fontSize: 32, mb: 1 }} />
+                  <Typography variant="subtitle1" fontWeight={600} color={theme.palette.text.primary}>Records</Typography>
+                  <Typography variant="h4" fontWeight={800} color={theme.palette.text.primary}>{statsLoading ? <CircularProgress size={24} /> : studentCount}</Typography>
+                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of students</Typography>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
@@ -582,7 +612,7 @@ function TeacherDashboardPage() {
                   <BookIcon sx={{ color: '#1565c0', fontSize: 32, mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600} color="#1565c0">Exams</Typography>
                   <Typography variant="h4" fontWeight={800} color="#1565c0">{statsLoading ? <CircularProgress size={24} /> : examCount}</Typography>
-                  <Typography sx={{ opacity: 0.8, color: '#555', fontSize: 15 }}>Total number of exams</Typography>
+                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of exams</Typography>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
@@ -590,7 +620,7 @@ function TeacherDashboardPage() {
                   <LineAxisIcon sx={{ color: '#37474f', fontSize: 32, mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600} color="#37474f">Results</Typography>
                   <Typography variant="h4" fontWeight={800} color="#37474f">{statsLoading ? <CircularProgress size={24} /> : resultCount}</Typography>
-                  <Typography sx={{ opacity: 0.8, color: '#555', fontSize: 15 }}>Number of available results</Typography>
+                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Number of available results</Typography>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
@@ -598,7 +628,7 @@ function TeacherDashboardPage() {
                   <PaperPlaneIcon sx={{ color: '#7b1fa2', fontSize: 32, mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600} color="#7b1fa2">Announcements</Typography>
                   <Typography variant="h4" fontWeight={800} color="#7b1fa2">{statsLoading ? <CircularProgress size={24} /> : announcementCount}</Typography>
-                  <Typography sx={{ opacity: 0.8, color: '#555', fontSize: 15 }}>Total number of messages sent</Typography>
+                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of messages sent</Typography>
                 </Card>
               </Grid>
             </Grid>
@@ -645,11 +675,11 @@ function TeacherDashboardPage() {
 
             {/* Exams Section */}
             <Grid container spacing={3}>
-              <Grid item xs={12} md={8}>
-                <Card sx={{ p: 2, boxShadow: 2 }}>
+              <Grid item xs={12}>
+                <Card sx={{ p: 3, boxShadow: 3 }}>
                   <Typography variant="h5" fontWeight={700} mb={2}>Manage Quiz</Typography>
                   <TableContainer>
-                    <Table>
+                    <Table size="medium">
                       <TableHead>
                         <TableRow>
                           <TableCell>Exam no.</TableCell>
@@ -658,8 +688,8 @@ function TeacherDashboardPage() {
                           <TableCell>No. of questions</TableCell>
                           <TableCell>Exam time</TableCell>
                           <TableCell>End time</TableCell>
-                          <TableCell>EDIT</TableCell>
-                          <TableCell>DELETE</TableCell>
+                          <TableCell>Access Code</TableCell>
+                          <TableCell align="center">Actions</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -677,10 +707,34 @@ function TeacherDashboardPage() {
                               <TableCell>{row.extime ? format(new Date(row.extime), 'yyyy-MM-dd HH:mm') : (row.start_time ? format(new Date(row.start_time), 'yyyy-MM-dd HH:mm') : '-')}</TableCell>
                               <TableCell>{row.end_time ? format(new Date(row.end_time), 'yyyy-MM-dd HH:mm') : '-'}</TableCell>
                               <TableCell>
-                                <Button size="small" variant="outlined" color="primary" startIcon={<EditIcon />} onClick={() => handleEditExam(row.id, row.nq)}>Edit</Button>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                  <Typography fontFamily="monospace">{row.access_code || '—'}</Typography>
+                                  <Tooltip title="Copy Access Code">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        if (row.access_code) {
+                                          navigator.clipboard.writeText(row.access_code);
+                                          setCopySnackbarOpen(true);
+                                        }
+                                      }}
+                                      disabled={!row.access_code}
+                                    >
+                                      <ContentCopyIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
                               </TableCell>
-                              <TableCell>
-                                <Button size="small" variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteExam(row.id)}>Delete</Button>
+                              <TableCell align="center">
+                                <Button size="small" variant="outlined" color="primary" startIcon={<EditIcon />} onClick={() => handleEditExam(row.id, row.nq)} sx={{ mr: 1 }}>
+                                  Edit
+                                </Button>
+                                <Button size="small" variant="outlined" color="info" startIcon={<VisibilityIcon />} onClick={() => router.push(`/preview-quiz/${row.id}`)} sx={{ mr: 1 }}>
+                                  Preview
+                                </Button>
+                                <Button size="small" variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteExam(row.id)}>
+                                  Delete
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))
@@ -694,25 +748,23 @@ function TeacherDashboardPage() {
                   </TableContainer>
                   {dashboardPageCount > 1 && (
                     <Box display="flex" justifyContent="center" mt={2}>
-                      <Pagination
-                        count={dashboardPageCount}
-                        page={dashboardExamPage}
-                        onChange={(_, value) => setDashboardExamPage(value)}
-                        color="primary"
-                        shape="rounded"
+                      <TablePagination
+                        component="div"
+                        count={exams.length}
+                        page={dashboardExamPage - 1}
+                        onPageChange={(event, newPage) => setDashboardExamPage(newPage + 1)}
+                        rowsPerPage={dashboardExamsPerPage}
+                        onRowsPerPageChange={e => {
+                          setDashboardExamsPerPage(parseInt(e.target.value, 10));
+                          setDashboardExamPage(1);
+                        }}
+                        rowsPerPageOptions={[5, 10, 25]}
+                        labelRowsPerPage={''}
+                        showFirstButton
+                        showLastButton
                       />
                     </Box>
                   )}
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Card sx={{ p: 4, boxShadow: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
-                  <EditIcon sx={{ fontSize: 48, color: '#1565c0', mb: 2 }} />
-                  <Typography variant="h6" fontWeight={700} mb={1} align="center">Exam Actions</Typography>
-                  <Typography variant="body2" color="text.secondary" align="center">
-                    Select an exam to edit questions, or use the menu to add new content.<br/>
-                    You can also manage exams using the table on the left.
-                  </Typography>
                 </Card>
               </Grid>
             </Grid>
@@ -721,7 +773,7 @@ function TeacherDashboardPage() {
         {currentTab === 'exams' && (
           <Box>
             <Typography variant="h5" fontWeight={700} mb={2}>Exams Section</Typography>
-            <ExamsSection />
+            <ExamsSection handleDeleteExam={handleDeleteExam} />
           </Box>
         )}
         {currentTab === 'results' && (
@@ -755,37 +807,30 @@ function TeacherDashboardPage() {
 
       {/* Custom Delete Quiz Confirmation Dialog */}
       <Dialog open={deleteQuizDialogOpen} onClose={handleDeleteQuizCancel}>
-        <DialogTitle sx={{ color: 'error.main', fontWeight: 600 }}>
-          Delete Quiz
-        </DialogTitle>
+        <DialogTitle>Delete Quiz?</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Are you sure you want to delete this quiz? This action cannot be undone.
+          <Typography sx={{ mb: 2 }}>
+            Are you sure you want to delete this quiz?
+            {quizToDeleteId && (
+              <><br /><b>Quiz:</b> {exams.find(q => q.id === quizToDeleteId)?.quiz_title || 'Untitled'}</>
+            )}
           </Typography>
           <Alert severity="warning" sx={{ mb: 2 }}>
             <Typography variant="body2">
-              <strong>Warning:</strong> Deleting this quiz will also remove all associated questions and student attempts.
+              <strong>Warning:</strong> Deleting this quiz will also remove <b>all associated questions</b> and <b>all student attempts/results</b> for this quiz. This action <b>cannot be undone</b>.
             </Typography>
           </Alert>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteQuizCancel} disabled={isDeleting}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleDeleteQuizConfirm} 
-            color="error" 
-            variant="contained"
-            disabled={isDeleting}
-            startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete Quiz'}
+          <Button onClick={handleDeleteQuizCancel} disabled={isDeleting}>Cancel</Button>
+          <Button onClick={handleDeleteQuizConfirm} color="error" variant="contained" disabled={isDeleting} startIcon={isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}>
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>
       {/* Logout Confirmation Dialog */}
       <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
-        <DialogTitle sx={{ color: '#002366', fontWeight: 700 }}>
+        <DialogTitle sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>
           Confirm Logout
         </DialogTitle>
         <DialogContent>
@@ -812,6 +857,41 @@ function TeacherDashboardPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      {/* Floating Settings Button */}
+      <IconButton
+        color="primary"
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 1300,
+          bgcolor: theme.palette.background.paper,
+          boxShadow: 3,
+          '&:hover': { bgcolor: theme.palette.primary.light },
+        }}
+        onClick={settings.onOpenDrawer}
+        aria-label="Open settings"
+      >
+        <Iconify icon="solar:settings-bold" width={28} />
+      </IconButton>
+      <SettingsDrawer />
+      <Snackbar
+        open={copySnackbarOpen}
+        autoHideDuration={2000}
+        onClose={() => setCopySnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          icon={<CheckCircleIcon fontSize="inherit" sx={{ color: '#2e7d32' }} />}
+          severity="success"
+          sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', borderRadius: 2, fontWeight: 600, boxShadow: 3 }}
+          elevation={6}
+          variant="filled"
+          onClose={() => setCopySnackbarOpen(false)}
+        >
+          Access code copied to clipboard!
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
@@ -820,6 +900,7 @@ function AnnouncementForm({ fname }: { fname: string }) {
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const theme = useTheme();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -857,7 +938,7 @@ function AnnouncementForm({ fname }: { fname: string }) {
         onChange={e => setFeedback(e.target.value)}
         inputProps={{ minLength: 4, maxLength: 100 }}
         placeholder="Message"
-        sx={{ mb: 3, background: '#fff', borderRadius: 2 }}
+        sx={{ mb: 3, background: theme.palette.background.paper, borderRadius: 2 }}
       />
       <Button
         type="submit"
@@ -887,6 +968,7 @@ function ExamResultsTable() {
   const [selectedQuiz, setSelectedQuiz] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(null);
+  const theme = useTheme();
 
   useEffect(() => {
     if (!user?.id) return;
@@ -989,7 +1071,7 @@ function ExamResultsTable() {
                   <TableCell>Score</TableCell>
                   <TableCell>Started At</TableCell>
                   <TableCell>End time</TableCell>
-                  <TableCell>Duration (min)</TableCell>
+                  <TableCell>Duration</TableCell>
                   <TableCell>Marked for Review</TableCell>
                 </TableRow>
               </TableHead>
@@ -997,7 +1079,12 @@ function ExamResultsTable() {
                 {paginatedResults.map((row, i) => {
                   const startedAt = row.start_time ? new Date(row.start_time) : null;
                   const submittedAt = row.submitted_at ? new Date(row.submitted_at) : null;
-                  const duration = startedAt && submittedAt ? Math.round((submittedAt.getTime() - startedAt.getTime()) / 60000) : '-';
+                  let duration = '-';
+                  if (startedAt && submittedAt && !isNaN(startedAt.getTime()) && !isNaN(submittedAt.getTime())) {
+                    let diffMin = Math.floor((submittedAt.getTime() - startedAt.getTime()) / 60000);
+                    if (diffMin < 0) diffMin = 0;
+                    duration = `${diffMin} min`;
+                  }
                   return (
                     <TableRow key={row.id}>
                       <TableCell>{row.quizzes?.quiz_title || 'Untitled Quiz'}</TableCell>
@@ -1046,6 +1133,7 @@ function RecordsSection() {
   const [form, setForm] = useState({ fname: '', uname: '', dob: '', gender: '', email: '', pword: '', cpword: '' });
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const theme = useTheme();
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -1151,6 +1239,7 @@ function TeacherSettings({ user }: { user: any }) {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const theme = useTheme();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -1189,7 +1278,7 @@ function TeacherSettings({ user }: { user: any }) {
   );
 }
 
-function ExamsSection() {
+function ExamsSection({ handleDeleteExam }: { handleDeleteExam: (quizId: number) => void }) {
   const { user } = useUser();
   const router = useRouter();
   const [exams, setExams] = useState<any[]>([]);
@@ -1197,6 +1286,7 @@ function ExamsSection() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
+  const theme = useTheme();
 
   const fetchExams = async () => {
     if (!user?.id) return;
@@ -1206,7 +1296,26 @@ function ExamsSection() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) setError(data.error || 'Error');
-    else setExams(data.exams || []);
+    else {
+      const exams = data.exams || [];
+      if (exams.length === 0) return setExams([]);
+      // Fetch all questions for these quiz IDs
+      const quizIds = exams.map((q: any) => q.id);
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('id, quiz_id');
+      const questionCounts: Record<number, number> = {};
+      (questions || []).forEach((q: { quiz_id: number }) => {
+        if (quizIds.includes(q.quiz_id)) {
+          questionCounts[q.quiz_id] = (questionCounts[q.quiz_id] || 0) + 1;
+        }
+      });
+      const examsWithCounts = exams.map((q: any) => ({
+        ...q,
+        questions_count: questionCounts[q.id] || 0,
+      }));
+      setExams(examsWithCounts);
+    }
   };
 
   useEffect(() => { fetchExams(); }, [user?.id]);
@@ -1253,20 +1362,20 @@ function ExamsSection() {
             </TableHead>
             <TableBody>
               {paginatedExams.map((exam, i) => (
-                <TableRow key={exam.exid}>
+                <TableRow key={exam.id || i}>
                   <TableCell>{(page - 1) * rowsPerPage + i + 1}</TableCell>
-                  <TableCell>{exam.exname}</TableCell>
-                  <TableCell>{exam.desp}</TableCell>
+                  <TableCell>{exam.quiz_title || '-'}</TableCell>
+                  <TableCell>{exam.description || '-'}</TableCell>
                   <TableCell>{exam.questions_count ?? '-'}</TableCell>
-                  <TableCell>{exam.extime}</TableCell>
+                  <TableCell>{exam.duration ? `${exam.duration} min` : '-'}</TableCell>
                   <TableCell>{exam.end_time ? format(new Date(exam.end_time), 'yyyy-MM-dd HH:mm') : '-'}</TableCell>
                   <TableCell>
-                    <IconButton color="primary">
+                    <IconButton color="primary" onClick={() => router.push(`/edit-quiz/${exam.id}`)}>
                       <EditIcon />
                     </IconButton>
                   </TableCell>
                   <TableCell>
-                    <IconButton color="error">
+                    <IconButton color="error" onClick={() => handleDeleteExam(exam.id)}>
                       <DeleteIcon />
                     </IconButton>
                   </TableCell>
@@ -1306,6 +1415,7 @@ function CreateAnnouncementForm({ user, onClose }: { user: any, onClose: () => v
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const theme = useTheme();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1481,6 +1591,7 @@ function AnnouncementsSection({ user }: { user: any }) {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const theme = useTheme();
 
   const fetchAnnouncements = async () => {
     setLoading(true);
@@ -1534,9 +1645,9 @@ function AnnouncementsSection({ user }: { user: any }) {
   };
 
   return (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: '#fff', maxWidth: 1200, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 1200, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" sx={{ color: '#002366', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+        <Typography variant="h5" sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
           Announcements
         </Typography>
         <Button
@@ -1560,12 +1671,12 @@ function AnnouncementsSection({ user }: { user: any }) {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Priority</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Title</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Content</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Target</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Created</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Priority</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Title</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Content</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Target</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Created</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1592,7 +1703,7 @@ function AnnouncementsSection({ user }: { user: any }) {
                       }} 
                     />
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: '#002366' }}>{announcement.title}</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: theme.palette.text.primary }}>{announcement.title}</TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
                       {announcement.content}

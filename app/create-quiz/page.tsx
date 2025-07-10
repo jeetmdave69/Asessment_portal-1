@@ -133,6 +133,7 @@ export default function CreateQuizPage() {
   const [mounted, setMounted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [accessCode, setAccessCode] = useState<string | null>(null);
+  const [createdQuizId, setCreatedQuizId] = useState<number | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; msg: string; type: 'success' | 'error' }>({
     open: false,
@@ -473,6 +474,7 @@ export default function CreateQuizPage() {
       reset();
       if (!isDraft) {
         setAccessCode(quiz.access_code);
+        setCreatedQuizId(quiz.id);
         setOpenDialog(true);
       }
       showToast(`Quiz ${isDraft ? 'saved as draft' : 'published'}!`, 'success');
@@ -558,7 +560,20 @@ export default function CreateQuizPage() {
           <AccordionDetails>
             {isExpanded ? (
             <Stack spacing={2}>
-              <TextField label="Question" {...register(`questions.${i}.question`)} fullWidth required error={!!errors.questions?.[i]?.question} helperText={errors.questions?.[i]?.question?.message} />
+              <Controller
+                name={`questions.${i}.question`}
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    label="Question"
+                    {...field}
+                    fullWidth
+                    required
+                    error={!!errors.questions?.[i]?.question}
+                    helperText={errors.questions?.[i]?.question?.message}
+                  />
+                )}
+              />
               
               {/* Question image upload */}
               <Box display="flex" alignItems="center" gap={2}>
@@ -602,43 +617,102 @@ export default function CreateQuizPage() {
               </Box>
               
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <Select label="Type" value={questionType as 'single' | 'multiple'} onChange={e => setValue(`questions.${i}.questionType`, e.target.value as 'single' | 'multiple')} fullWidth>
-                  <MenuItem value="single">Single Correct</MenuItem>
-                  <MenuItem value="multiple">Multiple Correct</MenuItem>
-                </Select>
-                <TextField label="Marks" type="number" {...register(`questions.${i}.marks`)} fullWidth required error={!!errors.questions?.[i]?.marks} helperText={errors.questions?.[i]?.marks?.message} />
+                <Controller
+                  name={`questions.${i}.questionType`}
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      label="Type"
+                      value={field.value as 'single' | 'multiple'}
+                      onChange={e => field.onChange(e.target.value as 'single' | 'multiple')}
+                      fullWidth
+                    >
+                      <MenuItem value="single">Single Correct</MenuItem>
+                      <MenuItem value="multiple">Multiple Correct</MenuItem>
+                    </Select>
+                  )}
+                />
+                <Controller
+                  name={`questions.${i}.marks`}
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      label="Marks"
+                      type="number"
+                      value={field.value}
+                      onChange={e => field.onChange(e.target.value)}
+                      fullWidth
+                      required
+                      error={!!errors.questions?.[i]?.marks}
+                      helperText={errors.questions?.[i]?.marks?.message}
+                    />
+                  )}
+                />
               </Stack>
               
-              <TextField label="Explanation" {...register(`questions.${i}.explanation`)} fullWidth multiline minRows={2} error={!!errors.questions?.[i]?.explanation} helperText={errors.questions?.[i]?.explanation?.message} />
+              <Controller
+                name={`questions.${i}.explanation`}
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    label="Explanation"
+                    {...field}
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    error={!!errors.questions?.[i]?.explanation}
+                    helperText={errors.questions?.[i]?.explanation?.message}
+                  />
+                )}
+              />
               
               {/* Enhanced Section Selection */}
-              <FormControl fullWidth sx={{ mt: 2 }}>
-                <InputLabel>Question Section *</InputLabel>
-                <Select
-                    value={sectionId || sections[0]}
-                  label="Question Section *"
-                    onChange={(e) => {
-                      if (e.target.value === "__add_new__") {
-                        setAddSectionDialog({ open: true, qIndex: i });
-                      } else {
-                        setValue(`questions.${i}.section`, e.target.value);
-                      }
-                    }}
-                    required
-                  >
-                    {sections.map((section) => (
-                      <MenuItem key={section} value={section}>{section}</MenuItem>
-                    ))}
-                    <MenuItem value="__add_new__" sx={{ fontStyle: 'italic', color: 'primary.main' }}>+ Add new section</MenuItem>
-                </Select>
-              </FormControl>
+              <Controller
+                name={`questions.${i}.section`}
+                control={control}
+                render={({ field }) => (
+                  <FormControl fullWidth sx={{ mt: 2 }}>
+                    <InputLabel>Question Section *</InputLabel>
+                    <Select
+                        value={field.value || sections[0]}
+                      label="Question Section *"
+                        onChange={(e) => {
+                          if (e.target.value === "__add_new__") {
+                            setAddSectionDialog({ open: true, qIndex: i });
+                          } else {
+                            field.onChange(e.target.value);
+                          }
+                        }}
+                        required
+                      >
+                        {sections.map((section) => (
+                          <MenuItem key={section} value={section}>{section}</MenuItem>
+                        ))}
+                        <MenuItem value="__add_new__" sx={{ fontStyle: 'italic', color: 'primary.main' }}>+ Add new section</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+              />
               
               <Typography variant="subtitle2" sx={{ mt: 1 }}>Options</Typography>
               <Stack spacing={1}>
                 {opts.map((opt, j) => (
                   <Stack key={j} direction="row" spacing={2} alignItems="center" sx={{ border: opt.isCorrect ? '2px solid #1976d2' : '1px solid #eee', borderRadius: 2, p: 1, background: 'background.paper' }}>
                     <Chip label={String.fromCharCode(65 + j)} color="default" />
-                    <TextField label={`Option ${j + 1}`} {...register(`questions.${i}.options.${j}.text`)} fullWidth required error={!!errors.questions?.[i]?.options?.[j]?.text} helperText={errors.questions?.[i]?.options?.[j]?.text?.message} />
+                    <Controller
+                      name={`questions.${i}.options.${j}.text`}
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          label={`Option ${j + 1}`}
+                          {...field}
+                          fullWidth
+                          required
+                          error={!!errors.questions?.[i]?.options?.[j]?.text}
+                          helperText={errors.questions?.[i]?.options?.[j]?.text?.message}
+                        />
+                      )}
+                    />
                     {/* Image upload for option */}
                     <Box>
                       {opt.image && (
@@ -836,17 +910,52 @@ Cricket,Who is known as the "God of Cricket"?,Virat Kohli,Sachin Tendulkar,MS Dh
                       )}
                     />
                     {errors.quizTitle && <Typography color="error" variant="caption">{errors.quizTitle.message}</Typography>}
-                    <TextField label="Description" {...register("description")}
-                      fullWidth multiline minRows={2}
-                      helperText="Describe the quiz for students (optional)."
-                      error={!!errors.description} />
+                    <Controller
+                      name="description"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          label="Description"
+                          {...field}
+                          fullWidth
+                          multiline
+                          minRows={2}
+                          helperText="Describe the quiz for students (optional)."
+                          error={!!errors.description}
+                        />
+                      )}
+                    />
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                      <TextField label="Total Marks" type="number" {...register("totalMarks")}
-                        fullWidth helperText="Sum of all question marks. This will be automatically calculated and added."
-                        error={!!errors.totalMarks} />
-                      <TextField label="Duration (mins)" type="number" {...register("duration")}
-                        fullWidth helperText="How long students have to complete the quiz."
-                        error={!!errors.duration} />
+                      <Controller
+                        name="totalMarks"
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            label="Total Marks"
+                            type="number"
+                            value={field.value}
+                            onChange={e => field.onChange(e.target.value)}
+                            fullWidth
+                            helperText="Sum of all question marks. This will be automatically calculated and added."
+                            error={!!errors.totalMarks}
+                          />
+                        )}
+                      />
+                      <Controller
+                        name="duration"
+                        control={control}
+                        render={({ field }) => (
+                          <TextField
+                            label="Duration (mins)"
+                            type="number"
+                            value={field.value}
+                            onChange={e => field.onChange(e.target.value)}
+                            fullWidth
+                            helperText="How long students have to complete the quiz."
+                            error={!!errors.duration}
+                          />
+                        )}
+                      />
                     </Stack>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                       <ModernDateTimePicker label="Start Date & Time"
@@ -856,9 +965,21 @@ Cricket,Who is known as the "God of Cricket"?,Virat Kohli,Sachin Tendulkar,MS Dh
                         value={watch("expiryDateTime") instanceof Date ? watch("expiryDateTime") : new Date()}
                         onChange={date => setValue("expiryDateTime", date ?? new Date())} />
                     </Stack>
-                    <TextField label="Max Attempts" type="number" {...register("maxAttempts")}
-                      fullWidth helperText="How many times a student can attempt this quiz."
-                      error={!!errors.maxAttempts} />
+                    <Controller
+                      name="maxAttempts"
+                      control={control}
+                      render={({ field }) => (
+                        <TextField
+                          label="Max Attempts"
+                          type="number"
+                          value={field.value}
+                          onChange={e => field.onChange(e.target.value)}
+                          fullWidth
+                          helperText="How many times a student can attempt this quiz."
+                          error={!!errors.maxAttempts}
+                        />
+                      )}
+                    />
                     <Stack direction="row" spacing={2}>
                       <FormControlLabel control={<Checkbox {...register("previewMode")} />} label="Enable Preview Mode" />
                       <FormControlLabel control={<Checkbox {...register("shuffleQuestions")} />} label="Shuffle Questions" />
@@ -974,8 +1095,8 @@ Cricket,Who is known as the "God of Cricket"?,Virat Kohli,Sachin Tendulkar,MS Dh
             <Button onClick={() => router.push('/dashboard')} variant="outlined" color="primary">
               ← Back to Dashboard
             </Button>
-            {accessCode && (
-              <Button onClick={() => router.push(`/edit-quiz/${accessCode}`)} variant="contained" color="primary">
+            {createdQuizId && (
+              <Button onClick={() => router.push(`/edit-quiz/${createdQuizId}`)} variant="contained" color="primary">
                 Edit This Quiz
               </Button>
             )}

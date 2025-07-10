@@ -116,7 +116,7 @@ export const defaultQuizValues: QuizFormValues = {
     {
       question: "",
       questionType: "single",
-      section: "Section 1",
+      section: "",
       image: null,
       explanation: "",
       marks: "1",

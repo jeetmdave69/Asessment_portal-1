@@ -55,6 +55,11 @@ import {
   Replay as ReplayIcon,
 } from '@mui/icons-material';
 import SummaryCards from '../../../components/dashboard/SummaryCards';
+import { useSettingsContext } from '@/context/settings-context';
+import IconButton from '@mui/material/IconButton';
+import Iconify from '@/components/iconify/Iconify';
+import { useTheme } from '@mui/material/styles';
+import dayjs from 'dayjs';
 
 const formatDateTime = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -86,9 +91,11 @@ const boxStyles = [
 ];
 
 export default function StudentDashboardPage() {
+  const settings = useSettingsContext();
   const { user } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
+  const theme = useTheme();
 
   const [selectedSection, setSelectedSection] = useState('dashboard');
   const [allQuizzes, setAllQuizzes] = useState<any[]>([]);
@@ -128,6 +135,9 @@ export default function StudentDashboardPage() {
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
   const [quizProgress, setQuizProgress] = useState<Record<number, boolean>>({});
+
+  // Add a new state for code error Snackbar
+  const [showCodeErrorSnackbar, setShowCodeErrorSnackbar] = useState(false);
 
   const now = new Date();
   const classify = (q: any): 'live' | 'upcoming' | 'completed' | 'expired' => {
@@ -345,6 +355,7 @@ export default function StudentDashboardPage() {
     setCodeError('');
     if (!accessCode.trim()) {
       setCodeError('Enter a code.');
+      setShowCodeErrorSnackbar(true);
       return;
     }
     setCodeLoading(true);
@@ -352,12 +363,17 @@ export default function StudentDashboardPage() {
       const { data } = await supabase.from('quizzes').select('*').eq('access_code', accessCode).single();
       if (!data) {
         setCodeError('Invalid code.');
+        setShowCodeErrorSnackbar(true);
         return;
       }
       const now = new Date();
-      if (now < new Date(data.start_time)) setCodeError('Quiz not started.');
-      else if (now > new Date(data.end_time)) setCodeError('Quiz ended.');
-      else router.push(`/attempt-quiz/${data.id}`);
+      if (now < new Date(data.start_time)) {
+        setCodeError('Quiz not started.');
+        setShowCodeErrorSnackbar(true);
+      } else if (now > new Date(data.end_time)) {
+        setCodeError('Quiz ended.');
+        setShowCodeErrorSnackbar(true);
+      } else router.push(`/attempt-quiz/${data.id}`);
     } finally {
       setCodeLoading(false);
     }
@@ -502,12 +518,12 @@ export default function StudentDashboardPage() {
   ];
 
   const helpContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: '#fff', maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: '#002366', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
         About & Help
       </Typography>
       <Box mt={3}>
-        <Typography variant="h6" sx={{ color: '#002366', fontWeight: 600, mb: 2 }}>How to use</Typography>
+        <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontWeight: 600, mb: 2 }}>How to use</Typography>
         <Box component="ol" sx={{ pl: 3 }}>
           <li><Typography variant="subtitle1" fontWeight={600}>How to logout?</Typography>
             <Typography variant="body2">Click on the logout button at the left bottom on the navigation bar.</Typography></li>
@@ -525,8 +541,8 @@ export default function StudentDashboardPage() {
   )
 
   const settingsContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: '#fff', maxWidth: 500, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: '#002366', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 500, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
         My Profile
       </Typography>
       <Box display="flex" flexDirection="column" alignItems="center" mb={2}>
@@ -626,19 +642,19 @@ export default function StudentDashboardPage() {
   );
 
   const messagesContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: '#fff', maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: '#002366', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
         Announcements
       </Typography>
       <TableContainer component={Paper} sx={{ boxShadow: 'none', background: 'transparent', mt: 3 }}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#002366', width: '15%' }}>Priority</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366', width: '25%' }}>Title</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366', width: '40%' }}>Content</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366', width: '10%' }}>From</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366', width: '10%' }}>Date</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '15%' }}>Priority</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '25%' }}>Title</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '40%' }}>Content</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '10%' }}>From</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '10%' }}>Date</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -670,7 +686,7 @@ export default function StudentDashboardPage() {
                         }} 
                       />
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: '#002366' }}>{row.title}</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: theme.palette.text.primary }}>{row.title}</TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
                         {row.content}
@@ -690,7 +706,7 @@ export default function StudentDashboardPage() {
                       )}
                     </TableCell>
                     <TableCell>{row.sender_name}</TableCell>
-                    <TableCell>{row.created_at ? new Date(row.created_at).toLocaleDateString() : ''}</TableCell>
+                    <TableCell>{row.created_at ? dayjs(row.created_at).format('YYYY-MM-DD') : ''}</TableCell>
                   </TableRow>
                 );
               })
@@ -706,29 +722,30 @@ export default function StudentDashboardPage() {
   );
 
   const resultsContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: '#fff', maxWidth: 1200, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: '#002366', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 1200, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
         My Results
       </Typography>
       <TableContainer component={Paper} sx={{ boxShadow: 'none', background: 'transparent', mt: 3 }}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Student Name</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Exam Name</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Total Questions</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Correct Answers</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Marks Obtained</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Total Marks</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Percentage</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Time Taken</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#002366' }}>Completed On</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Student Name</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Exam Name</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Total Questions</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Correct Answers</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Marks Obtained</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Total Marks</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Percentage</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Time Taken</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Completed On</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Review</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {resultsLoading ? (
               <TableRow>
-                <TableCell colSpan={9} align="center">
+                <TableCell colSpan={10} align="center">
                   <CircularProgress size={28} />
                 </TableCell>
               </TableRow>
@@ -772,13 +789,24 @@ export default function StudentDashboardPage() {
                     <TableCell>{totalMarks}</TableCell>
                     <TableCell>{percentage}%</TableCell>
                     <TableCell>{timeTaken} min</TableCell>
-                    <TableCell>{row.submitted_at ? new Date(row.submitted_at).toLocaleString() : '-'}</TableCell>
+                    <TableCell>{row.submitted_at ? dayjs(row.submitted_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        size="small"
+                        onClick={() => router.push(`/result/${row.id}`)}
+                        sx={{ borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif' }}
+                      >
+                        Review
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={9} align="center">No results found.</TableCell>
+                <TableCell colSpan={10} align="center">No results found.</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -903,8 +931,8 @@ export default function StudentDashboardPage() {
             </Grid>
 
             {/* General Instructions */}
-            <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: '#fff', maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-              <Typography variant="h6" align="center" gutterBottom sx={{ color: '#002366', fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+            <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+              <Typography variant="h6" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
                 :: General Instructions ::
               </Typography>
               <ul style={{ paddingLeft: 24 }}>
@@ -936,79 +964,17 @@ export default function StudentDashboardPage() {
                 </Button>
               </Stack>
             </Box>
-            {/* Exam Section (Quizzes List) */}
-            {loading ? (
-              <Box py={6} display="flex" justifyContent="center">
-                <CircularProgress />
-              </Box>
-            ) : (
-              <>
-                <Box mb={6}>
-                  {liveQuizzes.length > 0 && (
-                    <>
-                      <Typography variant="h6" mb={2} sx={{ color: '#002366', fontWeight: 700 }}>Live</Typography>
-                      <Grid container spacing={3}>
-                        {liveQuizzes.map((q) => (
-                          <QuizCard
-                            key={q.id}
-                            quiz={q}
-                            status="live"
-                            attempts={userAttempts[q.id] || 0}
-                            hasProgress={quizProgress[q.id]}
-                            onStart={() => router.push(`/attempt-quiz/${q.id}`)}
-                          />
-                        ))}
-                      </Grid>
-                    </>
-                  )}
-
-                  {upcomingQuizzes.length > 0 && (
-                    <>
-                      <Typography variant="h6" mb={2} sx={{ color: '#002366', fontWeight: 700 }}>Upcoming</Typography>
-                      <Grid container spacing={3}>
-                        {upcomingQuizzes.map((q) => (
-                          <QuizCard
-                            key={q.id}
-                            quiz={q}
-                            status="upcoming"
-                            attempts={0}
-                            onStart={() => {}}
-                          />
-                        ))}
-                      </Grid>
-                    </>
-                  )}
-
-                  {completedQuizzes.length > 0 && (
-                    <>
-                      <Typography variant="h6" mb={2} sx={{ color: '#002366', fontWeight: 700 }}>Completed / Expired</Typography>
-                      <Grid container spacing={3}>
-                        {currentCompleted.map((q) => (
-                          <QuizCard
-                            key={q.id}
-                            quiz={q}
-                            status={classify(q)}
-                            attempts={userAttempts[q.id] || 0}
-                            onStart={() => {}}
-                          />
-                        ))}
-                      </Grid>
-                      {completedQuizzes.length > COMPLETED_PAGE_SIZE && (
-                        <Box mt={3} display="flex" justifyContent="center">
-                          <Pagination
-                            shape="rounded"
-                            color="primary"
-                            count={Math.ceil(completedQuizzes.length / COMPLETED_PAGE_SIZE)}
-                            page={completedPage}
-                            onChange={(_, p) => setCompletedPage(p)}
-                          />
-                        </Box>
-                      )}
-                    </>
-                  )}
-                </Box>
-              </>
-            )}
+            <Snackbar
+              open={showCodeErrorSnackbar}
+              autoHideDuration={3500}
+              onClose={() => setShowCodeErrorSnackbar(false)}
+              anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+              <Alert severity="error" onClose={() => setShowCodeErrorSnackbar(false)} sx={{ width: '100%' }}>
+                {codeError || 'Invalid code.'}
+              </Alert>
+            </Snackbar>
+            {/* All other exam/quiz lists and actions are removed/commented out */}
           </>
         )}
 
@@ -1024,6 +990,24 @@ export default function StudentDashboardPage() {
         {/* Results Section */}
         {selectedSection === 'results' && resultsContent}
       </Box>
+
+      {/* Floating Settings Button */}
+      <IconButton
+        color="primary"
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 1300,
+          bgcolor: 'background.paper',
+          boxShadow: 3,
+          '&:hover': { bgcolor: 'primary.light' },
+        }}
+        onClick={settings.onOpenDrawer}
+        aria-label="Open settings"
+      >
+        <Iconify icon="solar:settings-bold" width={28} />
+      </IconButton>
 
       {/* Logout Confirmation Dialog */}
       <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
@@ -1256,7 +1240,7 @@ export function ExamsPage() {
                       <TableCell>{exam.subject || '-'}</TableCell>
                       <TableCell>{exam.nq || '-'}</TableCell>
                       <TableCell>{exam.duration} min</TableCell>
-                      <TableCell>{exam.end_time ? new Date(exam.end_time).toLocaleString() : '-'}</TableCell>
+                      <TableCell>{exam.end_time ? dayjs(exam.end_time).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
                       <TableCell>
                         <Button
                           variant="contained"

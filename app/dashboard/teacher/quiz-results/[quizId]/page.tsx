@@ -217,7 +217,7 @@ export default function QuizResultsPage() {
                                 );
                                 return (
                                   <TableRow key={qid}>
-                                    <TableCell>{qInfo.quizOrder}</TableCell>
+                                    <TableCell>{`Q${qInfo.quizOrder}`}</TableCell>
                                     <TableCell>{qInfo.text}</TableCell>
                                   </TableRow>
                                 );
