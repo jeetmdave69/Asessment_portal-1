@@ -22,6 +22,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   Avatar,
+  Grid,
 } from '@mui/material';
 import { supabase } from '@/utils/supabaseClient';
 import { motion } from 'framer-motion';
@@ -32,6 +33,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useTheme } from '@mui/material/styles';
 
 const PASS_THRESHOLD = 60;
 
@@ -42,6 +44,7 @@ type SectionScoresMap = { [section: SectionKey]: { correct: number; total: numbe
 export default function ResultPage() {
   const params = useParams();
   const router = useRouter();
+  const theme = useTheme();
 
   const attemptId = Number(Array.isArray(params?.attemptId) ? params.attemptId[0] : params?.attemptId);
   const [attempt, setAttempt] = useState<any>(null);
@@ -272,8 +275,8 @@ export default function ResultPage() {
       let correctIndices: number[] = [];
       if (q.options && q.options.length > 0) {
         correctIndices = q.options
-          .map((opt: any, idx: number) => (opt.isCorrect ? idx : null))
-          .filter((idx: number | null) => idx !== null);
+        .map((opt: any, idx: number) => (opt.isCorrect ? idx : null))
+        .filter((idx: number | null) => idx !== null);
       } else if (q.correct_answers && Array.isArray(q.correct_answers)) {
         // Fallback: if correct_answers is present as array of indices
         correctIndices = q.correct_answers;
@@ -359,7 +362,7 @@ export default function ResultPage() {
               maxWidth: 500,
               width: '100%',
               background: '#fff',
-              border: '1px solid #e0e0e0',
+              border: theme.palette.mode === 'dark' ? `2.5px solid ${theme.palette.primary.main}` : '1px solid #e0e0e0',
               boxShadow: '0 2px 8px 0 rgba(0,0,0,0.03)',
               display: 'flex',
               flexDirection: 'column',
@@ -367,7 +370,7 @@ export default function ResultPage() {
               fontFamily: 'Poppins, sans-serif',
             }}>
               <Typography variant="h4" fontWeight={800} color={isPassed ? 'success.main' : 'error.main'} mb={1} align="center">
-                {isPassed ? 'Congratulations!' : 'Better Luck Next Time'}
+                    {isPassed ? 'Congratulations!' : 'Better Luck Next Time'}
               </Typography>
               <Typography variant="subtitle1" color="text.secondary" fontWeight={500} align="center">
                 {isPassed
@@ -423,8 +426,8 @@ export default function ResultPage() {
                       : 'None'
                   }
                 </Typography>
-              </Stack>
-            </Paper>
+            </Stack>
+          </Paper>
           </Box>
 
           {/* Add Review Mistakes Button next to view mode toggle */}
@@ -471,68 +474,261 @@ export default function ResultPage() {
               ) : (
                 <Stack spacing={4}>
                   {/* Improved Section Performance Summary */}
+                  {/* Replace the old section performance summary card with the new professional version */}
                   <Box mb={4} display="flex" justifyContent="center">
-                    <Paper elevation={2} sx={{
-                      p: { xs: 2, sm: 3 },
-                      borderRadius: 3,
-                      minWidth: 320,
-                      maxWidth: 700,
+              <Paper elevation={0} sx={{
+                      p: { xs: 3, sm: 4 },
+                borderRadius: 3,
                       width: '100%',
-                      background: '#f8fafc',
-                      boxShadow: 2,
-                      fontFamily: 'Poppins, sans-serif',
+                      maxWidth: 900,
+                      background: '#ffffff',
+                      border: '1px solid #e8eaed',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                     }}>
-                      <Typography variant="h6" fontWeight={700} color="primary.main" mb={2} align="center">
-                        Section Performance Summary
-                      </Typography>
-                      <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" flexWrap="wrap" mb={1}>
-                        <Typography variant="subtitle2" fontWeight={600} color="success.main">
-                          <EmojiEventsIcon sx={{ fontSize: 20, verticalAlign: 'middle', mr: 0.5 }} />
-                          Best Section{bestSections.length > 1 ? 's' : ''}:
+                      <Typography variant="h5" fontWeight={600} color="#1a1a1a" mb={4} 
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                          '&:before, &:after': {
+                            content: '""',
+                            flex: 1,
+                            borderBottom: '1px solid #e8eaed',
+                            mr: 3,
+                            ml: 3,
+                          }
+                        }}
+                      >
+                        <BarChartIcon sx={{ mr: 1.5, color: '#1976d2', fontSize: '1.5rem' }} />
+                        Performance Analysis
+                </Typography>
+
+                      <Grid container spacing={3}>
+                        {/* Best Section */}
+                        <Grid item xs={12} md={4}>
+                          <Paper elevation={0} sx={{
+                            p: 3,
+                            height: '100%',
+                            borderLeft: '4px solid #2e7d32',
+                            background: '#f8fdf8',
+                            borderRadius: 3,
+                            border: '1px solid #e8f5e9',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              boxShadow: '0 2px 8px rgba(46, 125, 50, 0.1)',
+                            }
+                          }}>
+                            <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
+                              <EmojiEventsIcon sx={{ color: '#2e7d32', fontSize: '1.25rem' }} />
+                              <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
+                                Top Performing
                         </Typography>
-                        {bestSections.map((s, i) => (
-                          <Chip key={s} label={s} color="success" size="small" sx={{ fontWeight: 600, fontSize: 14, mx: 0.5 }} />
-                        ))}
-                      </Stack>
-                      <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" flexWrap="wrap" mb={1}>
-                        <Typography variant="subtitle2" fontWeight={600} color="error.main">
-                          <ErrorOutlineIcon sx={{ fontSize: 18, verticalAlign: 'middle', mr: 0.5 }} />
-                          Weakest Section{weakestSections.length > 1 ? 's' : ''}:
+                            </Stack>
+                            {bestSections.length > 0 ? (
+                              bestSections.map((s, i) => (
+                                <Box key={s} sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center',
+                                  mb: i < bestSections.length - 1 ? 1.5 : 0,
+                                  p: 1,
+                                  borderRadius: 2,
+                                  backgroundColor: '#ffffff',
+                                  border: '1px solid #e8f5e9'
+                                }}>
+                                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, color: '#2e7d32' }}>{s}</Typography>
+                                  <Chip 
+                                    label={`${sectionMarks[s]?.percentage || 0}%`} 
+                                    size="small" 
+                            sx={{
+                                      backgroundColor: '#2e7d32',
+                                      color: '#ffffff',
+                                      fontWeight: 600,
+                                      fontSize: '0.75rem',
+                                      height: 24
+                                    }} 
+                                  />
+                                </Box>
+                              ))
+                            ) : (
+                              <Typography variant="body2" color="#666" sx={{ fontStyle: 'italic' }}>No sections available</Typography>
+                            )}
+                          </Paper>
+                        </Grid>
+
+                        {/* Needs Improvement */}
+                        <Grid item xs={12} md={4}>
+                          <Paper elevation={0} sx={{
+                            p: 3,
+                            height: '100%',
+                            borderLeft: '4px solid #ed6c02',
+                            background: '#fffbf8',
+                            borderRadius: 3,
+                            border: '1px solid #fff3e0',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              boxShadow: '0 2px 8px rgba(237, 108, 2, 0.1)',
+                            }
+                          }}>
+                            <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
+                              <ErrorOutlineIcon sx={{ color: '#ed6c02', fontSize: '1.25rem' }} />
+                              <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
+                                Needs Focus
+                              </Typography>
+                            </Stack>
+                            {needsImprovementSections.length > 0 ? (
+                              needsImprovementSections.map((s, i) => (
+                                <Box key={s} sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center',
+                                  mb: i < needsImprovementSections.length - 1 ? 1.5 : 0,
+                                  p: 1,
+                                  borderRadius: 2,
+                                  backgroundColor: '#ffffff',
+                                  border: '1px solid #fff3e0'
+                                }}>
+                                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, color: '#ed6c02' }}>{s}</Typography>
+                                  <Chip 
+                                    label={`${sectionMarks[s]?.percentage || 0}%`} 
+                                    size="small" 
+                              sx={{
+                                      backgroundColor: '#ed6c02',
+                                      color: '#ffffff',
+                                      fontWeight: 600,
+                                      fontSize: '0.75rem',
+                                      height: 24
+                                    }} 
+                                  />
+                                </Box>
+                              ))
+                            ) : (
+                              <Typography variant="body2" color="#666" sx={{ fontStyle: 'italic' }}>All sections performing well</Typography>
+                            )}
+                          </Paper>
+                        </Grid>
+
+                        {/* Weakest Section */}
+                        <Grid item xs={12} md={4}>
+                          <Paper elevation={0} sx={{
+                            p: 3,
+                                height: '100%',
+                            borderLeft: '4px solid #d32f2f',
+                            background: '#fef8f8',
+                            borderRadius: 3,
+                            border: '1px solid #ffebee',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              boxShadow: '0 2px 8px rgba(211, 47, 47, 0.1)',
+                            }
+                          }}>
+                            <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
+                              <ErrorOutlineIcon sx={{ color: '#d32f2f', fontSize: '1.25rem' }} />
+                              <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
+                                Needs Improvement
+                              </Typography>
+                            </Stack>
+                            {weakestSections.length > 0 ? (
+                              weakestSections.map((s, i) => (
+                                <Box key={s} sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center',
+                                  mb: i < weakestSections.length - 1 ? 1.5 : 0,
+                                  p: 1,
+                                  borderRadius: 2,
+                                  backgroundColor: '#ffffff',
+                                  border: '1px solid #ffebee'
+                                }}>
+                                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, color: '#d32f2f' }}>{s}</Typography>
+                                  <Chip 
+                                    label={`${sectionMarks[s]?.percentage || 0}%`} 
+                                    size="small" 
+                                    sx={{ 
+                                      backgroundColor: '#d32f2f',
+                                      color: '#ffffff',
+                                      fontWeight: 600,
+                                      fontSize: '0.75rem',
+                                      height: 24
+                              }}
+                            />
+                          </Box>
+                              ))
+                            ) : (
+                              <Typography variant="body2" color="#666" sx={{ fontStyle: 'italic' }}>No weak sections</Typography>
+                            )}
+                          </Paper>
+                        </Grid>
+                      </Grid>
+
+                      {/* Section Ranking */}
+                      <Box mt={4}>
+                        <Typography variant="h6" fontWeight={600} color="#1a1a1a" mb={3} sx={{ textAlign: 'center' }}>
+                          Section Ranking
                         </Typography>
-                        {weakestSections.map((s, i) => (
-                          <Chip key={s} label={s} color="error" size="small" sx={{ fontWeight: 600, fontSize: 14, mx: 0.5 }} />
-                        ))}
-                      </Stack>
-                      <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" flexWrap="wrap" mb={1}>
-                        <Typography variant="subtitle2" fontWeight={600} color="warning.main">
-                          Needs Improvement:
-                        </Typography>
-                        {needsImprovementSections.map((s, i) => (
-                          <Chip key={s} label={s} color="warning" size="small" sx={{ fontWeight: 600, fontSize: 14, mx: 0.5 }} />
-                        ))}
-                        {needsImprovementSections.length === 0 && (
-                          <Chip label="None" color="success" size="small" sx={{ fontWeight: 600, fontSize: 14, mx: 0.5 }} />
-                        )}
-                      </Stack>
-                      <Box mt={2}>
-                        <Typography variant="subtitle2" fontWeight={600} color="primary" mb={1}>
-                          Section Ranking:
-                        </Typography>
-                        <Box sx={{ overflowX: 'auto', whiteSpace: 'nowrap', pb: 1 }}>
+                        <Box sx={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: { xs: 'repeat(auto-fit, minmax(280px, 1fr))', sm: 'repeat(auto-fit, minmax(300px, 1fr))' },
+                          gap: 2
+                        }}>
                           {rankedSections.map(([name, v], idx) => {
-                            let chipColor: 'success' | 'warning' | 'error' | 'default' = 'default';
-                            if (v.percentage >= 80) chipColor = 'success';
-                            else if (v.percentage >= 60) chipColor = 'warning';
-                            else if (v.percentage >= 40) chipColor = 'error';
-                            else chipColor = 'default';
+                            let chipColor = '';
+                            let bgColor = '';
+                            let borderColor = '';
+                            if (v.percentage >= 80) {
+                              chipColor = '#2e7d32';
+                              bgColor = '#f8fdf8';
+                              borderColor = '#e8f5e9';
+                            } else if (v.percentage >= 60) {
+                              chipColor = '#ed6c02';
+                              bgColor = '#fffbf8';
+                              borderColor = '#fff3e0';
+                            } else {
+                              chipColor = '#d32f2f';
+                              bgColor = '#fef8f8';
+                              borderColor = '#ffebee';
+                            }
                             return (
-                              <Chip
-                                key={name}
-                                label={`${idx + 1}. ${name} (${v.percentage}%)`}
-                                color={chipColor}
-                                size="medium"
-                                sx={{ fontWeight: 600, fontSize: 15, mx: 0.5, mb: 0.5, background: chipColor === 'default' ? '#eee' : undefined, color: chipColor === 'default' ? '#333' : undefined }}
-                              />
+                              <Paper 
+                                key={name} 
+                                elevation={0}
+                                sx={{
+                                  p: 2.5,
+                                  borderRadius: 3,
+                                  backgroundColor: bgColor,
+                                  border: `1px solid ${borderColor}`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  transition: 'all 0.2s ease',
+                                  '&:hover': {
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                    transform: 'translateY(-1px)'
+                                  }
+                                }}
+                              >
+                                <Avatar sx={{ 
+                                  width: 32, 
+                                  height: 32, 
+                                  fontSize: 14, 
+                                  mr: 2,
+                                  backgroundColor: chipColor,
+                                  color: '#ffffff',
+                                  fontWeight: 600
+                                }}>
+                                  {idx + 1}
+                                </Avatar>
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="body1" fontWeight={600} color="#1a1a1a" mb={0.5}>{name}</Typography>
+                                  <Typography variant="caption" color="#666" sx={{ display: 'block' }}>
+                                    {v.obtained}/{v.total} marks
+                                  </Typography>
+                        </Box>
+                        <Typography 
+                                  variant="h6" 
+                                  fontWeight={700}
+                                  sx={{ color: chipColor }}
+                                >
+                                  {v.percentage}%
+                        </Typography>
+                              </Paper>
                             );
                           })}
                         </Box>
@@ -558,8 +754,8 @@ export default function ResultPage() {
                             <Box flexGrow={1} />
                             <Typography variant="body2" fontWeight={600} color={marks.percentage >= 60 ? 'success.main' : 'error.main'}>
                               Score: {marks.obtained}/{marks.total} ({marks.percentage}%)
-                            </Typography>
-                          </Box>
+                      </Typography>
+                    </Box>
                           {sectionInfo.description && (
                             <Typography variant="body2" color="text.secondary" mt={0.5}>{sectionInfo.description}</Typography>
                           )}
@@ -610,102 +806,151 @@ function QuestionReviewCard({ q, idx, userIndices, sectionName, attempt }: { q: 
     userIndices.length === correctIndices.length &&
     userIndices.every((idx: number) => correctIndices.includes(idx));
   const isMarked = attempt.marked_for_review && attempt.marked_for_review[q.id];
+
   return (
     <Card
       id={`question-${q.id}`}
-      elevation={4}
+      elevation={2}
       sx={{
-        borderRadius: 3,
+      borderRadius: 3,
         p: 2,
         mb: 2,
-        // Remove border/background highlight
+        borderLeft: isMarked ? '4px solid #FFC107' : 'none',
+        background: isMarked ? '#FFF9E6' : 'background.paper',
+        '&:hover': {
+          boxShadow: 4,
+        },
       }}
     >
       <CardContent>
         {sectionName && (
-          <Chip label={sectionName} size="small" color="primary" sx={{ mb: 1 }} />
+          <Chip 
+            label={sectionName} 
+            size="small" 
+            sx={{ 
+              mb: 1.5,
+              backgroundColor: '#E3F2FD',
+              color: '#1565C0',
+              fontWeight: 600,
+            }} 
+          />
         )}
-        <Stack direction="row" alignItems="center" spacing={2} mb={1}>
-          <Typography variant="h6" fontWeight={700} color="primary.main">
-            Q{idx + 1}
-          </Typography>
-          <Typography variant="body1" fontWeight={600} color="text.primary">
+        
+        <Stack direction="row" alignItems="flex-start" spacing={1} mb={2}>
+          <Typography variant="h6" fontWeight={700} color="text.primary">
+            Q{idx + 1}.
+            </Typography>
+          <Typography variant="body1" color="text.primary" sx={{ lineHeight: 1.5 }}>
             {q.question_text}
-          </Typography>
+            </Typography>
         </Stack>
+        
         <Box mb={2}>
           {q.options.map((opt: any, i: number) => {
             const selected = userIndices.includes(i);
             const isOptionCorrect = opt.isCorrect;
-            return (
+                
+                return (
               <Paper
-                key={i}
+                    key={i}
                 variant="outlined"
-                sx={{
-                  p: 1.2,
-                  pl: 2,
-                  display: 'flex',
+                    sx={{
+                      p: 1.5,
+                  pl: 2.5,
+                      display: 'flex',
                   alignItems: 'center',
                   mb: 1,
                   background:
                     selected && isOptionCorrect
-                      ? '#e3f2fd' // blue for correct+selected
+                      ? '#E8F5E9' // Light green for correct+selected
                       : isOptionCorrect
-                      ? '#c8e6c9' // green for correct
+                      ? '#F1F8E9' // Very light green for correct
                       : selected
-                      ? '#ffebee' // red for wrong selected
+                      ? '#FFEBEE' // Light red for wrong selected
                       : 'inherit',
-                  borderColor: selected && isOptionCorrect
-                    ? 'primary.main'
-                    : isOptionCorrect
-                    ? 'success.main'
-                    : selected
-                    ? 'error.main'
-                    : 'divider',
-                  borderWidth: 2,
+                  borderColor: 
+                    selected && isOptionCorrect
+                      ? '#4CAF50' // Green border
+                      : isOptionCorrect
+                      ? '#C8E6C9' // Light green border
+                      : selected
+                      ? '#EF9A9A' // Light red border
+                      : '#E0E0E0', // Default gray border
+                  '&:hover': {
+                    borderColor: selected ? 'inherit' : '#90CAF9',
+                  },
                 }}
               >
-                <Typography sx={{ flex: 1 }}>
-                  {opt.text}
-                </Typography>
-                {/* Green check for correct, blue for correct+selected, red X for wrong+selected */}
+                <Typography sx={{ flex: 1, color: 'text.primary' }}>
+                      {opt.text}
+                    </Typography>
+                
                 {isOptionCorrect && selected && (
-                  <Chip
-                    label="Correct & Your Answer"
-                    color="primary"
-                    size="small"
-                    icon={<Check size={18} color="#1976d2" />}
-                    sx={{ ml: 1, fontWeight: 700 }}
-                  />
-                )}
-                {isOptionCorrect && !selected && (
-                  <Chip
-                    label="Correct"
-                    color="success"
-                    size="small"
+                      <Chip
+                    label="Your correct answer"
+                        size="small"
+                        sx={{ 
+                          ml: 1,
+                      fontWeight: 600,
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                        }}
                     icon={<Check size={18} />}
-                    sx={{ ml: 1, fontWeight: 700 }}
-                  />
-                )}
+                      />
+                    )}
+                {isOptionCorrect && !selected && (
+                      <Chip
+                    label="Correct answer"
+                        size="small"
+                        sx={{ 
+                          ml: 1,
+                      fontWeight: 600,
+                      backgroundColor: '#C8E6C9',
+                      color: '#2E7D32',
+                        }}
+                    icon={<Check size={18} />}
+                      />
+                    )}
                 {!isOptionCorrect && selected && (
-                  <Chip
-                    label="Your Answer"
-                    color="error"
-                    size="small"
+                      <Chip
+                    label="Your answer"
+                        size="small"
+                        sx={{ 
+                          ml: 1,
+                      fontWeight: 600,
+                      backgroundColor: '#FFCDD2',
+                      color: '#C62828',
+                        }}
                     icon={<X size={18} />}
-                    sx={{ ml: 1, fontWeight: 700 }}
-                  />
-                )}
+                      />
+                    )}
               </Paper>
-            );
-          })}
+                );
+              })}
         </Box>
+        
         {q.explanation && (
-          <Box mt={2} p={2} bgcolor="#fffde7" borderRadius={2} borderLeft="6px solid #ffb300">
-            <Typography variant="body2" fontStyle="italic" color="text.secondary">
-              <b>Explanation:</b> {q.explanation}
-            </Typography>
-          </Box>
+          <Accordion 
+            elevation={0}
+            sx={{
+              backgroundColor: '#F5F5F5',
+              borderRadius: '8px !important',
+              '&:before': {
+                display: 'none',
+              },
+            }}
+          >
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                Explanation
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" color="text.secondary">
+                {q.explanation}
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
         )}
       </CardContent>
     </Card>

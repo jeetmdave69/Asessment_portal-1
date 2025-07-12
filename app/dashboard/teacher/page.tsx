@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, lazy } from 'react';
+import { useEffect, useState, Suspense, lazy, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AppBar,
@@ -42,7 +42,8 @@ import {
   TablePagination,
   IconButton,
   Tooltip,
-  Snackbar
+  Snackbar,
+  InputAdornment
 } from '@mui/material';
 import { useClerk, useUser } from '@clerk/nextjs';
 import { ThemeToggleButton } from '@/components/ThemeToggleButton';
@@ -63,7 +64,9 @@ import {
   Edit as EditIcon,
   Add as AddIcon,
   Visibility as VisibilityIcon,
-  ContentCopy as ContentCopyIcon
+  ContentCopy as ContentCopyIcon,
+  CheckCircle as CheckCircleIcon,
+  WarningAmber as WarningAmberIcon
 } from '@mui/icons-material';
 import AddExamForm from '../../../components/dashboard/AddExamForm';
 import AddQuestionsForm from '../../../components/dashboard/AddQuestionsForm';
@@ -78,7 +81,8 @@ import { SettingsDrawer } from '../../../components/settings/SettingsDrawer';
 import { useSettingsContext } from '@/context/settings-context';
 import Iconify from '@/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import Skeleton from '@mui/material/Skeleton';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 // Lazy load components
 const QuizTable = lazy(() => import('@/components/dashboard/QuizTable'));
@@ -192,10 +196,40 @@ function TeacherDashboardPage() {
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
 
+  const [studentDeleteDialogOpen, setStudentDeleteDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<any>(null);
+  const [recordsKey, setRecordsKey] = useState(0);
+
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete?.id) return;
+    try {
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: studentToDelete.id }),
+      });
+      
+      if (res.ok) {
+        // Trigger a refresh of the students list
+        console.log('Student deleted successfully');
+        // Force a re-render of the RecordsSection by updating a key
+        setRecordsKey(prev => prev + 1);
+        setStudentDeleteDialogOpen(false);
+        setStudentToDelete(null);
+      } else {
+        console.error('Failed to delete student');
+      }
+    } catch (err) {
+      console.error('Error deleting student:', err);
+    } finally {
+      setStudentDeleteDialogOpen(false);
+      setStudentToDelete(null);
+    }
+  };
+
   const fetchQuizzes = async () => {
     if (!user?.id) return;
 
-    setLoading(true);
     setError(null);
 
     try {
@@ -220,8 +254,6 @@ function TeacherDashboardPage() {
     } catch (err) {
       console.error('Error fetching quizzes:', err);
       setError('Failed to load quizzes. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -355,8 +387,10 @@ function TeacherDashboardPage() {
 
   useEffect(() => {
     if (isLoaded && user) {
+      // Load quizzes immediately without blocking UI
       fetchQuizzes();
 
+      // Set up real-time subscription
       const subscription = supabase
         .channel('quizzes_changes')
         .on(
@@ -384,73 +418,95 @@ function TeacherDashboardPage() {
     
     const fetchStats = async () => {
       if (!user?.id) return;
-      setStatsLoading(true);
       try {
-        // Students (filter by teacher_id if available, else leave as is)
-        const { count: students } = await supabase.from('student').select('id', { count: 'exact', head: true });
-        setStudentCount(students || 0);
-        // Exams (only this teacher's)
-        const { count: exams } = await supabase.from('quizzes').select('id', { count: 'exact', head: true }).eq('user_id', user.id);
-        setExamCount(exams || 0);
-        // Results (attempts for this teacher's quizzes)
-        const { count: results } = await supabase
+        // Fetch all stats in parallel for better performance
+        const [studentsResult, examsResult, announcementsResult] = await Promise.all([
+          supabase.from('student').select('id', { count: 'exact', head: true }),
+          supabase.from('quizzes').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+          supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('sender_id', user.id)
+        ]);
+
+        setStudentCount(studentsResult.count || 0);
+        setExamCount(examsResult.count || 0);
+        setAnnouncementCount(announcementsResult.count || 0);
+
+        // Get quiz IDs for results count
+        const quizIds = examsResult.data?.map(q => q.id) || [];
+        
+        if (quizIds.length > 0) {
+          const [resultsResult, recentResults] = await Promise.all([
+            supabase
           .from('attempts')
           .select('id', { count: 'exact', head: true })
-          .in('quiz_id', (
-            (await supabase.from('quizzes').select('id').eq('user_id', user.id)).data?.map(q => q.id) || []
-          ));
-        setResultCount(results || 0);
-        // Announcements (already filtered)
-        const { count: announcements } = await supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('sender_id', user.id);
-        setAnnouncementCount(announcements || 0);
-        // Recent results (last 8)
-        const { data: recent } = await supabase
+              .in('quiz_id', quizIds),
+            supabase
           .from('attempts')
-          .select(`*, quizzes:quiz_id(quiz_title, total_marks, user_id)`) // include user_id for filtering
+              .select(`*, quizzes:quiz_id(quiz_title, total_marks, user_id)`)
           .order('submitted_at', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(8);
-        setRecentResults((recent || []).filter(r => r.quizzes?.user_id === user.id));
-        setStatsLoading(false);
+              .limit(8)
+          ]);
+          
+          setResultCount(resultsResult.count || 0);
+          setRecentResults((recentResults.data || []).filter(r => r.quizzes?.user_id === user.id));
+        } else {
+          setResultCount(0);
+          setRecentResults([]);
+        }
       } catch (error) {
         console.error('Error fetching stats:', error);
+      } finally {
         setStatsLoading(false);
       }
     };
+    
+    // Load stats immediately without blocking UI
     fetchStats();
   }, [user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
-    setExamsLoading(true);
-    supabase
+    
+    const fetchExams = async () => {
+      try {
+        const { data } = await supabase
       .from('quizzes')
       .select('*')
-      .order('created_at', { ascending: false })
-      .then(async ({ data }) => {
-        const teacherExams = (data || []).filter((e: any) => e.user_id === user!.id);
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        const teacherExams = data || [];
         const quizIds: number[] = teacherExams.map((q: any) => q.id);
+        
         if (quizIds.length === 0) {
           setExams([]);
-          setExamsLoading(false);
           return;
         }
+
         const { data: questions } = await supabase
           .from('questions')
-          .select('id, quiz_id');
+          .select('id, quiz_id')
+          .in('quiz_id', quizIds);
+
         const questionCounts: Record<number, number> = {};
         (questions || []).forEach((q: { quiz_id: number }) => {
-          if (quizIds.includes(q.quiz_id)) {
             questionCounts[q.quiz_id] = (questionCounts[q.quiz_id] || 0) + 1;
-          }
         });
+
         const teacherExamsWithCounts = teacherExams.map((q: any) => ({
           ...q,
           questions_count: questionCounts[q.id] || 0,
         }));
+        
         setExams(teacherExamsWithCounts);
+      } catch (error) {
+        console.error('Error fetching exams:', error);
+      } finally {
         setExamsLoading(false);
-      });
+      }
+    };
+
+    // Load exams immediately without blocking UI
+    fetchExams();
   }, [user?.id]);
 
   // Sidebar navigation links
@@ -491,7 +547,7 @@ function TeacherDashboardPage() {
     </Box>
   );
 
-  if (!isLoaded || loading) {
+  if (!isLoaded) {
     return (
       <Box height="100vh" display="flex" justifyContent="center" alignItems="center">
         <CircularProgress />
@@ -518,8 +574,8 @@ function TeacherDashboardPage() {
           [`& .MuiDrawer-paper`]: {
             width: 240,
             boxSizing: 'border-box',
-            background: theme.palette.background.paper,
-            color: theme.palette.text.primary,
+            background: '#002366',
+            color: '#ffffff',
             border: 'none',
             minHeight: '100vh',
             boxShadow: '2px 0 8px 0 rgba(0,0,0,0.04)',
@@ -528,8 +584,8 @@ function TeacherDashboardPage() {
         }}
       >
         <Box display="flex" alignItems="center" p={2} mb={1}>
-          <DashboardIcon sx={{ mr: 1, color: theme.palette.text.primary, fontSize: 32 }} />
-          <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
+          <DashboardIcon sx={{ mr: 1, color: '#ffffff', fontSize: 32 }} />
+          <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
         </Box>
         <List sx={{ mt: 2 }}>
           {sidebarLinks.map((link, idx) => (
@@ -538,19 +594,19 @@ function TeacherDashboardPage() {
               key={link.text}
               onClick={link.onClick}
               sx={{
-                color: link.logout ? '#ff5252' : theme.palette.text.primary,
-                background: link.tab && link.tab === currentTab ? theme.palette.action.selected : 'none',
+                color: link.logout ? '#ff5252' : '#ffffff',
+                background: link.tab && link.tab === currentTab ? '#001b4e' : 'none',
                 borderRadius: '30px 0 0 30px',
                 mb: 1,
                 fontWeight: link.tab && link.tab === currentTab ? 600 : 400,
                 pl: 2,
                 pr: 1,
-                '&:hover': { background: theme.palette.action.selected },
+                '&:hover': { background: '#001b4e' },
                 transition: 'all 0.4s',
               }}
             >
-              <ListItemIcon sx={{ color: theme.palette.text.primary, minWidth: 40 }}>{link.icon}</ListItemIcon>
-              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500 } }} />
+              <ListItemIcon sx={{ color: '#ffffff', minWidth: 40 }}>{link.icon}</ListItemIcon>
+              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500, color: '#ffffff' } }} />
             </ListItem>
           ))}
         </List>
@@ -564,19 +620,34 @@ function TeacherDashboardPage() {
           justifyContent="space-between"
           alignItems="center"
           mb={4}
-          p={2}
-          borderRadius={2}
+          p={3}
+          borderRadius={3}
           sx={{
-            background: theme.palette.background.paper,
+            background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.grey[50]} 100%)`,
             color: theme.palette.text.primary,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-            border: 'none',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            border: `1px solid ${theme.palette.divider}`,
             fontFamily: 'Poppins, sans-serif',
           }}
         >
-          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Teacher's Dashboard</Typography>
           <Box>
-            <ThemeToggleButton />
+            <Typography variant="h4" fontWeight={700} letterSpacing={0.5} sx={{ 
+              color: theme.palette.text.primary, 
+              fontFamily: 'Poppins, sans-serif',
+              mb: 0.5
+            }}>
+              Teacher's Dashboard
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+              Welcome back! Manage your students, exams, and results.
+            </Typography>
+          </Box>
+          <Box>
+            <Box display="flex" alignItems="center" gap={2}>
+              <ThemeToggleButton />
+              <Avatar src={user.imageUrl} alt="pro" sx={{ mr: 1, border: '2px solid #e3e6ef', width: 44, height: 44 }} />
+              <Typography variant="subtitle1" fontWeight={600} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{user.firstName || user.fullName}</Typography>
+            </Box>
           </Box>
         </Box>
 
@@ -603,7 +674,11 @@ function TeacherDashboardPage() {
                 <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
                   <PersonIcon sx={{ color: theme.palette.text.primary, fontSize: 32, mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600} color={theme.palette.text.primary}>Records</Typography>
-                  <Typography variant="h4" fontWeight={800} color={theme.palette.text.primary}>{statsLoading ? <CircularProgress size={24} /> : studentCount}</Typography>
+                  {statsLoading ? (
+                    <Skeleton variant="text" width={60} height={48} />
+                  ) : (
+                    <Typography variant="h4" fontWeight={800} color={theme.palette.text.primary}>{studentCount}</Typography>
+                  )}
                   <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of students</Typography>
                 </Card>
               </Grid>
@@ -611,7 +686,11 @@ function TeacherDashboardPage() {
                 <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
                   <BookIcon sx={{ color: '#1565c0', fontSize: 32, mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600} color="#1565c0">Exams</Typography>
-                  <Typography variant="h4" fontWeight={800} color="#1565c0">{statsLoading ? <CircularProgress size={24} /> : examCount}</Typography>
+                  {statsLoading ? (
+                    <Skeleton variant="text" width={60} height={48} />
+                  ) : (
+                    <Typography variant="h4" fontWeight={800} color="#1565c0">{examCount}</Typography>
+                  )}
                   <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of exams</Typography>
                 </Card>
               </Grid>
@@ -619,7 +698,11 @@ function TeacherDashboardPage() {
                 <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
                   <LineAxisIcon sx={{ color: '#37474f', fontSize: 32, mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600} color="#37474f">Results</Typography>
-                  <Typography variant="h4" fontWeight={800} color="#37474f">{statsLoading ? <CircularProgress size={24} /> : resultCount}</Typography>
+                  {statsLoading ? (
+                    <Skeleton variant="text" width={60} height={48} />
+                  ) : (
+                    <Typography variant="h4" fontWeight={800} color="#37474f">{resultCount}</Typography>
+                  )}
                   <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Number of available results</Typography>
                 </Card>
               </Grid>
@@ -627,7 +710,11 @@ function TeacherDashboardPage() {
                 <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
                   <PaperPlaneIcon sx={{ color: '#7b1fa2', fontSize: 32, mb: 1 }} />
                   <Typography variant="subtitle1" fontWeight={600} color="#7b1fa2">Announcements</Typography>
-                  <Typography variant="h4" fontWeight={800} color="#7b1fa2">{statsLoading ? <CircularProgress size={24} /> : announcementCount}</Typography>
+                  {statsLoading ? (
+                    <Skeleton variant="text" width={60} height={48} />
+                  ) : (
+                    <Typography variant="h4" fontWeight={800} color="#7b1fa2">{announcementCount}</Typography>
+                  )}
                   <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of messages sent</Typography>
                 </Card>
               </Grid>
@@ -648,9 +735,14 @@ function TeacherDashboardPage() {
                   </TableHead>
                   <TableBody>
                     {statsLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center"><CircularProgress size={24} /></TableCell>
+                      Array.from({ length: 4 }).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell><Skeleton variant="text" width={80} /></TableCell>
+                          <TableCell><Skeleton variant="text" width={120} /></TableCell>
+                          <TableCell><Skeleton variant="text" width={150} /></TableCell>
+                          <TableCell><Skeleton variant="text" width={60} /></TableCell>
                       </TableRow>
+                      ))
                     ) : recentResults.length > 0 ? (
                       recentResults.map((row, idx) => (
                         <TableRow key={idx}>
@@ -785,7 +877,17 @@ function TeacherDashboardPage() {
         {currentTab === 'records' && (
           <Box>
             <Typography variant="h5" fontWeight={700} mb={2}>Records Section</Typography>
-            <RecordsSection />
+            <RecordsSection 
+              key={recordsKey}
+              onDeleteStudent={(student) => {
+                setStudentToDelete(student);
+                setStudentDeleteDialogOpen(true);
+              }}
+              onStudentDeleted={(deletedStudentId) => {
+                // This will be called after successful deletion
+                console.log('Student deleted:', deletedStudentId);
+              }}
+            />
           </Box>
         )}
         {currentTab === 'messages' && user && (
@@ -892,6 +994,24 @@ function TeacherDashboardPage() {
           Access code copied to clipboard!
         </Alert>
       </Snackbar>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={studentDeleteDialogOpen} onClose={() => setStudentDeleteDialogOpen(false)}>
+        <DialogTitle sx={{ color: theme.palette.error.main, fontWeight: 700 }}>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Are you sure you want to delete <b>{studentToDelete?.fname} {studentToDelete?.lname}</b> (<b>{studentToDelete?.email}</b>)?
+          </Typography>
+          <Alert severity="warning">
+            This action cannot be undone.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStudentDeleteDialogOpen(false)} variant="outlined">Cancel</Button>
+          <Button onClick={handleDeleteStudent} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -972,33 +1092,45 @@ function ExamResultsTable() {
 
   useEffect(() => {
     if (!user?.id) return;
+    
+    const fetchResults = async () => {
     setLoading(true);
     setError('');
     setResults([]);
-    (async () => {
-      // Fetch all quizzes for the teacher
-      const { data: quizData } = await supabase
+      
+      try {
+        // Fetch quizzes and results in parallel
+        const [quizResult, resultsResult] = await Promise.all([
+          supabase
         .from('quizzes')
         .select('id, quiz_title')
-        .eq('user_id', user.id);
-      setQuizzes(quizData || []);
-      // Fetch all attempts for quizzes created by this teacher
-      const { data, error } = await supabase
+            .eq('user_id', user.id),
+          supabase
         .from('attempts')
-        .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, quizzes(quiz_title, user_id)`) // use start_time
-        .order('submitted_at', { ascending: false });
-      if (error) {
-        setError(error.message || 'Error fetching results');
-        setLoading(false);
+            .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, quizzes(quiz_title, user_id)`)
+            .order('submitted_at', { ascending: false })
+        ]);
+
+        if (resultsResult.error) {
+          setError(resultsResult.error.message || 'Error fetching results');
         return;
       }
-      const filtered = (data || []).filter((row: any) => row.quizzes?.user_id === user.id);
+
+        setQuizzes(quizResult.data || []);
+        const filtered = (resultsResult.data || []).filter((row: any) => row.quizzes?.user_id === user.id);
       setResults(filtered);
+        
       // Extract unique students
       const uniqueStudents = Array.from(new Set(filtered.map((row: any) => row.user_name)));
       setStudents(uniqueStudents);
+      } catch (err) {
+        setError('Failed to fetch results');
+      } finally {
       setLoading(false);
-    })();
+      }
+    };
+
+    fetchResults();
   }, [user?.id]);
 
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -1071,7 +1203,7 @@ function ExamResultsTable() {
                   <TableCell>Score</TableCell>
                   <TableCell>Started At</TableCell>
                   <TableCell>End time</TableCell>
-                  <TableCell>Duration</TableCell>
+                  <TableCell>Duration (min)</TableCell>
                   <TableCell>Marked for Review</TableCell>
                 </TableRow>
               </TableHead>
@@ -1079,12 +1211,7 @@ function ExamResultsTable() {
                 {paginatedResults.map((row, i) => {
                   const startedAt = row.start_time ? new Date(row.start_time) : null;
                   const submittedAt = row.submitted_at ? new Date(row.submitted_at) : null;
-                  let duration = '-';
-                  if (startedAt && submittedAt && !isNaN(startedAt.getTime()) && !isNaN(submittedAt.getTime())) {
-                    let diffMin = Math.floor((submittedAt.getTime() - startedAt.getTime()) / 60000);
-                    if (diffMin < 0) diffMin = 0;
-                    duration = `${diffMin} min`;
-                  }
+                  const duration = startedAt && submittedAt ? Math.round((submittedAt.getTime() - startedAt.getTime()) / 60000) : '-';
                   return (
                     <TableRow key={row.id}>
                       <TableCell>{row.quizzes?.quiz_title || 'Untitled Quiz'}</TableCell>
@@ -1094,9 +1221,36 @@ function ExamResultsTable() {
                       <TableCell>{submittedAt ? submittedAt.toLocaleString() : '-'}</TableCell>
                       <TableCell>{duration}</TableCell>
                       <TableCell>
-                        {row.marked_for_review && Object.keys(row.marked_for_review).filter(qid => row.marked_for_review[qid]).length > 0
-                          ? Object.keys(row.marked_for_review).filter(qid => row.marked_for_review[qid]).map(qid => `Q${Number(qid) + 1}`).join(', ')
-                          : 'None'}
+                        {(() => {
+                          console.log('Full row data for row', row.id, row);
+                          console.log('marked_for_review type:', typeof row.marked_for_review);
+                          console.log('marked_for_review value:', JSON.stringify(row.marked_for_review, null, 2));
+                          console.log('marked_questions value:', row.marked_questions);
+                          
+                          // Try different possible field names and formats
+                          let markedData = row.marked_for_review || row.marked_questions || {};
+                          
+                          // If it's a string, try to parse it
+                          if (typeof markedData === 'string') {
+                            try {
+                              markedData = JSON.parse(markedData);
+                            } catch (e) {
+                              console.log('Failed to parse marked_for_review as JSON:', e);
+                              return 'None';
+                            }
+                          }
+                          
+                          if (markedData && typeof markedData === 'object') {
+                            const keys = Object.keys(markedData).filter(qid => markedData[qid]);
+                            console.log('Filtered keys:', keys);
+                            console.log('All keys in markedData:', Object.keys(markedData));
+                            console.log('All values in markedData:', Object.values(markedData));
+                            if (keys.length > 0) {
+                              return keys.map((qid, idx) => `Q${Number(qid) + 1}`).join(', ');
+                            }
+                          }
+                          return 'None';
+                        })()}
                       </TableCell>
                     </TableRow>
                   );
@@ -1125,102 +1279,1109 @@ function ExamResultsTable() {
   );
 }
 
-function RecordsSection() {
+function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent: (student: any) => void, onStudentDeleted: (deletedStudentId: number) => void }) {
   const [students, setStudents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState({ fname: '', uname: '', dob: '', gender: '', email: '', pword: '', cpword: '' });
+  const [form, setForm] = useState({ 
+    firstName: '', 
+    lastName: '', 
+    email: '', 
+    password: '', 
+    confirmPassword: '', 
+    role: 'student',
+    username: ''
+  });
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [successSnackbarOpen, setSuccessSnackbarOpen] = useState(false);
   const theme = useTheme();
 
-  const fetchStudents = async () => {
-    setLoading(true);
-    setError('');
-    const res = await fetch('/api/students');
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) setError(data.error || 'Error');
-    else setStudents(data.students || []);
+  // Password validation functions
+  const validatePassword = (password: string) => {
+    return {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    };
   };
 
-  useEffect(() => { fetchStudents(); }, []);
+  const passwordValidation = validatePassword(form.password);
+  
+  // Calculate password strength
+  const getPasswordStrength = () => {
+    const validations = Object.values(passwordValidation);
+    const metRequirements = validations.filter(Boolean).length;
+    const totalRequirements = validations.length;
+    const percentage = (metRequirements / totalRequirements) * 100;
+    
+    if (percentage === 100) return { strength: 'Strong', color: theme.palette.success.main, width: '100%' };
+    if (percentage >= 80) return { strength: 'Good', color: theme.palette.warning.main, width: '80%' };
+    if (percentage >= 60) return { strength: 'Fair', color: theme.palette.warning.dark, width: '60%' };
+    if (percentage >= 40) return { strength: 'Weak', color: theme.palette.error.light, width: '40%' };
+    return { strength: 'Very Weak', color: theme.palette.error.main, width: '20%' };
+  };
+  
+  const passwordStrength = getPasswordStrength();
 
+  // Fetch Clerk users
+  useEffect(() => {
+    async function fetchClerkUsers() {
+    setLoading(true);
+    setError('');
+      try {
+        const res = await fetch('/api/clerk-users?limit=1000');
+    const data = await res.json();
+        // Only show users with role === 'student'
+        setStudents(Array.isArray(data) ? data.filter((u: any) => u.role === 'student') : []);
+      } catch (err) {
+        setError('Failed to fetch students from Clerk.');
+      } finally {
+    setLoading(false);
+      }
+    }
+    fetchClerkUsers();
+  }, []);
+
+  // Add Student to Clerk (same as admin)
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     setFormSuccess('');
-    const res = await fetch('/api/add-student', {
+    setSubmitting(true);
+    
+    // Validate passwords match
+    if (form.password !== form.confirmPassword) {
+      setFormError('Passwords do not match');
+      setSubmitting(false);
+      return;
+    }
+
+    // Additional validation
+    if (!form.email || !form.email.includes('@')) {
+      setFormError('Please enter a valid email address');
+      setSubmitting(false);
+      return;
+    }
+
+    if (form.password.length < 8) {
+      setFormError('Password must be at least 8 characters long');
+      setSubmitting(false);
+      return;
+    }
+
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setFormError('First name and last name are required');
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      // Add student to Clerk using the same API as admin
+      const res = await fetch('/api/add-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
+        body: JSON.stringify({
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          role: form.role,
+          username: form.username?.trim() || null
+        }),
+      });
+      
     const data = await res.json();
-    if (!res.ok) setFormError(data.error || 'Error');
-    else {
-      setFormSuccess('Student added!');
-      setForm({ fname: '', uname: '', dob: '', gender: '', email: '', pword: '', cpword: '' });
-      setAddOpen(false);
-      fetchStudents();
+      console.log('API Response:', data);
+      
+      if (!res.ok) {
+        // Check for Clerk's pwned password error
+        if (data?.details?.errors && Array.isArray(data.details.errors)) {
+          const pwnedError = data.details.errors.find((err: any) => err.code === 'form_password_pwned');
+          if (pwnedError) {
+            setFormError('This password has been found in a data breach. Please choose a different, stronger password for your safety.');
+            setIsPwnedPassword(true);
+          } else {
+            setFormError(data.error || data.message || 'Error adding student');
+            setIsPwnedPassword(false);
+          }
+        } else {
+          setFormError(data.error || data.message || 'Error adding student');
+          setIsPwnedPassword(false);
+        }
+      } else {
+        setFormSuccess('Student added successfully!');
+        setSuccessSnackbarOpen(true);
+        setTimeout(() => setAddOpen(false), 500); // Delay closing dialog
+        setForm({ 
+          firstName: '', 
+          lastName: '', 
+          email: '', 
+          password: '', 
+          confirmPassword: '', 
+          role: 'student',
+          username: ''
+        });
+        // Re-fetch Clerk users to show the new student
+        const refreshRes = await fetch('/api/clerk-users?limit=1000');
+        const refreshData = await refreshRes.json();
+        setStudents(Array.isArray(refreshData) ? refreshData.filter((u: any) => u.role === 'student') : []);
+      }
+    } catch (err) {
+      console.error('Error adding student:', err);
+      setFormError('Failed to add student. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  // ... inside RecordsSection, after other useState hooks ...
+  const [filter, setFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10;
+  
+  const filteredStudents = students.filter(stu => {
+    const name = ((stu.firstName || stu.first_name || stu.fname || '') + ' ' + (stu.lastName || stu.last_name || stu.lname || '')).toLowerCase();
+    const email = (stu.email || '').toLowerCase();
+    const role = (stu.role || '').toLowerCase();
+    const search = filter.toLowerCase();
+    return name.includes(search) || email.includes(search) || role.includes(search);
+  });
+  
+  const paginatedStudents = filteredStudents.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // ...
+  // Remove any other declarations of filter, setFilter, page, setPage, rowsPerPage in RecordsSection.
+
+  // ... after other useState hooks in RecordsSection ...
+  const [isPwnedPassword, setIsPwnedPassword] = useState(false);
+
+  // Auto-close logic for 2.5s
+  useEffect(() => {
+    if (successSnackbarOpen) {
+      const timer = setTimeout(() => setSuccessSnackbarOpen(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [successSnackbarOpen]);
+
+  // ... after the useEffect for add success ...
+  const [deleteSuccessOpen, setDeleteSuccessOpen] = useState(false);
+  const [studentDeleteDialogOpen, setStudentDeleteDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<any>(null);
+
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete?.id) return;
+    try {
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: studentToDelete.id }),
+      });
+      if (res.ok) {
+        // Refresh the students list directly
+        const refreshRes = await fetch('/api/clerk-users?limit=1000');
+        const refreshData = await refreshRes.json();
+        setStudents(Array.isArray(refreshData) ? refreshData.filter((u: any) => u.role === 'student') : []);
+        setStudentDeleteDialogOpen(false);
+        setStudentToDelete(null);
+        setDeleteSuccessOpen(true);
+      } else {
+        console.error('Failed to delete student');
+      }
+    } catch (err) {
+      console.error('Error deleting student:', err);
+    } finally {
+      setStudentDeleteDialogOpen(false);
+      setStudentToDelete(null);
+    }
+  };
+
+  // ... after the useEffect for add success ...
+  useEffect(() => {
+    if (deleteSuccessOpen) {
+      const timer = setTimeout(() => setDeleteSuccessOpen(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [deleteSuccessOpen]);
+
+  // Professional Green Success Dialog
   return (
-    <Box>
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Button variant="contained" onClick={() => setAddOpen(true)}>Add New Student</Button>
-      </Paper>
-      {loading ? <Typography>Loading...</Typography> : error ? <Alert severity="error">{error}</Alert> : (
-        <Paper sx={{ p: 2 }}>
+    <Box sx={{ 
+      background: theme.palette.background.paper, 
+      borderRadius: 3, 
+      boxShadow: '0 4px 20px rgba(0,0,0,0.08)', 
+      border: `1px solid ${theme.palette.divider}`,
+      overflow: 'hidden',
+      fontFamily: 'Poppins, sans-serif' 
+    }}>
+      {/* Header Section */}
+      <Box
+        sx={{
+          background: `linear-gradient(120deg, ${theme.palette.background.paper} 60%, ${theme.palette.background.default} 100%)`,
+          color: theme.palette.text.primary,
+          borderRadius: 2,
+          p: { xs: 2, sm: 3 },
+          mb: 3,
+          border: `1px solid ${theme.palette.divider}`,
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 4px 16px rgba(0,0,0,0.22)'
+            : '0 4px 16px rgba(30,64,175,0.10)',
+          transition: 'box-shadow 0.2s',
+          '&:hover': {
+            boxShadow: theme.palette.mode === 'dark'
+              ? '0 6px 20px rgba(0,0,0,0.28)'
+              : '0 6px 20px rgba(30,64,175,0.13)'
+          }
+        }}
+      >
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+              <PersonIcon sx={{ color: theme.palette.primary.main, fontSize: 32 }} />
+              <Typography variant="h4" fontWeight={700}>
+                Student Records
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              Manage and monitor student accounts
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setAddOpen(true)}
+            sx={{
+              borderRadius: 2,
+              fontWeight: 600,
+              px: 3,
+              py: 1.5,
+              background: theme.palette.primary.main,
+              color: '#fff',
+              boxShadow: 'none',
+              '&:hover': {
+                background: theme.palette.primary.dark,
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Add New Student
+          </Button>
+        </Box>
+        <Divider sx={{ my: 1, borderColor: theme.palette.primary.light, opacity: 0.3 }} />
+      </Box>
+
+      {/* Content Section */}
+      <Box p={3}>
+        {/* Filter input */}
+        <Box mb={2} display="flex" alignItems="center" gap={2}>
+          <TextField
+            label="Search by name, email, or role"
+            variant="outlined"
+            size="small"
+            value={filter}
+            onChange={e => { setFilter(e.target.value); setPage(0); }}
+            sx={{ minWidth: 300 }}
+          />
+        </Box>
+        {loading ? (
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
+            <Box textAlign="center">
+              <CircularProgress size={48} sx={{ color: theme.palette.primary.main, mb: 2 }} />
+              <Typography variant="body1" color="text.secondary">
+                Loading student records...
+              </Typography>
+            </Box>
+          </Box>
+        ) : error ? (
+          <Alert 
+            severity="error" 
+            sx={{ 
+              mb: 3,
+              borderRadius: 2,
+              '& .MuiAlert-icon': { fontSize: 28 }
+            }}
+          >
+            <Typography variant="body1" fontWeight={600}>
+              {error}
+            </Typography>
+          </Alert>
+        ) : (
+          <TableContainer sx={{ 
+            borderRadius: 2, 
+            border: `1px solid ${theme.palette.divider}`,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}>
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Full name</TableCell>
-                <TableCell>Username</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Gender</TableCell>
-                <TableCell>DOB</TableCell>
+                <TableRow sx={{ background: theme.palette.mode === 'dark' ? theme.palette.grey[900] : theme.palette.grey[50] }}>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    ID
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Full Name
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Email
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Role
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Created At
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Actions
+                  </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {students.map(stu => (
-                <TableRow key={stu.id}>
-                  <TableCell>{stu.id}</TableCell>
-                  <TableCell>{stu.fname}</TableCell>
-                  <TableCell>{stu.uname}</TableCell>
-                  <TableCell>{stu.email}</TableCell>
-                  <TableCell>{stu.gender}</TableCell>
-                  <TableCell>{stu.dob}</TableCell>
+                {paginatedStudents.length > 0 ? (
+                  paginatedStudents.map((stu: any, index: number) => (
+                    <TableRow key={stu.id} sx={{ 
+                      backgroundColor: theme.palette.mode === 'dark'
+                        ? (index % 2 === 0 ? theme.palette.background.paper : theme.palette.grey[900])
+                        : (index % 2 === 0 ? 'background.paper' : theme.palette.grey[50]),
+                      '&:hover': { 
+                        backgroundColor: theme.palette.action.hover,
+                        transform: 'scale(1.001)',
+                        transition: 'all 0.2s ease'
+                      },
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <TableCell sx={{ 
+                        fontWeight: 600, 
+                        color: theme.palette.text.primary,
+                        fontFamily: 'monospace',
+                        fontSize: '0.875rem'
+                      }}>
+                        #{stu.id}
+                      </TableCell>
+                      <TableCell sx={{ 
+                        fontWeight: 600, 
+                        color: theme.palette.text.primary,
+                        fontSize: '0.95rem'
+                      }}>
+                        <Typography sx={{ color: theme.palette.text.primary }}>
+                          {(stu.firstName || stu.first_name || stu.fname || '') + ' ' + (stu.lastName || stu.last_name || stu.lname || '')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ 
+                        color: theme.palette.text.secondary,
+                        fontSize: '0.875rem'
+                      }}>
+                        {stu.email}
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={stu.role} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined"
+                          sx={{ 
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                            textTransform: 'uppercase'
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ 
+                        color: theme.palette.text.secondary,
+                        fontSize: '0.875rem'
+                      }}>
+                        {stu.created_at
+                          ? new Date(stu.created_at).toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Delete Student" arrow>
+                          <IconButton 
+                            size="small" 
+                            color="error" 
+                            onClick={() => {
+                              setStudentToDelete(stu);
+                              setStudentDeleteDialogOpen(true);
+                            }}
+                            sx={{
+                              '&:hover': {
+                                background: theme.palette.error.light,
+                                transform: 'scale(1.1)',
+                                transition: 'all 0.2s ease'
+                              },
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
                 </TableRow>
-              ))}
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                      <Box textAlign="center">
+                        <PersonIcon sx={{ 
+                          fontSize: 64, 
+                          color: theme.palette.text.disabled, 
+                          mb: 2 
+                        }} />
+                        <Typography variant="h6" color="text.secondary" fontWeight={600} mb={1}>
+                          No Students Found
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                          Get started by adding your first student to the system.
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          startIcon={<AddIcon />}
+                          onClick={() => setAddOpen(true)}
+                          sx={{ borderRadius: 2 }}
+                        >
+                          Add First Student
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
             </TableBody>
           </Table>
-        </Paper>
-      )}
+            {/* Pagination */}
+            <TablePagination
+              component="div"
+              count={filteredStudents.length}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={() => {}}
+              rowsPerPageOptions={[rowsPerPage]}
+              labelRowsPerPage={''}
+            />
+          </TableContainer>
+        )}
+      </Box>
 
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)}>
-        <DialogTitle>Add New Student</DialogTitle>
-        <DialogContent>
-          <form onSubmit={handleAddStudent}>
-            <TextField label="Full Name" name="fname" value={form.fname} onChange={handleFormChange} fullWidth required sx={{ mb: 2 }} />
-            <TextField label="Username" name="uname" value={form.uname} onChange={handleFormChange} fullWidth required sx={{ mb: 2 }} />
-            <TextField label="Password" name="pword" type="password" value={form.pword} onChange={handleFormChange} fullWidth required sx={{ mb: 2 }} />
-            <TextField label="Confirm Password" name="cpword" type="password" value={form.cpword} onChange={handleFormChange} fullWidth required sx={{ mb: 2 }} />
-            <TextField label="Email" name="email" value={form.email} onChange={handleFormChange} fullWidth required sx={{ mb: 2 }} />
-            <TextField label="Date of Birth" name="dob" type="date" value={form.dob} onChange={handleFormChange} fullWidth required sx={{ mb: 2 }} InputLabelProps={{ shrink: true }} />
-            <TextField label="Gender" name="gender" value={form.gender} onChange={handleFormChange} fullWidth required sx={{ mb: 2 }} />
+      <Dialog 
+        open={addOpen} 
+        onClose={() => setAddOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            border: `1px solid ${theme.palette.divider}`
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+          color: 'white',
+          fontWeight: 700,
+          fontSize: '1.5rem',
+          py: 3
+        }}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <AddIcon sx={{ fontSize: 28 }} />
+            Add New Student
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 4 }}>
+          <form onSubmit={handleAddStudent} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <TextField
+                name="firstName"
+                label="First Name"
+                value={form.firstName}
+                onChange={handleFormChange}
+                required
+                fullWidth
+                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
+              />
+              <TextField
+                name="lastName"
+                label="Last Name"
+                value={form.lastName}
+                onChange={handleFormChange}
+                required
+                fullWidth
+                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
+              />
+            </div>
+            <TextField
+              name="username"
+              label="Username (optional)"
+              value={form.username}
+              onChange={handleFormChange}
+              fullWidth
+              sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
+            />
+            <TextField
+              name="email"
+              label="Email"
+              type="email"
+              value={form.email}
+              onChange={handleFormChange}
+              required
+              fullWidth
+              sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
+            />
+            <TextField
+              name="password"
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              value={form.password}
+              onChange={e => {
+                setForm({ ...form, password: e.target.value });
+                setIsPwnedPassword(false); // Reset on change
+              }}
+              required
+              fullWidth
+              error={isPwnedPassword}
+              helperText={isPwnedPassword ? (
+                <Box display="flex" alignItems="center" color="error.main" gap={1}>
+                  <WarningAmberIcon fontSize="small" />
+                  <span>This password has been found in a data breach. Please choose a different one.</span>
+                </Box>
+              ) : ''}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                color: theme.palette.text.primary,
+                '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
+                '& .MuiInputBase-root': { color: theme.palette.text.primary },
+                '& .MuiOutlinedInput-root': isPwnedPassword ? {
+                  '& fieldset': {
+                    borderColor: theme.palette.error.main,
+                    borderWidth: 2,
+                  },
+                } : {},
+              }}
+            />
+            <Box sx={{ mb: 1, mt: -2 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block', fontWeight: 600 }}>
+                Password Requirements:
+              </Typography>
+              {form.password && (
+                <Box sx={{ mb: 2, p: 2, borderRadius: 1, backgroundColor: theme.palette.grey[50], border: `1px solid ${theme.palette.divider}` }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: passwordStrength.color }}>
+                      Password Strength: {passwordStrength.strength}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {Object.values(passwordValidation).filter(Boolean).length}/5 requirements met
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    width: '100%', 
+                    height: 4, 
+                    backgroundColor: theme.palette.grey[300], 
+                    borderRadius: 2,
+                    overflow: 'hidden'
+                  }}>
+                    <Box sx={{ 
+                      width: passwordStrength.width, 
+                      height: '100%', 
+                      backgroundColor: passwordStrength.color,
+                      transition: 'all 0.3s ease',
+                      borderRadius: 2
+                    }} />
+                  </Box>
+                </Box>
+              )}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 16, 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    backgroundColor: passwordValidation.length ? theme.palette.success.main : theme.palette.grey[300],
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {passwordValidation.length ? '✓' : '!'}
+                  </Box>
+                  <Typography variant="caption" sx={{ 
+                    color: passwordValidation.length ? theme.palette.success.main : theme.palette.text.secondary,
+                    fontWeight: passwordValidation.length ? 600 : 400
+                  }}>
+                    At least 8 characters
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 16, 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    backgroundColor: passwordValidation.uppercase ? theme.palette.success.main : theme.palette.grey[300],
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {passwordValidation.uppercase ? '✓' : '!'}
+                  </Box>
+                  <Typography variant="caption" sx={{ 
+                    color: passwordValidation.uppercase ? theme.palette.success.main : theme.palette.text.secondary,
+                    fontWeight: passwordValidation.uppercase ? 600 : 400
+                  }}>
+                    One uppercase letter (A-Z)
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 16, 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    backgroundColor: passwordValidation.lowercase ? theme.palette.success.main : theme.palette.grey[300],
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {passwordValidation.lowercase ? '✓' : '!'}
+                  </Box>
+                  <Typography variant="caption" sx={{ 
+                    color: passwordValidation.lowercase ? theme.palette.success.main : theme.palette.text.secondary,
+                    fontWeight: passwordValidation.lowercase ? 600 : 400
+                  }}>
+                    One lowercase letter (a-z)
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 16, 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    backgroundColor: passwordValidation.number ? theme.palette.success.main : theme.palette.grey[300],
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {passwordValidation.number ? '✓' : '!'}
+                  </Box>
+                  <Typography variant="caption" sx={{ 
+                    color: passwordValidation.number ? theme.palette.success.main : theme.palette.text.secondary,
+                    fontWeight: passwordValidation.number ? 600 : 400
+                  }}>
+                    One number (0-9)
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 16, 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    backgroundColor: passwordValidation.special ? theme.palette.success.main : theme.palette.grey[300],
+                    color: 'white',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {passwordValidation.special ? '✓' : '!'}
+                  </Box>
+                  <Typography variant="caption" sx={{ 
+                    color: passwordValidation.special ? theme.palette.success.main : theme.palette.text.secondary,
+                    fontWeight: passwordValidation.special ? 600 : 400
+                  }}>
+                    One special character (!@#$%^&*)
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+            <TextField
+              name="confirmPassword"
+              label="Confirm Password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={form.confirmPassword}
+              onChange={handleFormChange}
+              required
+              fullWidth
+              InputProps={{
+                endAdornment: (
+                  <IconButton
+                    aria-label="toggle confirm password visibility"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    edge="end"
+                    sx={{ color: theme.palette.text.secondary }}
+                  >
+                    {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                ),
+              }}
+              sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
+            />
             {formError && <Alert severity="error">{formError}</Alert>}
-            {formSuccess && <Alert severity="success">{formSuccess}</Alert>}
-            <DialogActions>
-              <Button onClick={() => setAddOpen(false)}>Cancel</Button>
-              <Button type="submit" variant="contained">Add</Button>
-            </DialogActions>
           </form>
         </DialogContent>
+        <DialogActions sx={{ p: 4, pt: 2 }}>
+          <Button 
+            onClick={() => setAddOpen(false)} 
+            variant="outlined"
+            disabled={submitting}
+            sx={{ 
+              borderRadius: 2,
+              px: 3,
+              py: 1.5,
+              fontWeight: 600
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddStudent} 
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={submitting}
+            sx={{ 
+              fontWeight: 700, 
+              py: 1.5, 
+              px: 4,
+              color: 'white', 
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+              borderRadius: 2,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              '&:hover': { 
+                background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+                transform: 'translateY(-1px)',
+                boxShadow: '0 6px 16px rgba(0,0,0,0.2)'
+              },
+              '&:disabled': {
+                background: theme.palette.action.disabledBackground,
+                transform: 'none',
+                boxShadow: 'none'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {submitting ? (
+              <Box display="flex" alignItems="center" gap={1}>
+                <CircularProgress size={20} sx={{ color: 'white' }} />
+                <span>Adding...</span>
+              </Box>
+            ) : (
+              'Add Student'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={successSnackbarOpen}
+        onClose={() => setSuccessSnackbarOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            border: 'none',
+            background: theme.palette.success.main,
+            color: 'white',
+            p: 0,
+            minWidth: 0,
+            maxWidth: 360,
+            mx: 'auto',
+          }
+        }}
+        sx={{
+          '& .MuiDialog-paper': {
+            margin: '24px',
+            animation: 'fadeInUp 0.4s',
+          },
+          '@keyframes fadeInUp': {
+            '0%': {
+              transform: 'translateY(30px)',
+              opacity: 0
+            },
+            '100%': {
+              transform: 'translateY(0)',
+              opacity: 1
+            }
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 3, textAlign: 'center', position: 'relative', zIndex: 1 }}>
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 2,
+            }}
+          >
+            <CheckCircleIcon sx={{ fontSize: 40, color: 'white' }} />
+          </Box>
+          <Typography 
+            variant="h6" 
+            fontWeight={700} 
+            sx={{ mb: 1, color: 'white', letterSpacing: 0.2 }}
+          >
+            Student Added Successfully
+          </Typography>
+          <Typography 
+            variant="body2" 
+            sx={{ mb: 2, color: 'white', opacity: 0.92 }}
+          >
+            The new student account has been created and is ready to use.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => setSuccessSnackbarOpen(false)}
+            sx={{
+              background: 'rgba(255,255,255,0.18)',
+              color: 'white',
+              borderRadius: 2,
+              px: 3,
+              py: 1,
+              fontWeight: 600,
+              fontSize: '1rem',
+              boxShadow: 'none',
+              '&:hover': {
+                background: 'rgba(255,255,255,0.28)',
+                color: 'white',
+              },
+              transition: 'all 0.2s',
+            }}
+            autoFocus
+          >
+            Close
+          </Button>
+        </DialogContent>
+        {/* Auto-close indicator (2.5s) */}
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: 'rgba(255,255,255,0.18)',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            sx={{
+              height: '100%',
+              background: 'rgba(255,255,255,0.7)',
+              animation: 'shrinkbar 2.5s linear forwards',
+              '@keyframes shrinkbar': {
+                '0%': { width: '100%' },
+                '100%': { width: '0%' }
+              }
+            }}
+          />
+        </Box>
+      </Dialog>
+      <Dialog
+        open={deleteSuccessOpen}
+        onClose={() => setDeleteSuccessOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            border: 'none',
+            background: theme.palette.success.main,
+            color: 'white',
+            p: 0,
+            minWidth: 0,
+            maxWidth: 360,
+            mx: 'auto',
+          }
+        }}
+        sx={{
+          '& .MuiDialog-paper': {
+            margin: '24px',
+            animation: 'fadeInUp 0.4s',
+          },
+          '@keyframes fadeInUp': {
+            '0%': {
+              transform: 'translateY(30px)',
+              opacity: 0
+            },
+            '100%': {
+              transform: 'translateY(0)',
+              opacity: 1
+            }
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 3, textAlign: 'center', position: 'relative', zIndex: 1 }}>
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 2,
+            }}
+          >
+            <CheckCircleIcon sx={{ fontSize: 40, color: 'white' }} />
+          </Box>
+          <Typography 
+            variant="h6" 
+            fontWeight={700} 
+            sx={{ mb: 1, color: 'white', letterSpacing: 0.2 }}
+          >
+            Student Deleted Successfully
+          </Typography>
+          <Typography 
+            variant="body2" 
+            sx={{ mb: 2, color: 'white', opacity: 0.92 }}
+          >
+            The student account has been deleted from the system.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => setDeleteSuccessOpen(false)}
+            sx={{
+              background: 'rgba(255,255,255,0.18)',
+              color: 'white',
+              borderRadius: 2,
+              px: 3,
+              py: 1,
+              fontWeight: 600,
+              fontSize: '1rem',
+              boxShadow: 'none',
+              '&:hover': {
+                background: 'rgba(255,255,255,0.28)',
+                color: 'white',
+              },
+              transition: 'all 0.2s',
+            }}
+            autoFocus
+          >
+            Close
+          </Button>
+        </DialogContent>
+        {/* Auto-close indicator (2.5s) */}
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: 'rgba(255,255,255,0.18)',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            sx={{
+              height: '100%',
+              background: 'rgba(255,255,255,0.7)',
+              animation: 'shrinkbar 2.5s linear forwards',
+              '@keyframes shrinkbar': {
+                '0%': { width: '100%' },
+                '100%': { width: '0%' }
+              }
+            }}
+          />
+        </Box>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={studentDeleteDialogOpen} onClose={() => setStudentDeleteDialogOpen(false)}>
+        <DialogTitle sx={{ color: theme.palette.error.main, fontWeight: 700 }}>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Are you sure you want to delete <b>{studentToDelete?.firstName || studentToDelete?.first_name || studentToDelete?.fname} {studentToDelete?.lastName || studentToDelete?.last_name || studentToDelete?.lname}</b> (<b>{studentToDelete?.email}</b>)?
+          </Typography>
+          <Alert severity="warning">
+            This action cannot be undone.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setStudentDeleteDialogOpen(false)} variant="outlined">Cancel</Button>
+          <Button onClick={handleDeleteStudent} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
@@ -1228,52 +2389,333 @@ function RecordsSection() {
 
 function TeacherSettings({ user }: { user: any }) {
   const [form, setForm] = useState({
-    fname: user?.firstName || '',
+    full_name: user?.firstName || '',
     subject: user?.subject || '',
-    uname: user?.username || '',
+    username: user?.username || '',
     email: user?.email || '',
     dob: user?.dob || '',
     gender: user?.gender || '',
     id: user?.id || '',
-    img: user?.imageUrl || '',
+    profile_picture: user?.imageUrl || '',
   });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const theme = useTheme();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleProfilePicChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setLoading(true);
     setError('');
-    setSuccess('');
-    const res = await fetch('/api/update-teacher', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    if (!res.ok) setError(data.error || 'Error');
-    else setSuccess('Profile updated successfully! Kindly re-login to see the changes.');
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}.${fileExt}`;
+      
+      console.log('Uploading to bucket: profile-pictures, filePath:', filePath, 'user:', user);
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('profile-pictures')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError, JSON.stringify(uploadError, null, 2));
+        setError('Failed to upload image: ' + (uploadError.message || JSON.stringify(uploadError)));
+        setLoading(false);
+        return;
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage.from('profile-pictures').getPublicUrl(filePath);
+      console.log('getPublicUrl data:', publicUrlData);
+      const publicUrl = publicUrlData?.publicUrl;
+      
+      if (publicUrl) {
+        setForm(prev => ({ ...prev, profile_picture: publicUrl }));
+        // Update in DB immediately - use upsert to create record if it doesn't exist
+        const { error: dbError } = await supabase.from('teacher').upsert({
+          id: user.id,
+          profile_picture: publicUrl,
+          full_name: user.firstName || user.fullName || '',
+          email: user.email || '',
+        });
+        if (dbError) {
+          console.error('Supabase DB update error:', dbError);
+          setError('Failed to update profile picture in database: ' + dbError.message);
+          setLoading(false);
+          return;
+        }
+        // Update Clerk profile image via backend API
+        try {
+          await fetch('/api/update-clerk-profile-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, imageUrl: publicUrl }),
+          });
+        } catch (clerkErr) {
+          console.error('Failed to update Clerk profile image:', clerkErr);
+        }
+      }
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Unexpected error during upload:', err, JSON.stringify(err, null, 2));
+      setError('Unexpected error: ' + (err.message || JSON.stringify(err)));
+      setLoading(false);
+    }
   };
 
+  const handleDeleteProfilePic = async () => {
+    if (!user || !form.profile_picture) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      // Extract file name from URL
+      const urlParts = form.profile_picture.split('/');
+      const fileName = urlParts[urlParts.length - 1].split('?')[0];
+      
+      // Remove from storage
+      const { error: removeError } = await supabase.storage.from('profile-pictures').remove([fileName]);
+      if (removeError) {
+        setError('Failed to delete image: ' + removeError.message);
+        setLoading(false);
+        return;
+      }
+      
+      // Set profile_picture to null in DB - use upsert to create record if it doesn't exist
+      const { error: dbError } = await supabase.from('teacher').upsert({
+        id: user.id,
+        profile_picture: null,
+        full_name: user.firstName || user.fullName || '',
+        email: user.email || '',
+      });
+      if (dbError) {
+        setError('Failed to update database: ' + dbError.message);
+        setLoading(false);
+        return;
+      }
+      
+      setForm(prev => ({ ...prev, profile_picture: '' }));
+      
+      // Remove Clerk profile image via backend API
+      try {
+        await fetch('/api/update-clerk-profile-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, imageUrl: null }),
+        });
+      } catch (clerkErr) {
+        console.error('Failed to remove Clerk profile image:', clerkErr);
+      }
+    } catch (err: any) {
+      setError('Unexpected error: ' + (err.message || String(err)));
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { full_name, email, dob, gender, profile_picture } = form;
+      
+      const { error } = await supabase
+        .from('teacher')
+        .upsert({
+          id: user.id,
+          full_name,
+          email,
+          dob,
+          gender,
+          profile_picture,
+        });
+
+      if (error) throw error;
+
+      setSuccess('Profile updated successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const professionalBoxSx = (theme: any) => ({
+    background: theme.palette.mode === 'dark'
+      ? 'rgba(20, 24, 36, 0.92)'
+      : 'linear-gradient(135deg, #f7fafd 0%, #e3eafc 100%)',
+    maxWidth: 600,
+    mx: 'auto',
+    border: theme.palette.mode === 'dark'
+      ? `2.5px solid ${theme.palette.primary.main}`
+      : '1.5px solid #dbeafe',
+    borderRadius: 4,
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 4px 24px 0 rgba(0,0,0,0.25)'
+      : '0 4px 24px 0 rgba(30,64,175,0.07)',
+    fontFamily: 'Poppins, sans-serif',
+    transition: 'box-shadow 0.2s, border 0.2s, background 0.2s',
+    '&:hover': {
+      boxShadow: theme.palette.mode === 'dark'
+        ? '0 8px 32px 0 rgba(0,0,0,0.32)'
+        : '0 8px 32px 0 rgba(30,64,175,0.13)',
+      borderColor: theme.palette.primary.main,
+    },
+    p: { xs: 2.5, sm: 4 },
+  });
+
   return (
-    <Box display="flex" justifyContent="center" alignItems="flex-start" minHeight="60vh">
-      <Paper sx={{ width: 400, mt: 6, p: 4, borderRadius: 3, boxShadow: 6 }}>
-        <Typography variant="h6" fontWeight={700} mb={2}>My Profile</Typography>
-        <Avatar src={form.img} alt="pro" sx={{ width: 100, height: 100, mx: 'auto', mb: 2 }} />
-        <form onSubmit={handleSubmit}>
-          <TextField label="Full Name" name="fname" value={form.fname} onChange={handleChange} fullWidth required sx={{ mb: 2 }} />
-          <TextField label="Subject" name="subject" value={form.subject} fullWidth disabled sx={{ mb: 2 }} />
-          <TextField label="Username" name="uname" value={form.uname} fullWidth disabled sx={{ mb: 2 }} />
-          <TextField label="Email" name="email" value={form.email} onChange={handleChange} fullWidth required sx={{ mb: 2 }} />
-          <TextField label="Date of Birth" name="dob" type="date" value={form.dob} onChange={handleChange} fullWidth required sx={{ mb: 2 }} InputLabelProps={{ shrink: true }} />
-          <TextField label="Gender" name="gender" value={form.gender} onChange={handleChange} fullWidth required sx={{ mb: 2 }} />
-          <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>Update</Button>
-          {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mt: 2 }}>{success}</Alert>}
-        </form>
-      </Paper>
+    <Box sx={professionalBoxSx(theme)}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+        My Profile
+      </Typography>
+      <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
+        <Avatar 
+          src={form.profile_picture || user.imageUrl} 
+          alt="profile" 
+          sx={{ width: 100, height: 100, border: '3px solid #e3e6ef', mb: 2 }} 
+        />
+        <Box display="flex" gap={1}>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={() => fileInputRef.current?.click()} 
+            disabled={loading}
+            sx={{ borderRadius: 2 }}
+          >
+            {loading ? 'Uploading...' : 'Change Photo'}
+          </Button>
+          {form.profile_picture && (
+            <Button 
+              variant="outlined" 
+              size="small" 
+              color="error" 
+              onClick={handleDeleteProfilePic} 
+              disabled={loading}
+              sx={{ borderRadius: 2 }}
+            >
+              Delete Photo
+            </Button>
+          )}
+        </Box>
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={handleProfilePicChange}
+        />
+      </Box>
+      <form onSubmit={handleSubmit}>
+        <TextField
+          label="Full Name"
+          name="full_name"
+          value={form.full_name}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Subject"
+          name="subject"
+          value={form.subject}
+          fullWidth
+          margin="normal"
+          disabled
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Username"
+          name="username"
+          value={form.username}
+          fullWidth
+          margin="normal"
+          disabled
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Email"
+          name="email"
+          value={form.email}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          required
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Date of Birth"
+          name="dob"
+          type="date"
+          value={form.dob}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          InputLabelProps={{ shrink: true }}
+          required
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Gender (M or F)"
+          name="gender"
+          value={form.gender}
+          onChange={handleChange}
+          fullWidth
+          margin="normal"
+          inputProps={{ maxLength: 1 }}
+          required
+          sx={{ mb: 3 }}
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          color="primary"
+          fullWidth
+          sx={{ 
+            fontWeight: 600, 
+            borderRadius: 2, 
+            background: '#002366', 
+            color: '#fff', 
+            py: 1.5,
+            '&:hover': { background: '#001b4e' } 
+          }}
+          disabled={loading}
+        >
+          {loading ? 'Updating…' : 'Update Profile'}
+        </Button>
+      </form>
+      
+      {/* Snackbar for success */}
+      <Snackbar
+        open={!!success}
+        autoHideDuration={3000}
+        onClose={() => setSuccess('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccess('')} severity="success" sx={{ width: '100%' }}>
+          {success}
+        </Alert>
+      </Snackbar>
+      
+      {/* Snackbar for error */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={4000}
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError('')} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
@@ -1282,7 +2724,7 @@ function ExamsSection({ handleDeleteExam }: { handleDeleteExam: (quizId: number)
   const { user } = useUser();
   const router = useRouter();
   const [exams, setExams] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
@@ -1292,33 +2734,51 @@ function ExamsSection({ handleDeleteExam }: { handleDeleteExam: (quizId: number)
     if (!user?.id) return;
     setLoading(true);
     setError('');
+    
+    try {
     const res = await fetch(`/api/exams?user_id=${user.id}`);
     const data = await res.json();
-    setLoading(false);
-    if (!res.ok) setError(data.error || 'Error');
-    else {
+      
+      if (!res.ok) {
+        setError(data.error || 'Error');
+        return;
+      }
+      
       const exams = data.exams || [];
-      if (exams.length === 0) return setExams([]);
+      if (exams.length === 0) {
+        setExams([]);
+        return;
+      }
+      
       // Fetch all questions for these quiz IDs
       const quizIds = exams.map((q: any) => q.id);
       const { data: questions } = await supabase
         .from('questions')
-        .select('id, quiz_id');
+        .select('id, quiz_id')
+        .in('quiz_id', quizIds);
+        
       const questionCounts: Record<number, number> = {};
       (questions || []).forEach((q: { quiz_id: number }) => {
-        if (quizIds.includes(q.quiz_id)) {
           questionCounts[q.quiz_id] = (questionCounts[q.quiz_id] || 0) + 1;
-        }
       });
+      
       const examsWithCounts = exams.map((q: any) => ({
         ...q,
         questions_count: questionCounts[q.id] || 0,
       }));
+      
       setExams(examsWithCounts);
+    } catch (err) {
+      setError('Failed to fetch exams');
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => { fetchExams(); }, [user?.id]);
+  useEffect(() => { 
+    // Load exams immediately without blocking UI
+    fetchExams(); 
+  }, [user?.id]);
 
   // Pagination logic
   const pageCount = Math.ceil(exams.length / rowsPerPage);
@@ -1412,6 +2872,7 @@ function CreateAnnouncementForm({ user, onClose }: { user: any, onClose: () => v
     tags: [] as string[],
     expires_at: ''
   });
+  const [tagInput, setTagInput] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -1466,13 +2927,18 @@ function CreateAnnouncementForm({ user, onClose }: { user: any, onClose: () => v
   };
 
   const handleTagInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      const newTag = e.currentTarget.value.trim();
-      if (!form.tags.includes(newTag)) {
-        setForm(prev => ({ ...prev, tags: [...prev.tags, newTag] }));
+      e.stopPropagation();
+      
+      if (tagInput && tagInput.trim()) {
+        const newTag = tagInput.trim();
+        // Prevent duplicate tags (case-insensitive)
+        if (!form.tags.some(tag => tag.toLowerCase() === newTag.toLowerCase())) {
+          setForm(prev => ({ ...prev, tags: [...prev.tags, newTag] }));
+        }
+        setTagInput('');
       }
-      e.currentTarget.value = '';
     }
   };
 
@@ -1547,12 +3013,22 @@ function CreateAnnouncementForm({ user, onClose }: { user: any, onClose: () => v
             />
             
             <Box>
-              <Typography variant="subtitle2" gutterBottom>Tags (Press Enter to add)</Typography>
+              <Typography variant="subtitle2" gutterBottom>
+                Tags
+                {form.tags.length > 0 && (
+                  <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>
+                    ({form.tags.length} tag{form.tags.length !== 1 ? 's' : ''})
+                  </Typography>
+                )}
+              </Typography>
               <TextField
-                placeholder="Add tags..."
-                onKeyPress={handleTagInput}
+                value={tagInput || ''}
+                onChange={(e) => setTagInput(e.target.value)}
+                placeholder="Type a tag and press Enter to add..."
+                onKeyDown={handleTagInput}
                 fullWidth
                 size="small"
+                helperText="Type and press Enter to add tags"
               />
               {form.tags.length > 0 && (
                 <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -1564,6 +3040,12 @@ function CreateAnnouncementForm({ user, onClose }: { user: any, onClose: () => v
                       size="small"
                       color="primary"
                       variant="outlined"
+                      sx={{
+                        '&:hover': {
+                          backgroundColor: theme.palette.primary.light,
+                          color: 'white'
+                        }
+                      }}
                     />
                   ))}
                 </Box>
@@ -1591,6 +3073,10 @@ function AnnouncementsSection({ user }: { user: any }) {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [announcementToDelete, setAnnouncementToDelete] = useState<any>(null);
+  const [deleteSuccessOpen, setDeleteSuccessOpen] = useState(false);
   const theme = useTheme();
 
   const fetchAnnouncements = async () => {
@@ -1599,33 +3085,71 @@ function AnnouncementsSection({ user }: { user: any }) {
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching announcements:', error);
+        throw error;
+      }
+      
       setAnnouncements(data || []);
     } catch (err) {
       console.error('Error fetching announcements:', err);
+      setAnnouncements([]);
+      setError('Failed to load announcements.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Load announcements immediately without blocking UI
     fetchAnnouncements();
   }, []);
 
-  const handleDelete = async (id: number) => {
+  // Auto-close success dialog after 2 seconds
+  useEffect(() => {
+    if (deleteSuccessOpen) {
+      const timer = setTimeout(() => setDeleteSuccessOpen(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [deleteSuccessOpen]);
+
+  const handleDeleteClick = (announcement: any) => {
+    setAnnouncementToDelete(announcement);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!announcementToDelete) return;
+    
     try {
       const { error } = await supabase
         .from('announcements')
         .update({ is_active: false })
-        .eq('id', id);
+        .eq('id', announcementToDelete.id);
       
-      if (error) throw error;
-      fetchAnnouncements();
+      if (error) {
+        console.error('Supabase delete error:', error);
+        throw error;
+      }
+      
+      // Immediately remove from UI for real-time experience
+      setAnnouncements(prev => prev.filter(announcement => announcement.id !== announcementToDelete.id));
+      setDeleteDialogOpen(false);
+      setAnnouncementToDelete(null);
+      setDeleteSuccessOpen(true);
     } catch (err) {
       console.error('Error deleting announcement:', err);
+      // If deletion failed, refresh the list to show current state
+      fetchAnnouncements();
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setAnnouncementToDelete(null);
   };
 
   const getPriorityColor = (priority: number) => {
@@ -1666,6 +3190,14 @@ function AnnouncementsSection({ user }: { user: any }) {
           Create Announcement
         </Button>
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          <Typography variant="body1" fontWeight={600}>
+            {error}
+          </Typography>
+        </Alert>
+      )}
 
       <TableContainer component={Paper} sx={{ boxShadow: 'none', background: 'transparent' }}>
         <Table>
@@ -1734,7 +3266,7 @@ function AnnouncementsSection({ user }: { user: any }) {
                   <TableCell>
                     <IconButton 
                       color="error" 
-                      onClick={() => handleDelete(announcement.id)}
+                      onClick={() => handleDeleteClick(announcement)}
                       size="small"
                     >
                       <DeleteIcon />
@@ -1760,6 +3292,150 @@ function AnnouncementsSection({ user }: { user: any }) {
           }} 
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+        <DialogTitle sx={{ color: theme.palette.error.main, fontWeight: 700 }}>
+          Confirm Delete Announcement
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Are you sure you want to delete the announcement <b>"{announcementToDelete?.title}"</b>?
+          </Typography>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Warning:</strong> This action will deactivate the announcement. It can be reactivated later if needed.
+            </Typography>
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} variant="outlined">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+            startIcon={<DeleteIcon />}
+          >
+            Delete Announcement
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Success Dialog */}
+      <Dialog
+        open={deleteSuccessOpen}
+        onClose={() => setDeleteSuccessOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            border: 'none',
+            background: theme.palette.success.main,
+            color: 'white',
+            p: 0,
+            minWidth: 0,
+            maxWidth: 360,
+            mx: 'auto',
+          }
+        }}
+        sx={{
+          '& .MuiDialog-paper': {
+            margin: '24px',
+            animation: 'fadeInUp 0.4s',
+          },
+          '@keyframes fadeInUp': {
+            '0%': {
+              transform: 'translateY(30px)',
+              opacity: 0
+            },
+            '100%': {
+              transform: 'translateY(0)',
+              opacity: 1
+            }
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 3, textAlign: 'center', position: 'relative', zIndex: 1 }}>
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 2,
+            }}
+          >
+            <CheckCircleIcon sx={{ fontSize: 40, color: 'white' }} />
+          </Box>
+          <Typography 
+            variant="h6" 
+            fontWeight={700} 
+            sx={{ mb: 1, color: 'white', letterSpacing: 0.2 }}
+          >
+            Announcement Deleted
+          </Typography>
+          <Typography 
+            variant="body2" 
+            sx={{ mb: 2, color: 'white', opacity: 0.92 }}
+          >
+            The announcement has been successfully deleted.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => setDeleteSuccessOpen(false)}
+            sx={{
+              background: 'rgba(255,255,255,0.18)',
+              color: 'white',
+              borderRadius: 2,
+              px: 3,
+              py: 1,
+              fontWeight: 600,
+              fontSize: '1rem',
+              boxShadow: 'none',
+              '&:hover': {
+                background: 'rgba(255,255,255,0.28)',
+                color: 'white',
+              },
+              transition: 'all 0.2s',
+            }}
+            autoFocus
+          >
+            Close
+          </Button>
+        </DialogContent>
+        {/* Auto-close indicator (2s) */}
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: 'rgba(255,255,255,0.18)',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            sx={{
+              height: '100%',
+              background: 'rgba(255,255,255,0.7)',
+              animation: 'shrinkbar 2s linear forwards',
+              '@keyframes shrinkbar': {
+                '0%': { width: '100%' },
+                '100%': { width: '0%' }
+              }
+            }}
+          />
+        </Box>
+      </Dialog>
     </Box>
   );
 }

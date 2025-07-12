@@ -1,4 +1,5 @@
 import { Box, Typography, CircularProgress } from "@mui/material";
+import Image from 'next/image';
 
 interface RoleRedirectSplashProps {
   name: string;
@@ -24,8 +25,8 @@ export default function RoleRedirectSplash({ name, role }: RoleRedirectSplashPro
         alignItems: "center",
         justifyContent: "center",
         background: `
-          linear-gradient(135deg, #0f172a 0%, #1e293b 100%),
-          radial-gradient(circle at 20% 30%, rgba(56, 189, 248, 0.08) 0%, transparent 25%)
+          linear-gradient(120deg, #0f172a 0%, #2563eb 100%),
+          radial-gradient(circle at 20% 30%, rgba(56, 189, 248, 0.10) 0%, transparent 25%)
         `,
         color: "#f8fafc",
         textAlign: "center",
@@ -54,15 +55,41 @@ export default function RoleRedirectSplash({ name, role }: RoleRedirectSplashPro
           width: "100%"
         }}
       >
+        {/* Modern Illustration */}
+        <Box mb={3} display="flex" justifyContent="center">
+          <Box sx={{
+            width: { xs: 120, sm: 180 },
+            height: { xs: 32, sm: 48 },
+            position: 'relative',
+            mx: 'auto',
+            filter: 'drop-shadow(0 4px 24px rgba(56,189,248,0.18))',
+            animation: 'shimmer 2.2s infinite linear',
+            '@keyframes shimmer': {
+              '0%': { filter: 'drop-shadow(0 4px 24px rgba(56,189,248,0.18)) brightness(1)' },
+              '50%': { filter: 'drop-shadow(0 8px 32px rgba(56,189,248,0.32)) brightness(1.08)' },
+              '100%': { filter: 'drop-shadow(0 4px 24px rgba(56,189,248,0.18)) brightness(1)' },
+            }
+          }}>
+            <Image
+              src="/assets/illustrations/loading-bar.png"
+              alt="Loading bar"
+              fill
+              style={{ objectFit: 'contain' }}
+              priority
+            />
+          </Box>
+        </Box>
+
         <Typography 
           component="h1"
-          variant="h4"
-          fontWeight={600}
-          mb={3}
+          variant="h3"
+          fontWeight={800}
+          mb={2}
           sx={{
             color: "#ffffff",
-            letterSpacing: "0.3px",
-            lineHeight: 1.3
+            letterSpacing: "0.5px",
+            lineHeight: 1.2,
+            textShadow: '0 2px 16px rgba(30,64,175,0.13)'
           }}
         >
           Welcome, {name}
@@ -70,42 +97,48 @@ export default function RoleRedirectSplash({ name, role }: RoleRedirectSplashPro
 
         <Typography
           component="p"
-          variant="h6"
+          variant="h5"
           mb={4}
           sx={{
-            color: "#e2e8f0",
+            color: "#e0e7ef",
             fontWeight: 400,
-            "& strong": {
+            letterSpacing: 0.2,
+            mb: 3,
+            '& strong': {
               color: "#38bdf8",
-              fontWeight: 500
+              fontWeight: 600
             }
           }}
         >
           Loading <strong>{roleDisplay}</strong> dashboard...
         </Typography>
 
-        <CircularProgress 
-          size={72}
-          thickness={4}
-          sx={{ 
-            color: "#38bdf8",
-            mb: 5,
-            "& .MuiCircularProgress-circle": {
-              strokeLinecap: "round"
-            }
-          }} 
-        />
+        <Box mb={5} display="flex" justifyContent="center">
+          <CircularProgress 
+            size={64}
+            thickness={4.5}
+            sx={{ 
+              color: "#38bdf8",
+              '& .MuiCircularProgress-circle': {
+                strokeLinecap: "round"
+              }
+            }} 
+          />
+        </Box>
 
         <Typography 
           component="p"
-          variant="body2"
+          variant="body1"
           sx={{
-            color: "#94a3b8",
+            color: "#b6c2d6",
             fontStyle: "italic",
             maxWidth: "600px",
             mx: "auto",
-            "&::before": { content: '"“"', mr: 0.5 },
-            "&::after": { content: '"”"', ml: 0.5 }
+            fontWeight: 500,
+            fontSize: { xs: '1rem', sm: '1.1rem' },
+            letterSpacing: 0.1,
+            '&::before': { content: '"“"', mr: 0.5 },
+            '&::after': { content: '"”"', ml: 0.5 }
           }}
         >
           Please wait while we prepare your workspace

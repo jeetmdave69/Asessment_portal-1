@@ -22,16 +22,6 @@ export default function LoadingScreen({ portal = false, sx = {}, ...other }: Loa
       <Fade in>
         <LoadingContent sx={sx} {...other}>
           <CircularProgress size={48} thickness={4} sx={{ mb: 3, color: 'primary.main' }} />
-          <img
-            src="/assets/illustrations/loading-bar.png"
-            alt="Loading"
-            style={{
-              width: 120,
-              height: 120,
-              objectFit: 'contain',
-              marginBottom: 24,
-            }}
-          />
           <LinearProgress color="primary" sx={{ width: '100%', maxWidth: 360, mb: 2 }} />
           <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 2 }}>
             Loading, please wait...

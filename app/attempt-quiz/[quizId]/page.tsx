@@ -91,7 +91,6 @@ interface Question {
   marks?: number
   question_type: string
   explanation?: string
-  difficulty?: 'easy' | 'medium' | 'hard'
 }
 interface Quiz {
   id: number
@@ -147,12 +146,6 @@ const NAV_COLORS = {
   borderCurrent: '#002366',
   borderMarkedForReview: '#7b1fa2',
   borderBookmarked: '#ffb300'
-}
-
-const DIFFICULTY_COLORS: Record<string, string> = {
-  easy: '#43a047',      // Green
-  medium: '#ffa000',    // Amber
-  hard: '#d32f2f'       // Red
 }
 
 const QuestionButton = ({
@@ -354,24 +347,23 @@ export default function AttemptQuizPage() {
           section_id: q.section_id,
           marks: q.marks || 1,
           question_type: q.question_type || 'single',
-          explanation: q.explanation,
-          difficulty: q.difficulty || 'medium'
+          explanation: q.explanation
         }))
 
         setQuestions(parsedQuestions)
 
         // Initialize time (persistent timer)
-        const durationInSeconds = (quizData.duration || 30) * 60
-        setTotalTime(durationInSeconds)
-        let startTime = localStorage.getItem(`quiz-${quizId}-startTime`)
-        if (!startTime) {
-          // Store as minutes since epoch
-          startTime = Math.floor(Date.now() / 60000).toString();
-          localStorage.setItem(`quiz-${quizId}-startTime`, startTime)
-        }
-        const elapsed = Math.floor((Date.now() / 60000) - parseInt(startTime, 10))
-        const remaining = Math.floor(durationInSeconds / 60) - elapsed
-        setTimeLeft(remaining > 0 ? remaining : 0)
+        const durationInSeconds = (quizData.duration || 30) * 60;
+        setTotalTime(durationInSeconds);
+        // Always set start time and duration in ms
+        const startTimeMs = Date.now();
+        localStorage.setItem(`quiz-${quizId}-startTime`, startTimeMs.toString());
+        const durationMs = durationInSeconds * 1000;
+        localStorage.setItem(`quiz-${quizId}-duration`, durationMs.toString());
+        // Timer state
+        const elapsed = Math.floor((Date.now() - startTimeMs) / 1000); // seconds
+        const remaining = durationInSeconds - elapsed;
+        setTimeLeft(remaining > 0 ? remaining : 0);
 
         // Load saved state
         const savedState = localStorage.getItem(`quiz-${quizId}-state`)
@@ -386,6 +378,16 @@ export default function AttemptQuizPage() {
           setFlagged(typeof flags === 'string' ? JSON.parse(flags) : (flags || {}))
           setBookmarked(typeof bookmarks === 'string' ? JSON.parse(bookmarks) : (bookmarks || {}))
           setMarkedForReview(typeof reviews === 'string' ? JSON.parse(reviews) : (reviews || {}))
+          // Only show restored notification if there is actual data
+          const hasRestored = (
+            Object.keys(fixedAnswers).length > 0 ||
+            Object.keys(flags || {}).length > 0 ||
+            Object.keys(bookmarks || {}).length > 0 ||
+            Object.keys(reviews || {}).length > 0
+          );
+          setRestoredNotification(hasRestored);
+        } else {
+          setRestoredNotification(false);
         }
 
         if ((sectionData || []).length > 0) {
@@ -683,7 +685,13 @@ export default function AttemptQuizPage() {
             flagged: flagged || {},
             bookmarked: bookmarked || {},
             marked_for_review: markedForReview || {},
-            start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
+            start_time: (() => {
+              const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
+              if (!startTime) return undefined;
+              const num = Number(startTime);
+              if (isNaN(num)) return undefined;
+              return new Date(num).toISOString();
+            })(),
           })
         });
       } catch (e) {
@@ -707,7 +715,13 @@ export default function AttemptQuizPage() {
           flagged: progress.flagged,
           bookmarked: progress.bookmarked,
           marked_for_review: progress.markedForReview,
-          start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
+          start_time: (() => {
+            const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
+            if (!startTime) return undefined;
+            const num = Number(startTime);
+            if (isNaN(num)) return undefined;
+            return new Date(num).toISOString();
+          })(),
         })
       });
     }, 5000)
@@ -730,7 +744,13 @@ export default function AttemptQuizPage() {
         flagged: flagged || {},
         bookmarked: bookmarked || {},
         marked_for_review: markedForReview || {},
-        start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
+        start_time: (() => {
+          const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
+          if (!startTime) return undefined;
+          const num = Number(startTime);
+          if (isNaN(num)) return undefined;
+          return new Date(num).toISOString();
+        })(),
       };
       console.log('Saving quiz progress:', payload);
       fetch('/api/quiz-progress', {
@@ -759,7 +779,13 @@ export default function AttemptQuizPage() {
         flagged: flagged || {},
         bookmarked: bookmarked || {},
         marked_for_review: markedForReview || {},
-        start_time: localStorage.getItem(`quiz-${quizId}-startTime`) ? new Date(Number(localStorage.getItem(`quiz-${quizId}-startTime`) * 60000)).toISOString() : undefined,
+        start_time: (() => {
+          const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
+          if (!startTime) return undefined;
+          const num = Number(startTime);
+          if (isNaN(num)) return undefined;
+          return new Date(num).toISOString();
+        })(),
       };
       console.log('Saving quiz progress (unload):', payload);
       fetch('/api/quiz-progress', {
@@ -779,6 +805,12 @@ export default function AttemptQuizPage() {
     setConfirmDialogOpen(false)
     setSubmittingModalOpen(true)
     setSubmitted(true)
+    // Add a timeout fallback
+    const submissionTimeout = setTimeout(() => {
+      setSubmittingModalOpen(false);
+      setErrorPopup('Submission is taking too long. Please check your connection and try again.');
+      setSubmitted(false);
+    }, 15000); // 15 seconds
     try {
       // Prepare correct answers
       const correctAnswers: Record<number, string[]> = {}
@@ -794,7 +826,7 @@ export default function AttemptQuizPage() {
         }
       });
       // Save answers as indices for review page
-      const answersIndices: Record<number, number[]> = {};
+      const answersIndices: Record<string, number[]> = {};
       Object.entries(answers).forEach(([qid, arr]) => {
         answersIndices[qid] = (arr as number[]).map(Number);
       });
@@ -812,15 +844,18 @@ export default function AttemptQuizPage() {
       const status = 1;
       // Backend validation: Check time and attempt count
       // Fetch latest attempt count and quiz start time from DB
+      console.log('DEBUG: Fetching attempts from Supabase...');
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('attempts')
         .select('id,submitted_at')
         .eq('quiz_id', Number(quizId))
         .eq('user_id', user?.id);
+      console.log('DEBUG: attemptsData:', attemptsData, 'attemptsError:', attemptsError);
       if (attemptsError) throw attemptsError;
       if (attemptsData && attemptsData.length >= (quiz?.max_attempts || 1)) {
         setErrorPopup('You have reached the maximum number of attempts for this quiz.');
         setSubmitted(false);
+        clearTimeout(submissionTimeout);
         return;
       }
       // Check time (server-side)
@@ -830,16 +865,18 @@ export default function AttemptQuizPage() {
       if (quizStart && now < quizStart) {
         setErrorPopup('Quiz has not started yet.');
         setSubmitted(false);
+        clearTimeout(submissionTimeout);
         return;
       }
       if (quizEnd && now > quizEnd) {
         setErrorPopup('Quiz time is over.');
         setSubmitted(false);
+        clearTimeout(submissionTimeout);
         return;
       }
       // Prepare submission data
       const startTimeStr = localStorage.getItem(`quiz-${quizId}-startTime`);
-      const start_time = startTimeStr ? new Date(Number(startTimeStr) * 60000).toISOString() : undefined;
+      const start_time = startTimeStr ? new Date(Number(startTimeStr)).toISOString() : undefined;
       // Debug logs for timing
       console.log('DEBUG: start_time in localStorage:', startTimeStr, 'as ISO:', start_time);
       console.log('DEBUG: submitted_at:', new Date().toISOString());
@@ -848,26 +885,39 @@ export default function AttemptQuizPage() {
         user_id: user?.id,
         user_name: user?.fullName || 'Anonymous',
         answers: answersIndices,
-        answers_text: answersText,
         correct_answers: correctAnswers,
         submitted_at: new Date().toISOString(),
         score: Math.round(obtainedMarks),
-        total_questions: Math.round(totalQuestions),
         total_marks: Math.round(totalMarks),
-        correct_count: Math.round(correctCount),
-        percentage,
-        status: Math.round(status),
-        marked_for_review: markedForReview,
-        start_time
+        total_questions: Math.round(totalQuestions), // optional
+        correct_count: Math.round(correctCount), // optional
+        percentage: Math.round(percentage), // optional
+        status: Math.round(status), // optional
+        marked_for_review: markedForReview, // optional
+        start_time // optional
       }
+      console.log('DEBUG: submissionData:', submissionData);
       // Debug log for user ID and payload
       console.log('DEBUG: submitting as user_id:', user?.id);
       console.log('DEBUG: submissionData:', submissionData);
-      // Save to database
-      const { error } = await supabase
+      // Save to database with a 10s timeout
+      console.log('DEBUG: Inserting attempt into Supabase...');
+      let insertError = null;
+      let insertResult: any = undefined;
+      const insertPromise = supabase
         .from('attempts')
-        .insert([submissionData])
-      if (error) {
+        .insert([submissionData]);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase insert timed out')), 10000)
+      );
+      try {
+        insertResult = await Promise.race([insertPromise, timeoutPromise]);
+      } catch (err) {
+        insertError = err;
+      }
+      console.log('DEBUG: Insert finished', insertResult, insertError);
+      if (insertError || (insertResult?.error)) {
+        const error = insertError || insertResult?.error;
         // Enhanced error handling for RLS and other errors
         console.error('Submission error:', error, JSON.stringify(error, null, 2));
         if (
@@ -887,24 +937,33 @@ export default function AttemptQuizPage() {
           setErrorPopup("Failed to submit. Please check your network connection or try again.");
         }
         setSubmitted(false);
+        setSubmittingModalOpen(false);
+        setShowSubmitThankYou(false);
+        clearTimeout(submissionTimeout);
         return;
       }
       // After successful submission, delete progress
-      await fetch('/api/quiz-progress', {
+      console.log('DEBUG: Deleting quiz progress...');
+      const deleteRes = await fetch('/api/quiz-progress', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quiz_id: quizId, user_id: user?.id })
       });
+      console.log('DEBUG: quiz-progress delete response:', deleteRes);
       setRedirectMessage('Quiz submitted! Redirecting to dashboard...')
       setShowSubmitThankYou(true)
+      setSubmittingModalOpen(false)
+      clearTimeout(submissionTimeout);
       setTimeout(() => {
-        setSubmittingModalOpen(false)
         router.push('/dashboard/student')
       }, 3500)
     } catch (error) {
       setErrorPopup("An unexpected error occurred. Please try again.");
+      setSubmittingModalOpen(false);
+      setShowSubmitThankYou(false);
       console.error('Submission error:', error, JSON.stringify(error, null, 2));
       setSubmitted(false);
+      clearTimeout(submissionTimeout);
     }
   }
 
@@ -944,67 +1003,68 @@ export default function AttemptQuizPage() {
     return { score, totalMarks, obtainedMarks, percentage, passed };
   }
 
-  // Handle online/offline events for timer pause/resume
+  // --- TIMER REFACTOR START ---
+  // Robust timer state: only set start time if not already set, always use ms
   useEffect(() => {
-    function handleOffline() {
-      setIsOffline(true);
-      setPauseStart(Date.now());
-      localStorage.setItem(`quiz-${quizId}-paused`, 'true');
-      localStorage.setItem(`quiz-${quizId}-pauseStart`, Date.now().toString());
+    if (!quizId || !quiz) return;
+    const startKey = `quiz-${quizId}-startTime`;
+    const durationKey = `quiz-${quizId}-duration`;
+    const pausedKey = `quiz-${quizId}-pausedDuration`;
+    // Set start time only if not already set
+    if (!localStorage.getItem(startKey)) {
+      localStorage.setItem(startKey, Date.now().toString());
     }
-    function handleOnline() {
-      setIsOffline(false);
-      const pauseStartStr = localStorage.getItem(`quiz-${quizId}-pauseStart`);
-      if (pauseStartStr) {
-        const pauseStartTime = parseInt(pauseStartStr, 10);
-        const pauseDuration = Date.now() - pauseStartTime;
-        setPausedDuration((prev) => prev + pauseDuration);
-        localStorage.setItem(`quiz-${quizId}-pausedDuration`, ((parseInt(localStorage.getItem(`quiz-${quizId}-pausedDuration`) || '0', 10)) + pauseDuration).toString());
-      }
-      setPauseStart(null);
-      localStorage.removeItem(`quiz-${quizId}-paused`);
-      localStorage.removeItem(`quiz-${quizId}-pauseStart`);
+    // Set duration (ms) only if not already set
+    if (!localStorage.getItem(durationKey)) {
+      const durationMs = (quiz.duration && quiz.duration > 0 ? quiz.duration : 30) * 60 * 1000;
+      localStorage.setItem(durationKey, durationMs.toString());
     }
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('online', handleOnline);
-    // On mount, restore pause state
-    if (typeof window !== 'undefined') {
-      const paused = localStorage.getItem(`quiz-${quizId}-paused`) === 'true';
-      const pauseStartStr = localStorage.getItem(`quiz-${quizId}-pauseStart`);
-      const pausedDurStr = localStorage.getItem(`quiz-${quizId}-pausedDuration`);
-      if (paused) setIsOffline(true);
-      if (pauseStartStr) setPauseStart(parseInt(pauseStartStr, 10));
-      if (pausedDurStr) setPausedDuration(parseInt(pausedDurStr, 10));
+    // Set paused duration to 0 if not already set
+    if (!localStorage.getItem(pausedKey)) {
+      localStorage.setItem(pausedKey, '0');
     }
-    return () => {
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [quizId]);
+  }, [quizId, quiz?.id]);
 
-  // Timer countdown effect (modified for pause)
+  // Timer countdown effect (robust, ms-based)
+  const timerWasPositive = useRef(false);
   useEffect(() => {
-    if (submitted || timeLeft === null) return;
-    if (isOffline) return; // Pause timer if offline
-    if (timeLeft <= 0) {
-      confirmSubmit(); // Force submit when timer goes off
-      return;
-    }
-    if (timeLeft <= 60 && !showLastMinuteWarning) {
-      setShowLastMinuteWarning(true);
-    }
-    const timer = setInterval(() => {
-      const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
-      const pausedDurStr = localStorage.getItem(`quiz-${quizId}-pausedDuration`);
-      const pausedDur = pausedDurStr ? parseInt(pausedDurStr, 10) : pausedDuration;
-      if (startTime) {
-        const elapsed = Math.floor((Date.now() / 60000) - parseInt(startTime, 10) - pausedDur);
-        const remaining = totalTime - elapsed;
-        setTimeLeft(remaining > 0 ? remaining : 0);
+    if (!quizId || !quiz) return;
+    if (submitted) return;
+    let timerId: NodeJS.Timeout;
+    function tick() {
+      const startKey = `quiz-${quizId}-startTime`;
+      const durationKey = `quiz-${quizId}-duration`;
+      const pausedKey = `quiz-${quizId}-pausedDuration`;
+      const pauseStartKey = `quiz-${quizId}-pauseStart`;
+      const startTime = Number(localStorage.getItem(startKey));
+      const duration = Number(localStorage.getItem(durationKey));
+      let pausedDuration = Number(localStorage.getItem(pausedKey) || '0');
+      // If currently paused, add current pause duration
+      const pauseStartStr = localStorage.getItem(pauseStartKey);
+      if (pauseStartStr) {
+        const pauseStart = Number(pauseStartStr);
+        if (!isNaN(pauseStart)) {
+          pausedDuration += Date.now() - pauseStart;
+        }
       }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft, submitted, quizId, totalTime, isOffline, pausedDuration, showLastMinuteWarning]);
+      if (!startTime || !duration) return;
+      const elapsed = Date.now() - startTime - pausedDuration;
+      const remaining = Math.max(0, Math.floor((duration - elapsed) / 1000)); // in seconds
+      setTimeLeft(remaining);
+      if (remaining > 0) {
+        timerWasPositive.current = true;
+      }
+      // Only auto-submit if timer was ever positive and now reached 0
+      if (remaining <= 0 && timerWasPositive.current) {
+        confirmSubmit();
+        timerWasPositive.current = false;
+      }
+    }
+    timerId = setInterval(tick, 1000);
+    tick(); // initial call
+    return () => clearInterval(timerId);
+  }, [quizId, quiz, submitted]);
+  // --- TIMER REFACTOR END ---
 
   // Add a useEffect to always sync isOffline with navigator.onLine on mount and on online/offline events.
   useEffect(() => {
@@ -1069,7 +1129,64 @@ export default function AttemptQuizPage() {
       WebkitUserSelect: 'none',
       MozUserSelect: 'none',
       msUserSelect: 'none',
+      // Watermark background
+      position: 'relative',
+      zIndex: 0,
     }}>
+      {/* Watermark Layer */}
+      <Box
+        aria-hidden="true"
+        sx={{
+          pointerEvents: 'none',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 0,
+          opacity: 0.13,
+          backgroundImage: `repeating-linear-gradient(135deg, transparent 0 60px, rgba(0,0,0,0.01) 60px 80px, transparent 80px 120px), repeating-linear-gradient(45deg, transparent 0 60px, rgba(0,0,0,0.01) 60px 80px, transparent 80px 120px)`,
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            flexWrap: 'wrap',
+            zIndex: 0,
+            pointerEvents: 'none',
+            opacity: 0.18,
+            userSelect: 'none',
+          }}
+        >
+          {Array.from({ length: 12 }).map((_, row) => (
+            <Box key={row} sx={{ width: '100vw', display: 'flex', justifyContent: 'space-between', mb: 0 }}>
+              {Array.from({ length: 4 }).map((_, col) => (
+                <Typography
+                  key={col}
+                  sx={{
+                    fontSize: { xs: '2.2rem', sm: '2.8rem', md: '3.2rem' },
+                    fontWeight: 700,
+                    color: '#002366',
+                    opacity: 0.13,
+                    transform: `rotate(-25deg)`,
+                    whiteSpace: 'nowrap',
+                    mx: 6,
+                    my: 2,
+                    userSelect: 'none',
+                  }}
+                >
+                  {(user?.fullName || 'Anonymous')}
+                </Typography>
+              ))}
+            </Box>
+          ))}
+        </Box>
+      </Box>
       {/* Offline Overlay */}
       {isOffline && (
         <Box
@@ -1478,18 +1595,6 @@ export default function AttemptQuizPage() {
                   <Typography variant="h6" fontWeight="bold" sx={{ pr: 4 }}>
                     {currentQuestion.question_text}
                   </Typography>
-                  {currentQuestion.difficulty && (
-                    <Chip 
-                      label={currentQuestion.difficulty} 
-                      size="small" 
-                      sx={{ 
-                        mt: 1,
-                        backgroundColor: DIFFICULTY_COLORS[currentQuestion.difficulty],
-                        color: '#fff',
-                        fontWeight: 'bold'
-                      }} 
-                    />
-                  )}
                 </Box>
                 
                 <Box display="flex" gap={1}>

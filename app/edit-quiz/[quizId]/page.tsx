@@ -25,14 +25,14 @@ import {
   Card,
   LinearProgress
 } from "@mui/material";
-import { useForm, FormProvider, useFieldArray } from "react-hook-form";
+import { useForm, FormProvider, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { quizSchema, QuizFormValues } from "@/schemas/quizSchema";
-import { DateTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from "dayjs";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -263,15 +263,15 @@ export default function EditQuizPage() {
     // Detailed logging for debugging
     const quizUpdatePayload = {
       quiz_title: data.quizTitle,
-      description: data.description,
-      total_marks: parseInt(data.totalMarks),
-      duration: parseInt(data.duration),
-      start_time: data.startDateTime.toISOString(),
-      end_time: data.expiryDateTime.toISOString(),
-      shuffle_questions: data.shuffleQuestions,
-      shuffle_options: data.shuffleOptions,
-      max_attempts: parseInt(data.maxAttempts),
-      preview_mode: data.previewMode,
+        description: data.description,
+        total_marks: parseInt(data.totalMarks),
+        duration: parseInt(data.duration),
+        start_time: data.startDateTime.toISOString(),
+        end_time: data.expiryDateTime.toISOString(),
+        shuffle_questions: data.shuffleQuestions,
+        shuffle_options: data.shuffleOptions,
+        max_attempts: parseInt(data.maxAttempts),
+        preview_mode: data.previewMode,
       show_correct_answers: data.showCorrectAnswers,
       passing_score: parseInt(data.passingScore),
     };
@@ -325,7 +325,7 @@ export default function EditQuizPage() {
     setShowToast(true);
     setShowSuccessDialog(true);
     setSaveErrorMessage(null);
-};
+  };
 
   if (loading) return <CircularProgress sx={{ mx: "auto", mt: 10, display: "block" }} />;
 
@@ -333,9 +333,9 @@ export default function EditQuizPage() {
 
   return (
     <>
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <Container maxWidth="md" sx={{ py: 5 }}>
-          <FormProvider {...methods}>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Container maxWidth="md" sx={{ py: 5 }}>
+        <FormProvider {...methods}>
             {saving && (
               <Box sx={{ width: '100%', mb: 2 }}>
                 <LinearProgress />
@@ -356,7 +356,7 @@ export default function EditQuizPage() {
                 }
               })(e);
             }}>
-              <Stack spacing={4}>
+            <Stack spacing={4}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3, position: 'relative' }}>
                   <Button
                     startIcon={<ArrowBackIcon />}
@@ -370,9 +370,9 @@ export default function EditQuizPage() {
                     Edit Quiz
                   </Typography>
                 </Box>
-                <Paper elevation={3} sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-                  <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Quiz Information</Typography>
-                  <Stack spacing={2}>
+              <Paper elevation={3} sx={{ p: 3, borderRadius: 3, mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main' }}>Quiz Information</Typography>
+                <Stack spacing={2}>
                     <TextField
                       label="Quiz Title"
                       {...register("quizTitle")}
@@ -389,38 +389,38 @@ export default function EditQuizPage() {
                       multiline
                       minRows={2}
                     />
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                      <TextField label="Total Marks" type="number" {...register("totalMarks")} fullWidth helperText="Sum of all question marks." />
-                      <TextField label="Duration (mins)" type="number" {...register("duration")} fullWidth helperText="How long students have to complete the quiz." />
-                    </Stack>
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                      <DateTimePicker
-                        label="Start Date & Time"
-                        value={dayjs(watch("startDateTime"))}
-                        onChange={(val) => setValue("startDateTime", val?.toDate() || new Date())}
-                      />
-                      <DateTimePicker
-                        label="End Date & Time"
-                        value={dayjs(watch("expiryDateTime"))}
-                        onChange={(val) => setValue("expiryDateTime", val?.toDate() || new Date())}
-                      />
-                    </Stack>
-                    <TextField label="Max Attempts" type="number" {...register("maxAttempts")} fullWidth helperText="How many times a student can attempt this quiz." />
-                    <Stack direction="row" spacing={2}>
-                      <FormControlLabel control={<Checkbox {...register("previewMode")} />} label="Enable Preview Mode" />
-                      <FormControlLabel control={<Checkbox {...register("shuffleQuestions")} />} label="Shuffle Questions" />
-                      <FormControlLabel control={<Checkbox {...register("shuffleOptions")} />} label="Shuffle Options" />
-                    </Stack>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField label="Total Marks" type="number" {...register("totalMarks")} fullWidth helperText="Sum of all question marks." />
+                    <TextField label="Duration (mins)" type="number" {...register("duration")} fullWidth helperText="How long students have to complete the quiz." />
                   </Stack>
-                </Paper>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="h6" sx={{ color: 'primary.main', mb: 2 }}>Questions</Typography>
-                <Stack spacing={2}>
-                  {fields.map((q, i) => {
-                    const opts = watch(`questions.${i}.options`);
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <DateTimePicker
+                      label="Start Date & Time"
+                      value={dayjs(watch("startDateTime"))}
+                      onChange={(val) => setValue("startDateTime", val?.toDate() || new Date())}
+                    />
+                    <DateTimePicker
+                      label="End Date & Time"
+                      value={dayjs(watch("expiryDateTime"))}
+                      onChange={(val) => setValue("expiryDateTime", val?.toDate() || new Date())}
+                    />
+                  </Stack>
+                  <TextField label="Max Attempts" type="number" {...register("maxAttempts")} fullWidth helperText="How many times a student can attempt this quiz." />
+                  <Stack direction="row" spacing={2}>
+                    <FormControlLabel control={<Checkbox {...register("previewMode")} />} label="Enable Preview Mode" />
+                    <FormControlLabel control={<Checkbox {...register("shuffleQuestions")} />} label="Shuffle Questions" />
+                    <FormControlLabel control={<Checkbox {...register("shuffleOptions")} />} label="Shuffle Options" />
+                  </Stack>
+                </Stack>
+              </Paper>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" sx={{ color: 'primary.main', mb: 2 }}>Questions</Typography>
+              <Stack spacing={2}>
+                {fields.map((q, i) => {
+                  const opts = watch(`questions.${i}.options`);
                     const hasError = questionErrorIndexes.includes(i);
                     const questionErrorMessages = getQuestionErrorMessages(methods.formState.errors, i);
-                    return (
+                  return (
                       <Accordion
                         key={q.id}
                         expanded={expandedPanel === i}
@@ -428,7 +428,7 @@ export default function EditQuizPage() {
                         sx={{ borderRadius: 2, boxShadow: 2, mb: 1, border: hasError ? '2px solid #d32f2f' : undefined }}
                         id={`question-accordion-${i}`}
                       >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                           <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                             <Typography fontWeight={600} sx={{ color: 'text.primary', mr: 1 }}>
                               {`Q${i + 1}. `}{watch(`questions.${i}.question`) || `Question ${i + 1}`}
@@ -447,10 +447,10 @@ export default function EditQuizPage() {
                                 <li key={idx}>{msg}</li>
                               ))}
                             </ul>
-                          </Box>
+                        </Box>
                         )}
-                        <AccordionDetails>
-                          <Stack spacing={2}>
+                      <AccordionDetails>
+                        <Stack spacing={2}>
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                               <Select
                                 label="Section"
@@ -470,21 +470,33 @@ export default function EditQuizPage() {
                                 ))}
                                 <MenuItem value="__add_new__" sx={{ fontStyle: 'italic', color: 'primary.main' }}>+ Add new section</MenuItem>
                               </Select>
-                              <TextField label="Question" {...register(`questions.${i}.question`)} fullWidth required />
+                          <Controller
+                            name={`questions.${i}.question`}
+                            control={control}
+                            defaultValue={q.question || ''}
+                            render={({ field }) => (
+                              <TextField
+                                label="Question"
+                                {...field}
+                                fullWidth
+                                required
+                              />
+                            )}
+                          />
                             </Stack>
-                            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                               <Select label="Type" value={watch(`questions.${i}.questionType`) as "single" | "multiple"} onChange={e => setValue(`questions.${i}.questionType`, e.target.value as "single" | "multiple")}>
                                 <MenuItem value="single">Single Choice</MenuItem>
                                 <MenuItem value="multiple">Multiple Choice</MenuItem>
-                              </Select>
+                            </Select>
                               <TextField label="Marks" type="number" value={watch(`questions.${i}.marks`)} onChange={e => setValue(`questions.${i}.marks`, e.target.value)} fullWidth />
                             </Stack>
                             <TextField label="Explanation (optional)" {...register(`questions.${i}.explanation`)} fullWidth multiline minRows={2} />
                             <Stack direction="row" spacing={2} alignItems="center">
                               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Options:</Typography>
                               <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setValue(`questions.${i}.options`, [...opts, { text: '', image: null, isCorrect: false }])}>Add Option</Button>
-                            </Stack>
-                            <Stack spacing={1}>
+                          </Stack>
+                          <Stack spacing={1}>
                               {opts.map((opt, optIdx) => (
                                 <Stack key={optIdx} direction="row" alignItems="center" spacing={1}>
                                   <TextField
@@ -504,8 +516,8 @@ export default function EditQuizPage() {
                                   }}>
                                     <DeleteIcon />
                                   </IconButton>
-                                </Stack>
-                              ))}
+                              </Stack>
+                            ))}
                             </Stack>
                             <Stack direction="row" spacing={1} alignItems="center">
                               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Correct Answers:</Typography>
@@ -533,11 +545,34 @@ export default function EditQuizPage() {
                                 Delete Question
                               </Button>
                             </Box>
-                          </Stack>
-                        </AccordionDetails>
-                      </Accordion>
-                    );
-                  })}
+                        </Stack>
+                      </AccordionDetails>
+                    </Accordion>
+                  );
+                })}
+                {/* Add Question Button */}
+                <Box display="flex" justifyContent="center" mt={2}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<AddIcon />}
+                    onClick={() => append({
+                      question: '',
+                      image: null,
+                      explanation: '',
+                      questionType: 'single',
+                      section: sections[0]?.name || '',
+                      marks: '1',
+                      options: [
+                        { text: '', image: null, isCorrect: false },
+                        { text: '', image: null, isCorrect: false }
+                      ]
+                    })}
+                    sx={{ fontWeight: 700, borderRadius: 2 }}
+                  >
+                    Add Question
+                  </Button>
+                </Box>
                 </Stack>
                 <Card elevation={6} sx={{ mt: 4, mb: 2, p: 3, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'background.paper', boxShadow: 6 }}>
                   <Box>
@@ -550,11 +585,11 @@ export default function EditQuizPage() {
                   </Box>
                   <Button type="submit" variant="contained" size="large" sx={{ px: 5, fontWeight: 700, ml: 3 }}>
                     Save Changes
-                  </Button>
+                </Button>
                 </Card>
-              </Stack>
-            </form>
-          </FormProvider>
+            </Stack>
+          </form>
+        </FormProvider>
         </Container>
         <Snackbar open={showToast || errorToast} autoHideDuration={6000} onClose={() => { setShowToast(false); setErrorToast(false); }}>
           <Alert onClose={() => { setShowToast(false); setErrorToast(false); }} severity={errorToast ? "error" : "success"} sx={{ width: '100%' }}>
@@ -635,7 +670,7 @@ export default function EditQuizPage() {
             }} color="error" variant="contained">Delete</Button>
           </DialogActions>
         </Dialog>
-      </LocalizationProvider>
+    </LocalizationProvider>
     </>
   );
 }

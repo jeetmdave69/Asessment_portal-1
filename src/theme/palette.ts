@@ -12,6 +12,14 @@ const darkPalette: PaletteOptions = {
   primary: {
     main: '#2065D1',
   },
+  background: {
+    default: '#121212',
+    paper: '#1e1e1e',
+  },
+  text: {
+    primary: '#ffffff',
+    secondary: '#aaaaaa',
+  },
 };
 
 export const palette = {

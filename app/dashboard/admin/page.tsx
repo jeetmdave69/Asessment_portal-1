@@ -22,6 +22,7 @@ import IconButton from '@mui/material/IconButton';
 import { Iconify } from '@/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 const sidebarLinks = [
   { text: 'Dashboard', icon: <DashboardIcon />, tab: 'dashboard' },
@@ -73,9 +74,39 @@ export default function AdminDashboardPage() {
   const [message, setMessage] = useState("");
   const [creating, setCreating] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
 
   const settings = useSettingsContext();
   const theme = useTheme();
+
+  // Password validation functions
+  const validatePassword = (password: string) => {
+    return {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    };
+  };
+
+  const passwordValidation = validatePassword(formData.password);
+  
+  // Calculate password strength
+  const getPasswordStrength = () => {
+    const validations = Object.values(passwordValidation);
+    const metRequirements = validations.filter(Boolean).length;
+    const totalRequirements = validations.length;
+    const percentage = (metRequirements / totalRequirements) * 100;
+    
+    if (percentage === 100) return { strength: 'Strong', color: theme.palette.success.main, width: '100%' };
+    if (percentage >= 80) return { strength: 'Good', color: theme.palette.warning.main, width: '80%' };
+    if (percentage >= 60) return { strength: 'Fair', color: theme.palette.warning.dark, width: '60%' };
+    if (percentage >= 40) return { strength: 'Weak', color: theme.palette.error.light, width: '40%' };
+    return { strength: 'Very Weak', color: theme.palette.error.main, width: '20%' };
+  };
+  
+  const passwordStrength = getPasswordStrength();
 
   // Fetch counts and lists from Clerk API and quizzes from Supabase
   const fetchCountsAndLists = async () => {
@@ -435,16 +466,169 @@ export default function AdminDashboardPage() {
               <TextField
                 name="password"
                 label="Password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={handleChange}
                 required
                 fullWidth
+                InputProps={{
+                  endAdornment: (
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      sx={{ color: theme.palette.text.secondary }}
+                    >
+                      {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                    </IconButton>
+                  ),
+                }}
                 sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               />
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, mt: -2, color: theme.palette.text.secondary }}>
-                Password must be at least 8 characters, include 1 uppercase, 1 lowercase, 1 number, 1 special character, and must not be a commonly breached password.
+              <Box sx={{ mb: 1, mt: -2 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block', fontWeight: 600 }}>
+                  Password Requirements:
+                </Typography>
+                {formData.password && (
+                  <Box sx={{ mb: 2, p: 2, borderRadius: 1, backgroundColor: theme.palette.grey[50], border: `1px solid ${theme.palette.divider}` }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: passwordStrength.color }}>
+                        Password Strength: {passwordStrength.strength}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {Object.values(passwordValidation).filter(Boolean).length}/5 requirements met
+                      </Typography>
+                    </Box>
+                    <Box sx={{ 
+                      width: '100%', 
+                      height: 4, 
+                      backgroundColor: theme.palette.grey[300], 
+                      borderRadius: 2,
+                      overflow: 'hidden'
+                    }}>
+                      <Box sx={{ 
+                        width: passwordStrength.width, 
+                        height: '100%', 
+                        backgroundColor: passwordStrength.color,
+                        transition: 'all 0.3s ease',
+                        borderRadius: 2
+                      }} />
+                    </Box>
+                  </Box>
+                )}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ 
+                      width: 16, 
+                      height: 16, 
+                      borderRadius: '50%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      backgroundColor: passwordValidation.length ? theme.palette.success.main : theme.palette.grey[300],
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {passwordValidation.length ? '✓' : '!'}
+                    </Box>
+                    <Typography variant="caption" sx={{ 
+                      color: passwordValidation.length ? theme.palette.success.main : theme.palette.text.secondary,
+                      fontWeight: passwordValidation.length ? 600 : 400
+                    }}>
+                      At least 8 characters
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ 
+                      width: 16, 
+                      height: 16, 
+                      borderRadius: '50%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      backgroundColor: passwordValidation.uppercase ? theme.palette.success.main : theme.palette.grey[300],
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {passwordValidation.uppercase ? '✓' : '!'}
+                    </Box>
+                    <Typography variant="caption" sx={{ 
+                      color: passwordValidation.uppercase ? theme.palette.success.main : theme.palette.text.secondary,
+                      fontWeight: passwordValidation.uppercase ? 600 : 400
+                    }}>
+                      One uppercase letter (A-Z)
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ 
+                      width: 16, 
+                      height: 16, 
+                      borderRadius: '50%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      backgroundColor: passwordValidation.lowercase ? theme.palette.success.main : theme.palette.grey[300],
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {passwordValidation.lowercase ? '✓' : '!'}
+                    </Box>
+                    <Typography variant="caption" sx={{ 
+                      color: passwordValidation.lowercase ? theme.palette.success.main : theme.palette.text.secondary,
+                      fontWeight: passwordValidation.lowercase ? 600 : 400
+                    }}>
+                      One lowercase letter (a-z)
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ 
+                      width: 16, 
+                      height: 16, 
+                      borderRadius: '50%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      backgroundColor: passwordValidation.number ? theme.palette.success.main : theme.palette.grey[300],
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {passwordValidation.number ? '✓' : '!'}
+                    </Box>
+                    <Typography variant="caption" sx={{ 
+                      color: passwordValidation.number ? theme.palette.success.main : theme.palette.text.secondary,
+                      fontWeight: passwordValidation.number ? 600 : 400
+                    }}>
+                      One number (0-9)
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ 
+                      width: 16, 
+                      height: 16, 
+                      borderRadius: '50%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      backgroundColor: passwordValidation.special ? theme.palette.success.main : theme.palette.grey[300],
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {passwordValidation.special ? '✓' : '!'}
+                    </Box>
+                    <Typography variant="caption" sx={{ 
+                      color: passwordValidation.special ? theme.palette.success.main : theme.palette.text.secondary,
+                      fontWeight: passwordValidation.special ? 600 : 400
+                    }}>
+                      One special character (!@#$%^&*)
               </Typography>
+                  </Box>
+                </Box>
+              </Box>
               <TextField
                 name="role"
                 label="Role"

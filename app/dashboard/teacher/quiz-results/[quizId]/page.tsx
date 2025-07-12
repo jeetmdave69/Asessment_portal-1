@@ -184,48 +184,13 @@ export default function QuizResultsPage() {
                   <Typography variant="body2" color="text.secondary">
                     Submitted: {new Date(attempt.submitted_at).toLocaleString()}
                   </Typography>
-                  {(attempt.marked_questions && Object.keys(attempt.marked_questions).length > 0
-                    ? attempt.marked_questions
-                    : attempt.marked_for_review && Object.keys(attempt.marked_for_review).length > 0
-                      ? attempt.marked_for_review
-                      : null) && (
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="body2" color="warning.main" sx={{ fontWeight: 600, mb: 1 }}>
-                        Marked for Review:
-                      </Typography>
-                      <TableContainer component={Paper} sx={{ maxWidth: 500, boxShadow: 0, mb: 1 }}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell sx={{ fontWeight: 700 }}>Q#</TableCell>
-                              <TableCell sx={{ fontWeight: 700 }}>Question Text</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {Object.keys(attempt.marked_questions && Object.keys(attempt.marked_questions).length > 0
-                              ? attempt.marked_questions
-                              : attempt.marked_for_review || {})
-                              .filter(qid => (attempt.marked_questions && Object.keys(attempt.marked_questions).length > 0
-                                ? attempt.marked_questions[qid]
-                                : attempt.marked_for_review && attempt.marked_for_review[qid]))
-                              .map((qid) => {
-                                const qInfo = questionMap[qid];
-                                if (!qInfo) return (
-                                  <TableRow key={qid}>
-                                    <TableCell colSpan={2} sx={{ color: 'red' }}>Unknown question (ID: {qid})</TableCell>
-                                  </TableRow>
-                                );
-                                return (
-                                  <TableRow key={qid}>
-                                    <TableCell>{`Q${qInfo.quizOrder}`}</TableCell>
-                                    <TableCell>{qInfo.text}</TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </Box>
+                  {attempt.marked_for_review && Object.keys(attempt.marked_for_review).length > 0 && (
+                    <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+                      Marked for Review: {Object.keys(attempt.marked_for_review)
+                        .filter(qid => attempt.marked_for_review && attempt.marked_for_review[qid])
+                        .map((qid, idx) => `Q${Number(qid) + 1}`)
+                        .join(', ')}
+                    </Typography>
                   )}
                 </CardContent>
                 <CardActions>

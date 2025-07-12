@@ -59,6 +59,7 @@ import { useSettingsContext } from '@/context/settings-context';
 import IconButton from '@mui/material/IconButton';
 import Iconify from '@/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
+import { ThemeModeProvider } from '@/providers/ThemeModeProvider';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 
@@ -91,7 +92,31 @@ const boxStyles = [
   { bg: '#fff', color: '#37474f', border: '1px solid #e3e6ef' },
 ];
 
-export default function StudentDashboardPage() {
+const professionalBoxSx = (theme: any) => ({
+  background: theme.palette.mode === 'dark'
+    ? 'rgba(20, 24, 36, 0.92)'
+    : 'linear-gradient(135deg, #f7fafd 0%, #e3eafc 100%)',
+  maxWidth: 900,
+  mx: 'auto',
+  border: theme.palette.mode === 'dark'
+    ? `2.5px solid ${theme.palette.primary.main}`
+    : '1.5px solid #dbeafe',
+  borderRadius: 4,
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 4px 24px 0 rgba(0,0,0,0.25)'
+    : '0 4px 24px 0 rgba(30,64,175,0.07)',
+  fontFamily: 'Poppins, sans-serif',
+  transition: 'box-shadow 0.2s, border 0.2s, background 0.2s',
+  '&:hover': {
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 8px 32px 0 rgba(0,0,0,0.32)'
+      : '0 8px 32px 0 rgba(30,64,175,0.13)',
+    borderColor: theme.palette.primary.main,
+  },
+  p: { xs: 2.5, sm: 4 },
+});
+
+function StudentDashboardPageContent() {
   const settings = useSettingsContext();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -199,7 +224,7 @@ export default function StudentDashboardPage() {
   useEffect(() => {
     if (!user) return;
     supabase.from('attempts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).then(({ count }) => setAttemptsCount(count || 0));
-    supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('is_active', true).then(({ count }) => setAnnouncementsCount(count || 0));
+    supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('is_active', true).in('target_audience', ['all', 'students']).then(({ count }) => setAnnouncementsCount(count || 0));
   }, [user]);
 
   // Set examsCount to number of live quizzes
@@ -564,7 +589,7 @@ export default function StudentDashboardPage() {
   )
 
   const settingsContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 500, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+    <Box sx={professionalBoxSx(theme)}>
       <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
         My Profile
       </Typography>
@@ -745,7 +770,7 @@ export default function StudentDashboardPage() {
   );
 
   const resultsContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 1200, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+    <Box sx={{ ...professionalBoxSx(theme), maxWidth: 1200 }}>
       <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
         My Results
       </Typography>
@@ -763,6 +788,7 @@ export default function StudentDashboardPage() {
               <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Time Taken</TableCell>
               <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Completed On</TableCell>
               <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Review</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Marked for Review</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -817,7 +843,17 @@ export default function StudentDashboardPage() {
                     <TableCell>{marksObtained}</TableCell>
                     <TableCell>{totalMarks}</TableCell>
                     <TableCell>{percentage}%</TableCell>
-                    <TableCell>{timeTaken} min</TableCell>
+                    <TableCell>{(() => {
+                      const startTime = row.start_time ? new Date(row.start_time) : null;
+                      const endTime = row.completed_at ? new Date(row.completed_at) : row.submitted_at ? new Date(row.submitted_at) : null;
+                      if (startTime && endTime && !isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
+                        const diff = Math.max(0, endTime.getTime() - startTime.getTime());
+                        const mins = Math.floor(diff / 60000);
+                        const secs = Math.floor((diff % 60000) / 1000) % 60;
+                        return `${mins}m ${secs}s`;
+                      }
+                      return '-';
+                    })()}</TableCell>
                     <TableCell>{row.submitted_at ? dayjs(row.submitted_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
                     <TableCell>
                       <Button
@@ -835,17 +871,27 @@ export default function StudentDashboardPage() {
                         const markedForReview = row.marked_for_review || row.marked_questions || {};
                         const quizId = row.quiz_id || row.quizzes?.id;
                         const questions = questionsMap[quizId] || [];
-                        const questionOrderMap = questions.reduce((acc, q, i) => { acc[q.id] = { order: i + 1, text: q.question_text }; return acc; }, {});
+                        // Map question IDs to their order (1-based)
+                        const questionOrderMap = questions.reduce((acc, q, i) => { acc[q.id] = i + 1; return acc; }, {});
                         const marked = Object.keys(markedForReview).filter(qid => markedForReview[qid]);
-                        if (marked.length === 0) return 'None';
-                        return marked.map(qid => {
-                          const qInfo = questionOrderMap[qid];
-                          return qInfo ? (
-                            <Tooltip key={qid} title={qInfo.text} arrow>
-                              <span style={{ marginRight: 8 }}>{`Q${qInfo.order}`}</span>
-                            </Tooltip>
-                          ) : null;
-                        });
+                        if (marked.length === 0) {
+                          return <Chip label="None" size="small" color="default" variant="outlined" />;
+                        }
+                        // Show as Q-2, Q-5, etc.
+                        return (
+                          <Box display="flex" flexWrap="wrap" gap={1}>
+                            {marked.map(qid => (
+                              <Chip
+                                key={qid}
+                                label={`Q-${questionOrderMap[qid] || qid}`}
+                                size="small"
+                                color="warning"
+                                variant="outlined"
+                                sx={{ fontWeight: 600 }}
+                              />
+                            ))}
+                          </Box>
+                        );
                       })()}
                     </TableCell>
                   </TableRow>
@@ -874,7 +920,7 @@ export default function StudentDashboardPage() {
             width: 240,
             boxSizing: 'border-box',
             background: '#002366',
-            color: '#fff',
+            color: '#ffffff',
             border: 'none',
             minHeight: '100vh',
             boxShadow: '2px 0 8px 0 rgba(0,0,0,0.04)',
@@ -883,8 +929,8 @@ export default function StudentDashboardPage() {
         }}
       >
         <Box display="flex" alignItems="center" p={2} mb={1}>
-          <DashboardIcon sx={{ mr: 1, color: '#fff', fontSize: 32 }} />
-          <Typography variant="h6" sx={{ color: '#fff', fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
+          <DashboardIcon sx={{ mr: 1, color: '#ffffff', fontSize: 32 }} />
+          <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
         </Box>
         <List sx={{ mt: 2 }}>
           {sidebarLinks.map((link, idx) => (
@@ -893,26 +939,26 @@ export default function StudentDashboardPage() {
               key={link.text}
               onClick={link.onClick}
               sx={{
-                color: link.logout ? '#ff5252' : '#fff',
+                color: link.logout ? '#ff5252' : '#ffffff',
                 background: link.active ? '#001b4e' : 'none',
                 borderRadius: '30px 0 0 30px',
                 mb: 1,
                 fontWeight: link.active ? 600 : 400,
                 pl: 2,
                 pr: 1,
-                '&:hover': { background: '#001b4e' },
+                '&:hover': { background: link.logout ? '#fff0f0' : '#001b4e' },
                 transition: 'all 0.4s',
               }}
             >
-              <ListItemIcon sx={{ color: '#fff', minWidth: 40 }}>{link.icon}</ListItemIcon>
-              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500 } }} />
+              <ListItemIcon sx={{ color: link.logout ? '#ff5252' : '#ffffff', minWidth: 40 }}>{link.icon}</ListItemIcon>
+              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500, color: link.logout ? '#ff5252' : '#ffffff' } }} />
             </ListItem>
           ))}
         </List>
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: '#f5f5f5', fontFamily: 'Poppins, sans-serif' }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Poppins, sans-serif' }}>
         {/* Top Bar */}
         <Box
           display="flex"
@@ -922,17 +968,18 @@ export default function StudentDashboardPage() {
           p={2}
           borderRadius={2}
           sx={{
-            background: '#fff',
-            color: '#002366',
+            background: theme.palette.background.paper,
+            color: theme.palette.text.primary,
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             border: 'none',
             fontFamily: 'Poppins, sans-serif',
           }}
         >
-          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: '#002366', fontFamily: 'Poppins, sans-serif' }}>Student Dashboard</Typography>
-          <Box display="flex" alignItems="center">
+          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Student Dashboard</Typography>
+          <Box display="flex" alignItems="center" gap={2}>
+            <ThemeToggleButton />
             <Avatar src={profileForm.profile_picture || user.imageUrl} alt="pro" sx={{ mr: 2, border: '2px solid #e3e6ef', width: 44, height: 44 }} />
-            <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#002366', fontFamily: 'Poppins, sans-serif' }}>{user.firstName}</Typography>
+            <Typography variant="subtitle1" fontWeight={600} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{user.firstName}</Typography>
           </Box>
         </Box>
 
@@ -942,7 +989,7 @@ export default function StudentDashboardPage() {
             {/* Greeting */}
             <Box display="flex" alignItems="center" gap={2} mb={3}>
               {icon}
-              <Typography variant="h5" fontWeight={700} color="#002366">
+              <Typography variant="h5" fontWeight={700} color={theme.palette.text.primary}>
                 {greet}, {user?.firstName || user?.fullName || 'Student'}!
               </Typography>
             </Box>
@@ -952,39 +999,39 @@ export default function StudentDashboardPage() {
                 <SummaryCards
                   title="Exams"
                   total={examsCount}
-                  color="#002366"
-                  countColor="#002366"
+                  color={theme.palette.primary.main}
+                  countColor={theme.palette.primary.main}
                 />
-                <Typography sx={{ opacity: 0.8, color: '#555', fontSize: 15, textAlign: 'center', mt: 1 }}>Active exams</Typography>
+                <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15, textAlign: 'center', mt: 1 }}>Active exams</Typography>
               </Grid>
               <Grid item xs={12} sm={4}>
                 <SummaryCards
                   title="Upcoming Exams"
                   total={upcomingQuizzes.length}
-                  color="#000"
-                  countColor="#000"
+                  color={theme.palette.text.secondary}
+                  countColor={theme.palette.text.secondary}
                 />
-                <Typography sx={{ opacity: 0.8, color: '#555', fontSize: 15, textAlign: 'center', mt: 1 }}>Exams scheduled for the future</Typography>
+                <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15, textAlign: 'center', mt: 1 }}>Exams scheduled for the future</Typography>
               </Grid>
               <Grid item xs={12} sm={4}>
                 <SummaryCards
                   title="Announcements"
                   total={announcementsCount}
-                  color="#000"
-                  countColor="#000"
+                  color={theme.palette.text.secondary}
+                  countColor={theme.palette.text.secondary}
                 />
-                <Typography sx={{ opacity: 0.8, color: '#555', fontSize: 15, textAlign: 'center', mt: 1 }}>Total number of messages received</Typography>
+                <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15, textAlign: 'center', mt: 1 }}>Total number of messages received</Typography>
               </Grid>
             </Grid>
 
             {/* General Instructions */}
-            <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+            <Box sx={professionalBoxSx(theme)}>
               <Typography variant="h6" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
                 :: General Instructions ::
               </Typography>
               <ul style={{ paddingLeft: 24 }}>
                 {instructions.map((ins, idx) => (
-                  <li key={idx} style={{ marginBottom: 14, color: '#333', fontSize: 16, lineHeight: 1.7, fontFamily: 'Poppins, sans-serif' }}>{ins}</li>
+                  <li key={idx} style={{ marginBottom: 14, color: theme.palette.text.secondary, fontSize: 16, lineHeight: 1.7, fontFamily: 'Poppins, sans-serif' }}>{ins}</li>
                 ))}
               </ul>
             </Box>
@@ -994,8 +1041,8 @@ export default function StudentDashboardPage() {
         {selectedSection === 'exams' && (
           <>
             {/* Access Quiz by Code - moved to top */}
-            <Box mb={6} p={4} borderRadius={3} bgcolor="#fff" boxShadow={1} border="none" sx={{ fontFamily: 'Poppins, sans-serif' }}>
-              <Typography variant="h6" gutterBottom sx={{ color: '#002366', fontWeight: 700 }}>Access Quiz by Code</Typography>
+            <Box mb={6} p={4} borderRadius={3} bgcolor={theme.palette.background.paper} boxShadow={1} border="none" sx={{ fontFamily: 'Poppins, sans-serif' }}>
+              <Typography variant="h6" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700 }}>Access Quiz by Code</Typography>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   label="Access Code"
@@ -1006,7 +1053,7 @@ export default function StudentDashboardPage() {
                   helperText={codeError}
                   sx={{ fontFamily: 'Poppins, sans-serif' }}
                 />
-                <Button variant="contained" disabled={codeLoading} onClick={handleAccessCodeSubmit} sx={{ minWidth: 160, background: '#002366', color: '#fff', borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif', '&:hover': { background: '#001b4e' } }}>
+                <Button variant="contained" disabled={codeLoading} onClick={handleAccessCodeSubmit} sx={{ minWidth: 160, background: theme.palette.primary.main, color: '#fff', borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif', '&:hover': { background: theme.palette.primary.dark } }}>
                   {codeLoading ? 'Checking…' : 'Begin'}
                 </Button>
               </Stack>
@@ -1058,7 +1105,7 @@ export default function StudentDashboardPage() {
 
       {/* Logout Confirmation Dialog */}
       <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
-        <DialogTitle sx={{ color: '#002366', fontWeight: 700 }}>
+        <DialogTitle sx={{ color: theme.palette.text.primary, fontWeight: 700 }}>
           Log Out
         </DialogTitle>
         <DialogContent>
@@ -1089,6 +1136,14 @@ export default function StudentDashboardPage() {
   );
 }
 
+export default function StudentDashboardPage() {
+  return (
+    <ThemeModeProvider>
+        <StudentDashboardPageContent />
+    </ThemeModeProvider>
+  );
+}
+
 function QuizCard({
   quiz,
   status,
@@ -1104,6 +1159,7 @@ function QuizCard({
 }) {
   const start = new Date(quiz.start_time);
   const end = new Date(quiz.end_time);
+  const theme = useTheme();
 
   const map = {
     live: { badge: 'LIVE', bg: 'info.light', text: 'info.darker', btn: 'primary', disabled: false },
@@ -1118,7 +1174,7 @@ function QuizCard({
         p={3}
         borderRadius={3}
         border="none"
-        bgcolor="#fff"
+        bgcolor={theme.palette.background.paper}
         boxShadow={2}
         minHeight={310}
         display="flex"
@@ -1127,7 +1183,7 @@ function QuizCard({
         sx={{ '&:hover': { transform: status === 'live' ? 'translateY(-4px)' : undefined }, transition: '.2s', fontFamily: 'Poppins, sans-serif' }}
       >
         <Stack spacing={1}>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#002366', fontFamily: 'Poppins, sans-serif' }}>{quiz.quiz_title}</Typography>
+          <Typography variant="h6" fontWeight={700} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{quiz.quiz_title}</Typography>
           <Stack direction="row" spacing={1} alignItems="center">
             <Box px={1.5} py={0.4} borderRadius={2} fontSize={12} fontWeight={600} textTransform="uppercase" bgcolor={map.bg} color={map.text} sx={{ fontFamily: 'Poppins, sans-serif' }}>
               {map.badge}
@@ -1144,7 +1200,7 @@ function QuizCard({
           color={map.btn as any}
           disabled={map.disabled}
           onClick={onStart}
-          sx={{ mt: 3, textTransform: 'none', fontWeight: 600, borderRadius: 2, background: '#002366', color: '#fff', fontFamily: 'Poppins, sans-serif', '&:hover': { background: '#001b4e' } }}
+          sx={{ mt: 3, textTransform: 'none', fontWeight: 600, borderRadius: 2, background: theme.palette.primary.main, color: '#fff', fontFamily: 'Poppins, sans-serif', '&:hover': { background: theme.palette.primary.dark } }}
           startIcon={status === 'live' && hasProgress ? <ReplayIcon /> : <PlayArrowIcon />}
         >
           {status === 'live' ? (hasProgress ? 'Resume Quiz' : 'Start Quiz') : map.badge}
@@ -1194,8 +1250,8 @@ export function ExamsPage() {
           [`& .MuiDrawer-paper`]: {
             width: 240,
             boxSizing: 'border-box',
-            background: '#002366',
-            color: '#fff',
+            background: '#002366', // Always dark blue
+            color: '#fff', // Always white text
             border: 'none',
             minHeight: '100vh',
             boxShadow: '2px 0 8px 0 rgba(0,0,0,0.04)',
@@ -1226,7 +1282,7 @@ export function ExamsPage() {
               }}
             >
               <ListItemIcon sx={{ color: '#fff', minWidth: 40 }}>{link.icon}</ListItemIcon>
-              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500 } }} />
+              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500, color: '#fff' } }} />
             </ListItem>
           ))}
         </List>

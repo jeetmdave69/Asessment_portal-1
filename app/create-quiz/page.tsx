@@ -151,6 +151,7 @@ export default function CreateQuizPage() {
   const [newSection, setNewSection] = useState("");
   const [addSectionDialog, setAddSectionDialog] = useState<{ open: boolean; qIndex: number | null }>({ open: false, qIndex: null });
   const [inlineNewSection, setInlineNewSection] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
 
@@ -237,6 +238,11 @@ export default function CreateQuizPage() {
     setToast({ open: true, msg, type });
   };
 
+  const handleCsvButtonClick = () => {
+    fileInputRef.current?.value && (fileInputRef.current.value = ''); // always reset before open
+    fileInputRef.current?.click();
+  };
+
   const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -310,6 +316,7 @@ export default function CreateQuizPage() {
         showToast('Failed to read CSV', 'error');
       },
     });
+    event.target.value = '';
   };
 
   const onSubmit = async (data: QuizFormValues, isDraft: boolean) => {
@@ -585,6 +592,7 @@ export default function CreateQuizPage() {
                   accept="image/*"
                   style={{ display: 'none' }}
                   id={`question-image-${i}`}
+                  aria-label="Upload question image"
                   onChange={async e => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -730,6 +738,7 @@ export default function CreateQuizPage() {
                         accept="image/*"
                         style={{ display: 'none' }}
                         id={`option-image-${i}-${j}`}
+                        aria-label={`Upload image for option ${j + 1}`}
                         onChange={e => {
                           const file = e.target.files?.[0];
                           if (file) handleOptionImageUpload(i, j, file);
@@ -833,7 +842,7 @@ export default function CreateQuizPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
-                onClick={() => document.getElementById('csv-upload-input')?.click()}
+                onClick={handleCsvButtonClick}
               >
                 <ImageIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
                 <Typography variant="h6" color="primary" fontWeight={600} mb={1}>
@@ -844,18 +853,20 @@ export default function CreateQuizPage() {
                 </Typography>
                 <Button
                   variant="contained"
-                  component="label"
+                  component="span"
                   sx={{ textTransform: 'none', fontWeight: 600 }}
+                  onClick={handleCsvButtonClick}
                 >
                   Select CSV File
-                  <input
-                    id="csv-upload-input"
-                    type="file"
-                    hidden
-                    accept=".csv"
-                    onChange={handleCsvUpload}
-                  />
                 </Button>
+                <input
+                  id="csv-upload-input"
+                  type="file"
+                  hidden
+                  accept=".csv"
+                  ref={fileInputRef}
+                  onChange={handleCsvUpload}
+                />
               </Box>
               <Typography variant="caption" color="text.secondary" display="block" mt={2}>
                 Tip: You can prepare your questions in Excel, Google Sheets, or even Notepad (as plain text) and export or save as CSV.
