@@ -33,6 +33,7 @@ import {
   DialogActions,
   Snackbar,
   Alert,
+  Card,
 } from '@mui/material';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
@@ -62,6 +63,7 @@ import { useTheme } from '@mui/material/styles';
 import { ThemeModeProvider } from '@/providers/ThemeModeProvider';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
+import Skeleton from '@mui/material/Skeleton';
 
 const formatDateTime = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -553,7 +555,73 @@ function StudentDashboardPageContent() {
     }
   }, [profileSuccess]);
 
-  if (!mounted || !user) return null;
+  if (loading || !user) {
+    // Professional skeleton loader for student dashboard
+    return (
+      <Box
+        height="100vh"
+        display="flex"
+        flexDirection="column"
+        sx={{
+          background: '#fff',
+          minHeight: '100vh',
+          width: '100vw',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 9999,
+        }}
+      >
+        {/* Top Bar Skeleton */}
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={4}
+          p={3}
+          borderRadius={3}
+          sx={{
+            background: 'rgba(255,255,255,0.7)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            border: '1px solid #e3e6ef',
+            mt: 4,
+            mx: { xs: 2, sm: 6 },
+            minHeight: 90,
+          }}
+        >
+          <Box>
+            <Skeleton variant="text" width={220} height={38} sx={{ mb: 1 }} />
+            <Skeleton variant="text" width={180} height={24} />
+          </Box>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Skeleton variant="circular" width={44} height={44} />
+            <Skeleton variant="text" width={100} height={28} />
+          </Box>
+        </Box>
+
+        {/* Overview Cards Skeleton */}
+        <Grid container spacing={3} mb={4} px={{ xs: 2, sm: 6 }}>
+          {[1, 2, 3].map((i) => (
+            <Grid item xs={12} sm={4} key={i}>
+              <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
+                <Skeleton variant="circular" width={32} height={32} sx={{ mb: 1 }} />
+                <Skeleton variant="text" width={80} height={24} />
+                <Skeleton variant="rectangular" width={60} height={48} sx={{ my: 1 }} />
+                <Skeleton variant="text" width={120} height={18} />
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* Main Content Skeleton (e.g., instructions, tables) */}
+        <Card sx={{ mb: 4, p: 2, boxShadow: 2, mx: { xs: 2, sm: 6 } }}>
+          <Skeleton variant="text" width={180} height={28} sx={{ mb: 2 }} />
+          <Skeleton variant="rectangular" width="100%" height={120} sx={{ mb: 2 }} />
+          <Skeleton variant="rectangular" width="100%" height={60} />
+        </Card>
+      </Box>
+    );
+  }
 
   const sidebarLinks = [
     { text: 'Dashboard', icon: <DashboardIcon />, onClick: () => setSelectedSection('dashboard'), active: selectedSection === 'dashboard' },

@@ -273,7 +273,6 @@ export default function PreviewQuizPage() {
                     const isCorrect =
                       (Array.isArray(q.correct_answers) && (
                         q.correct_answers.includes(opt.text) ||
-                        q.correct_answers.includes(i) ||
                         q.correct_answers.includes(String(i))
                       )) ||
                       (typeof q.correct_answers === 'string' && q.correct_answers === opt.text) ||

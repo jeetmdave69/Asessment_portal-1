@@ -83,6 +83,7 @@ import Iconify from '@/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
 import Skeleton from '@mui/material/Skeleton';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import LoadingScreen from '@/components/loading-screen';
 
 // Lazy load components
 const QuizTable = lazy(() => import('@/components/dashboard/QuizTable'));
@@ -195,6 +196,7 @@ function TeacherDashboardPage() {
 
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false); // NEW STATE
 
   const [studentDeleteDialogOpen, setStudentDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
@@ -419,14 +421,17 @@ function TeacherDashboardPage() {
     const fetchStats = async () => {
       if (!user?.id) return;
       try {
-        // Fetch all stats in parallel for better performance
-        const [studentsResult, examsResult, announcementsResult] = await Promise.all([
-          supabase.from('student').select('id', { count: 'exact', head: true }),
+        // Fetch student count from Clerk API instead of Supabase
+        const [clerkUsersRes, examsResult, announcementsResult] = await Promise.all([
+          fetch('/api/clerk-users?limit=1000'),
           supabase.from('quizzes').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
           supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('sender_id', user.id)
         ]);
+        
+        const clerkUsers = await clerkUsersRes.json();
+        const studentCount = Array.isArray(clerkUsers) ? clerkUsers.filter((u: any) => u.role === 'student').length : 0;
 
-        setStudentCount(studentsResult.count || 0);
+        setStudentCount(studentCount);
         setExamCount(examsResult.count || 0);
         setAnnouncementCount(announcementsResult.count || 0);
 
@@ -461,6 +466,13 @@ function TeacherDashboardPage() {
     
     // Load stats immediately without blocking UI
     fetchStats();
+    
+    // Set up polling for real-time stats updates
+    const interval = setInterval(fetchStats, 10000); // Poll every 10 seconds
+    
+    return () => {
+      clearInterval(interval);
+    };
   }, [user?.id]);
 
   useEffect(() => {
@@ -547,10 +559,150 @@ function TeacherDashboardPage() {
     </Box>
   );
 
-  if (!isLoaded) {
+  if (!isLoaded && !loggingOut) { // Only show loading if not logging out
+    // Professional skeleton loader for dashboard
     return (
-      <Box height="100vh" display="flex" justifyContent="center" alignItems="center">
-        <CircularProgress />
+      <Box
+        height="100vh"
+        display="flex"
+        flexDirection="column"
+        sx={{
+          background: '#fff',
+          minHeight: '100vh',
+          width: '100vw',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 9999,
+        }}
+      >
+        {/* Top Bar Skeleton */}
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={4}
+          p={3}
+          borderRadius={3}
+          sx={{
+            background: 'rgba(255,255,255,0.7)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            border: '1px solid #e3e6ef',
+            mt: 4,
+            mx: { xs: 2, sm: 6 },
+            minHeight: 90,
+          }}
+        >
+          <Box>
+            <Skeleton variant="text" width={220} height={38} sx={{ mb: 1 }} />
+            <Skeleton variant="text" width={180} height={24} />
+          </Box>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Skeleton variant="circular" width={44} height={44} />
+            <Skeleton variant="text" width={100} height={28} />
+          </Box>
+        </Box>
+
+        {/* Overview Cards Skeleton */}
+        <Grid container spacing={3} mb={4} px={{ xs: 2, sm: 6 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <Grid item xs={12} sm={6} md={3} key={i}>
+              <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
+                <Skeleton variant="circular" width={32} height={32} sx={{ mb: 1 }} />
+                <Skeleton variant="text" width={80} height={24} />
+                <Skeleton variant="rectangular" width={60} height={48} sx={{ my: 1 }} />
+                <Skeleton variant="text" width={120} height={18} />
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* Recent Results Table Skeleton */}
+        <Card sx={{ mb: 4, p: 2, boxShadow: 2, mx: { xs: 2, sm: 6 } }}>
+          <Skeleton variant="text" width={180} height={28} sx={{ mb: 2 }} />
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  {["Date", "Name", "Exam name", "Percentage"].map((col) => (
+                    <TableCell key={col}><Skeleton variant="text" width={80} /></TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <TableRow key={idx}>
+                    {[1, 2, 3, 4].map((col) => (
+                      <TableCell key={col}><Skeleton variant="text" width={80} /></TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Box mt={2} textAlign="right">
+            <Skeleton variant="rectangular" width={100} height={36} />
+          </Box>
+        </Card>
+
+        {/* Exams Table Skeleton */}
+        <Grid container spacing={3} px={{ xs: 2, sm: 6 }}>
+          <Grid item xs={12}>
+            <Card sx={{ p: 3, boxShadow: 3 }}>
+              <Skeleton variant="text" width={180} height={32} sx={{ mb: 2 }} />
+              <TableContainer>
+                <Table size="medium">
+                  <TableHead>
+                    <TableRow>
+                      {["Exam no.", "Exam name", "Description", "No. of questions", "Exam time", "End time", "Access Code", "Actions"].map((col) => (
+                        <TableCell key={col}><Skeleton variant="text" width={80} /></TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <TableRow key={idx}>
+                        {Array.from({ length: 8 }).map((_, colIdx) => (
+                          <TableCell key={colIdx}><Skeleton variant="text" width={70} /></TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Box display="flex" justifyContent="center" mt={2}>
+                <Skeleton variant="rectangular" width={220} height={40} />
+              </Box>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  }
+
+  if (loggingOut) {
+    return (
+      <Box
+        height="100vh"
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        sx={{
+          background: '#fff',
+          minHeight: '100vh',
+          width: '100vw',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 9999,
+        }}
+      >
+        <Skeleton variant="circular" width={64} height={64} sx={{ mb: 3 }} />
+        <Skeleton variant="text" width={220} height={38} sx={{ mb: 1 }} />
+        <Typography variant="h5" color="primary" sx={{ mt: 2 }}>
+          Logging out, please wait...
+        </Typography>
       </Box>
     );
   }
@@ -594,19 +746,29 @@ function TeacherDashboardPage() {
               key={link.text}
               onClick={link.onClick}
               sx={{
-                color: link.logout ? '#ff5252' : '#ffffff',
-                background: link.tab && link.tab === currentTab ? '#001b4e' : 'none',
-                borderRadius: '30px 0 0 30px',
+                color: link.logout ? '#ef4444' : '#fff',
+                background: link.logout
+                  ? 'transparent'
+                  : link.tab && link.tab === currentTab
+                  ? '#001b4e'
+                  : 'none',
+                borderRadius: link.logout ? 0 : '30px 0 0 30px', // No border radius for logout
                 mb: 1,
-                fontWeight: link.tab && link.tab === currentTab ? 600 : 400,
+                fontWeight: link.logout ? 700 : link.tab && link.tab === currentTab ? 600 : 400,
                 pl: 2,
                 pr: 1,
-                '&:hover': { background: '#001b4e' },
-                transition: 'all 0.4s',
+                border: link.logout ? 'none' : 'none', // No border for logout
+                boxShadow: 'none',
+                transition: 'all 0.25s cubic-bezier(.4,0,.2,1)',
+                '&:hover': {
+                  background: link.logout ? '#ef4444' : '#001b4e',
+                  color: link.logout ? '#fff' : '#fff',
+                  boxShadow: 'none',
+                },
               }}
             >
-              <ListItemIcon sx={{ color: '#ffffff', minWidth: 40 }}>{link.icon}</ListItemIcon>
-              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500, color: '#ffffff' } }} />
+              <ListItemIcon sx={{ color: link.logout ? '#ef4444' : '#fff', minWidth: 40, transition: 'color 0.25s cubic-bezier(.4,0,.2,1)' }}>{link.icon}</ListItemIcon>
+              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: link.logout ? 700 : 500, color: 'inherit', transition: 'color 0.25s cubic-bezier(.4,0,.2,1)' } }} />
             </ListItem>
           ))}
         </List>
@@ -950,6 +1112,7 @@ function TeacherDashboardPage() {
           <Button
             onClick={() => {
               setLogoutDialogOpen(false);
+              setLoggingOut(true); // Set loggingOut to true
               signOut();
             }}
             color="error"
