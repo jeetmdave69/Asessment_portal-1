@@ -426,8 +426,16 @@ export default function ResultPage() {
                       : 'None'
                   }
                 </Typography>
-            </Stack>
-          </Paper>
+                {timeTaken && (
+                  <>
+                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Duration: <Box component="span" color="primary.main">{timeTaken}</Box>
+                    </Typography>
+                  </>
+                )}
+              </Stack>
+            </Paper>
           </Box>
 
           {/* Add Review Mistakes Button next to view mode toggle */}
