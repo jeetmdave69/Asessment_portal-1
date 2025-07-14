@@ -16,13 +16,14 @@ import {
 } from '@mui/icons-material';
 import { supabase } from '@/utils/supabaseClient';
 import TablePagination from '@mui/material/TablePagination';
-import { SettingsDrawer } from '@/components/settings/SettingsDrawer';
+import { SettingsDrawer } from '../../../components/settings/SettingsDrawer';
 import { useSettingsContext } from '@/context/settings-context';
 import IconButton from '@mui/material/IconButton';
-import { Iconify } from '@/components/iconify/Iconify';
+import Iconify from '../../../src/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
 import dayjs from 'dayjs';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 const sidebarLinks = [
   { text: 'Dashboard', icon: <DashboardIcon />, tab: 'dashboard' },
@@ -653,7 +654,7 @@ export default function AdminDashboardPage() {
                 <Typography color="error" fontWeight={600} mb={1} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Please fix the following:</Typography>
                 <ul style={{ color: '#d32f2f', margin: 0, paddingLeft: 20 }}>
                   {errorDetails.map((err, idx) => (
-                    <li key={idx} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{err}</li>
+                    <li key={idx}>{err}</li>
                   ))}
                 </ul>
               </Box>
@@ -814,7 +815,7 @@ export default function AdminDashboardPage() {
         onClick={settings.onOpenDrawer}
         aria-label="Open settings"
       >
-        <Iconify icon="solar:settings-bold" width={28} height={28} />
+        <Iconify icon="solar:settings-bold" width={28} />
       </IconButton>
       <SettingsDrawer />
     </Box>
