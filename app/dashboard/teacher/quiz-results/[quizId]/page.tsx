@@ -37,12 +37,18 @@ interface Attempt {
   submitted_at: string;
   marked_for_review?: Record<string, boolean>;
   marked_questions?: Record<string, boolean>;
+  answers?: Record<string, any>; // Added for new table display
+  total_marks?: number; // Add this line
+  percentage?: number; // Add this line
 }
 
 interface Question {
   id: number;
   question_text: string;
   sno?: number;
+  options?: { text: string; isCorrect?: boolean }[]; // Added for new table display
+  correct_answers?: any[]; // Added for new table display
+  marks?: number; // Added for new table display
 }
 
 export default function QuizResultsPage() {
@@ -72,7 +78,10 @@ export default function QuizResultsPage() {
           score,
           submitted_at,
           marked_for_review,
-          marked_questions
+          marked_questions,
+          answers,
+          total_marks,
+          percentage
         `)
         .eq('quiz_id', Number(quizId))
         .order('submitted_at', { ascending: false });
@@ -95,7 +104,7 @@ export default function QuizResultsPage() {
     async function fetchQuestions() {
       const { data, error } = await supabase
         .from('questions')
-        .select('id, question_text, sno')
+        .select('id, question_text, sno, options, correct_answers, marks')
         .eq('quiz_id', Number(quizId))
         .order('sno', { ascending: true })
         .order('id', { ascending: true });
@@ -167,52 +176,104 @@ export default function QuizResultsPage() {
       {attempts.length === 0 ? (
         <Typography sx={{ mt: 3 }}>No attempts found for this quiz yet.</Typography>
       ) : (
-        <Grid container spacing={3} sx={{ mt: 3 }}>
-          {attempts.map((attempt) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={attempt.id}>
-              <Card elevation={3}>
-                <CardContent>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Attempt ID: {attempt.id}
-                  </Typography>
-                  <Typography variant="h6" fontWeight={600} gutterBottom>
-                    {attempt.user_name}
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500}>
-                    Score: {attempt.score}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Submitted: {new Date(attempt.submitted_at).toLocaleString()}
-                  </Typography>
-                  {attempt.marked_for_review && Object.keys(attempt.marked_for_review).length > 0 && (
-                    <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-                      Marked for Review: {Object.keys(attempt.marked_for_review)
-                        .filter(qid => attempt.marked_for_review && attempt.marked_for_review[qid])
-                        .map((qid, idx) => `Q${Number(qid) + 1}`)
-                        .join(', ')}
-                    </Typography>
-                  )}
-                </CardContent>
-                <CardActions>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => router.push(`/result/${attempt.id}`)}
-                  >
-                    View Submission
-                  </Button>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() => handleOpenEdit(attempt.id, attempt.score)}
-                  >
-                    Edit Score
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        <TableContainer component={Paper} sx={{ mt: 4 }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Attempt ID</TableCell>
+                <TableCell>Student Name</TableCell>
+                <TableCell>Total Qs</TableCell>
+                <TableCell>Correct</TableCell>
+                <TableCell>Marks</TableCell>
+                <TableCell>Total</TableCell>
+                <TableCell>%</TableCell>
+                <TableCell>Submitted</TableCell>
+                <TableCell>Marked for Review</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {attempts.map((attempt) => {
+                const totalQuestions = questions.length;
+                // Parse answers if string
+                const parsedAnswers = typeof attempt.answers === 'string' ? JSON.parse(attempt.answers || '{}') : attempt.answers || {};
+                let totalMarks = 0;
+                let obtainedMarks = 0;
+                let correctAnswers = 0;
+                questions.forEach(q => {
+                  // Parse options as array of objects with isCorrect
+                  const options = typeof q.options === 'string' ? JSON.parse(q.options || '[]') : q.options || [];
+                  const mappedOptions = options.map((opt: any) => ({
+                    text: typeof opt === 'string' ? opt : opt?.text || '',
+                    isCorrect: typeof opt.is_correct !== 'undefined' ? !!opt.is_correct : !!opt.isCorrect,
+                  }));
+                  let userIndices = parsedAnswers?.[String(q.id)] ?? [];
+                  if (userIndices.length && typeof userIndices[0] === 'string') {
+                    userIndices = userIndices.map((val: string) => {
+                      const foundIdx = mappedOptions.findIndex((opt: any) => opt.text === val);
+                      return foundIdx !== -1 ? foundIdx : null;
+                    }).filter((idx: number | null) => idx !== null);
+                  }
+                  const correctIndices = mappedOptions
+                    .map((opt: any, idx: number) => (opt.isCorrect ? idx : null))
+                    .filter((idx: number | null) => idx !== null);
+                  const questionMarks = q.marks || 1;
+                  totalMarks += questionMarks || 0;
+                  // PARTIAL CREDIT: count number of correct options selected
+                  const correctSelected = userIndices.filter((a: number) => correctIndices.includes(a)).length;
+                  const totalCorrect = correctIndices.length;
+                  if (totalCorrect > 0) {
+                    const partialMark = (correctSelected / totalCorrect) * (questionMarks || 0);
+                    obtainedMarks += partialMark;
+                    if (correctSelected === totalCorrect && userIndices.length === totalCorrect) {
+                      correctAnswers += 1; // full correct
+                    }
+                  }
+                });
+                const safeObtainedMarks = isNaN(obtainedMarks) ? 0 : Math.round(obtainedMarks * 100) / 100;
+                const safeTotalMarks = isNaN(totalMarks) ? 0 : totalMarks;
+                const percentage = safeTotalMarks > 0 ? ((safeObtainedMarks / safeTotalMarks) * 100).toFixed(2) : '0.00';
+                return (
+                  <TableRow key={attempt.id}>
+                    <TableCell>{attempt.id}</TableCell>
+                    <TableCell>{attempt.user_name}</TableCell>
+                    <TableCell>{totalQuestions}</TableCell>
+                    <TableCell>{correctAnswers}</TableCell>
+                    <TableCell>{safeObtainedMarks}</TableCell>
+                    <TableCell>{safeTotalMarks}</TableCell>
+                    <TableCell>{percentage}%</TableCell>
+                    <TableCell>{new Date(attempt.submitted_at).toLocaleString()}</TableCell>
+                    <TableCell>
+                      {attempt.marked_for_review && Object.keys(attempt.marked_for_review).length > 0 ?
+                        Object.keys(attempt.marked_for_review)
+                          .filter(qid => attempt.marked_for_review && attempt.marked_for_review[qid])
+                          .map((qid, idx) => `Q${Number(qid) + 1}`)
+                          .join(', ')
+                        : 'None'}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => router.push(`/result/${attempt.id}`)}
+                      >
+                        View Submission
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleOpenEdit(attempt.id, attempt.score)}
+                        sx={{ ml: 1 }}
+                      >
+                        Edit Score
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
       <Dialog open={editOpen} onClose={() => setEditOpen(false)}>

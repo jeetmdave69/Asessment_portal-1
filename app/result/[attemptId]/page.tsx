@@ -51,7 +51,6 @@ export default function ResultPage() {
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [quizTitle, setQuizTitle] = useState('');
-  const [showBackWarning, setShowBackWarning] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(true);
   // Add state for view mode
@@ -146,7 +145,6 @@ export default function ResultPage() {
   useEffect(() => {
     window.history.pushState(null, '', window.location.href);
     const handlePopState = () => {
-      setShowBackWarning(true);
       window.history.pushState(null, '', window.location.href);
     };
     window.addEventListener('popstate', handlePopState);
@@ -315,9 +313,10 @@ export default function ResultPage() {
   const maxPercentage = sectionList.length > 0 ? Math.max(...sectionList.map(([_, v]) => v.percentage)) : 0;
   const weakestSections = sectionList.filter(([_, v]) => v.percentage === minPercentage).map(([k]) => k);
   const bestSections = sectionList.filter(([_, v]) => v.percentage === maxPercentage).map(([k]) => k);
-  const needsImprovementSections = sectionList.filter(([_, v]) => v.percentage < 60).map(([k]) => k);
-  // Ranking: sort sections by percentage descending
-  const rankedSections = [...sectionList].sort((a, b) => b[1].percentage - a[1].percentage);
+// Only include sections with exactly 0% in Needs Improvement
+const needsImprovementSections = sectionList.filter(([_, v]) => v.percentage === 0).map(([k]) => k);
+// Ranking: sort sections by percentage descending
+const rankedSections = [...sectionList].sort((a, b) => b[1].percentage - a[1].percentage);
 
   // Suggestion message per section
   function getSectionSuggestion(percentage: number) {
@@ -330,16 +329,16 @@ export default function ResultPage() {
   // Helper to flatten all questions for 'all' view
   const allQuestionsFlat = questions;
 
+  // Add debug log before rendering Needs Improvement
+  console.log('Needs Improvement Sections:', needsImprovementSections);
+  console.log('Section Marks:', sectionMarks);
+
+  const allSame = sectionList.length > 1 && sectionList.every(([_, v]) => v.percentage === maxPercentage);
+
   return (
     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
       <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f4f6f8 0%, #e3eafc 100%)', py: 4 }}>
         <Container maxWidth="md">
-          {showBackWarning && (
-            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-              ⚠️ You cannot go back to the quiz page after submission.
-            </Alert>
-          )}
-
           {/* Add Back to Dashboard Button */}
           <Box mb={2} display="flex" justifyContent="flex-start">
             <Button
@@ -513,81 +512,30 @@ export default function ResultPage() {
                 </Typography>
 
                       <Grid container spacing={3}>
-                        {/* Best Section */}
-                        <Grid item xs={12} md={4}>
-                          <Paper elevation={0} sx={{
-                            p: 3,
-                            height: '100%',
-                            borderLeft: '4px solid #2e7d32',
-                            background: '#f8fdf8',
-                            borderRadius: 3,
-                            border: '1px solid #e8f5e9',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              boxShadow: '0 2px 8px rgba(46, 125, 50, 0.1)',
-                            }
-                          }}>
-                            <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
-                              <EmojiEventsIcon sx={{ color: '#2e7d32', fontSize: '1.25rem' }} />
-                              <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
-                                Top Performing
-                        </Typography>
-                            </Stack>
-                            {bestSections.length > 0 ? (
-                              bestSections.map((s, i) => (
-                                <Box key={s} sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center',
-                                  mb: i < bestSections.length - 1 ? 1.5 : 0,
-                                  p: 1,
-                                  borderRadius: 2,
-                                  backgroundColor: '#ffffff',
-                                  border: '1px solid #e8f5e9'
-                                }}>
-                                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, color: '#2e7d32' }}>{s}</Typography>
-                                  <Chip 
-                                    label={`${sectionMarks[s]?.percentage || 0}%`} 
-                                    size="small" 
-                            sx={{
-                                      backgroundColor: '#2e7d32',
-                                      color: '#ffffff',
-                                      fontWeight: 600,
-                                      fontSize: '0.75rem',
-                                      height: 24
-                                    }} 
-                                  />
-                                </Box>
-                              ))
-                            ) : (
-                              <Typography variant="body2" color="#666" sx={{ fontStyle: 'italic' }}>No sections available</Typography>
-                            )}
-                          </Paper>
-                        </Grid>
-
-                        {/* Needs Improvement */}
-                        <Grid item xs={12} md={4}>
-                          <Paper elevation={0} sx={{
-                            p: 3,
-                            height: '100%',
-                            borderLeft: '4px solid #ed6c02',
-                            background: '#fffbf8',
-                            borderRadius: 3,
-                            border: '1px solid #fff3e0',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              boxShadow: '0 2px 8px rgba(237, 108, 2, 0.1)',
-                            }
-                          }}>
-                            <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
-                              <ErrorOutlineIcon sx={{ color: '#ed6c02', fontSize: '1.25rem' }} />
-                              <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
-                                Needs Focus
-                              </Typography>
-                            </Stack>
-                            {needsImprovementSections.length > 0 ? (
-                              needsImprovementSections.map((s, i) => (
-                                <Box key={s} sx={{ 
-                                  display: 'flex', 
+                        {/* Show only one: Needs Improvement OR Top Performing */}
+                        {needsImprovementSections.length > 0 ? (
+                          <Grid item xs={12} md={4}>
+                            <Paper elevation={0} sx={{
+                              p: 3,
+                              height: '100%',
+                              borderLeft: '4px solid #ed6c02',
+                              background: '#fffbf8',
+                              borderRadius: 3,
+                              border: '1px solid #fff3e0',
+                              transition: 'all 0.2s ease',
+                              '&:hover': {
+                                boxShadow: '0 2px 8px rgba(237, 108, 2, 0.1)',
+                              }
+                            }}>
+                              <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
+                                <ErrorOutlineIcon sx={{ color: '#ed6c02', fontSize: '1.25rem' }} />
+                                <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
+                                  Needs Improvement
+                                </Typography>
+                              </Stack>
+                              {needsImprovementSections.map((s, i) => (
+                                <Box key={s} sx={{
+                                  display: 'flex',
                                   alignItems: 'center',
                                   mb: i < needsImprovementSections.length - 1 ? 1.5 : 0,
                                   p: 1,
@@ -597,9 +545,9 @@ export default function ResultPage() {
                                 }}>
                                   <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, color: '#ed6c02' }}>{s}</Typography>
                                   <Chip 
-                                    label={`${sectionMarks[s]?.percentage || 0}%`} 
+                                    label={`${sectionMarks[s]?.percentage ?? 0}%`} 
                                     size="small" 
-                              sx={{
+                                    sx={{
                                       backgroundColor: '#ed6c02',
                                       color: '#ffffff',
                                       fontWeight: 600,
@@ -608,63 +556,57 @@ export default function ResultPage() {
                                     }} 
                                   />
                                 </Box>
-                              ))
-                            ) : (
-                              <Typography variant="body2" color="#666" sx={{ fontStyle: 'italic' }}>All sections performing well</Typography>
-                            )}
-                          </Paper>
-                        </Grid>
-
-                        {/* Weakest Section */}
-                        <Grid item xs={12} md={4}>
-                          <Paper elevation={0} sx={{
-                            p: 3,
-                                height: '100%',
-                            borderLeft: '4px solid #d32f2f',
-                            background: '#fef8f8',
-                            borderRadius: 3,
-                            border: '1px solid #ffebee',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              boxShadow: '0 2px 8px rgba(211, 47, 47, 0.1)',
-                            }
-                          }}>
-                            <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
-                              <ErrorOutlineIcon sx={{ color: '#d32f2f', fontSize: '1.25rem' }} />
-                              <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
-                                Needs Improvement
-                              </Typography>
-                            </Stack>
-                            {weakestSections.length > 0 ? (
-                              weakestSections.map((s, i) => (
-                                <Box key={s} sx={{ 
-                                  display: 'flex', 
+                              ))}
+                            </Paper>
+                          </Grid>
+                        ) : (
+                          <Grid item xs={12} md={4}>
+                            <Paper elevation={0} sx={{
+                              p: 3,
+                              height: '100%',
+                              borderLeft: '4px solid #2e7d32',
+                              background: '#f8fdf8',
+                              borderRadius: 3,
+                              border: '1px solid #e8f5e9',
+                              transition: 'all 0.2s ease',
+                              '&:hover': {
+                                boxShadow: '0 2px 8px rgba(46, 125, 50, 0.1)',
+                              }
+                            }}>
+                              <Stack direction="row" alignItems="center" spacing={1.5} mb={2}>
+                                <EmojiEventsIcon sx={{ color: '#2e7d32', fontSize: '1.25rem' }} />
+                                <Typography variant="subtitle1" fontWeight={600} color="#1a1a1a">
+                                  Top Performing
+                                </Typography>
+                              </Stack>
+                              {bestSections.map((s, i) => (
+                                <Box key={s} sx={{
+                                  display: 'flex',
                                   alignItems: 'center',
-                                  mb: i < weakestSections.length - 1 ? 1.5 : 0,
+                                  mb: i < bestSections.length - 1 ? 1.5 : 0,
                                   p: 1,
                                   borderRadius: 2,
                                   backgroundColor: '#ffffff',
-                                  border: '1px solid #ffebee'
+                                  border: '1px solid #e8f5e9'
                                 }}>
-                                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, color: '#d32f2f' }}>{s}</Typography>
+                                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 500, color: '#2e7d32' }}>{s}</Typography>
                                   <Chip 
-                                    label={`${sectionMarks[s]?.percentage || 0}%`} 
+                                    label={`${sectionMarks[s]?.percentage ?? 0}%`} 
                                     size="small" 
-                                    sx={{ 
-                                      backgroundColor: '#d32f2f',
+                                    sx={{
+                                      backgroundColor: '#2e7d32',
                                       color: '#ffffff',
                                       fontWeight: 600,
                                       fontSize: '0.75rem',
                                       height: 24
-                              }}
-                            />
-                          </Box>
-                              ))
-                            ) : (
-                              <Typography variant="body2" color="#666" sx={{ fontStyle: 'italic' }}>No weak sections</Typography>
-                            )}
-                          </Paper>
-                        </Grid>
+                                    }} 
+                                  />
+                                </Box>
+                              ))}
+                            </Paper>
+                          </Grid>
+                        )}
+                        {/* Hide Needs Focus column for simplicity */}
                       </Grid>
 
                       {/* Section Ranking */}
@@ -757,7 +699,7 @@ export default function ResultPage() {
                           <Box display="flex" alignItems="center" gap={2}>
                             <Typography variant="h6" fontWeight={700} color="#002366">{sectionName}</Typography>
                             {isBest && <Chip label="Best Section" color="success" size="small" />}
-                            {isWeakest && <Chip label="Weakest Section" color="error" size="small" />}
+                            {isWeakest && !allSame && <Chip label="Weakest Section" color="error" size="small" />}
                             {needsImprovement && <Chip label="Needs Improvement" color="warning" size="small" />}
                             <Box flexGrow={1} />
                             <Typography variant="body2" fontWeight={600} color={marks.percentage >= 60 ? 'success.main' : 'error.main'}>

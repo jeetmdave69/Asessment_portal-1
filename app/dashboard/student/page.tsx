@@ -375,10 +375,16 @@ function StudentDashboardPageContent() {
       await Promise.all(quizIds.map(async (quizId) => {
         const { data } = await supabase
           .from('questions')
-          .select('id, question_text')
+          .select('id, question_text, options, marks, correct_answers')
           .eq('quiz_id', quizId)
           .order('id', { ascending: true });
-        if (data) map[quizId] = data;
+        if (data) {
+          map[quizId] = data.map(q => ({
+            ...q,
+            options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+            correct_answers: typeof q.correct_answers === 'string' ? JSON.parse(q.correct_answers) : q.correct_answers,
+          }));
+        }
       }));
       setQuestionsMap(map);
     };
@@ -758,77 +764,156 @@ function StudentDashboardPageContent() {
   );
 
   const messagesContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box
+      p={{ xs: 2, sm: 3 }}
+      borderRadius={4}
+      boxShadow={4}
+      sx={{
+        background: `linear-gradient(135deg, #e3eafc 0%, #f7fafd 100%)`,
+        width: '100%',
+        mx: 0,
+        border: 'none',
+        fontFamily: 'Poppins, sans-serif',
+        minHeight: 320,
+      }}
+    >
+      <Typography
+        variant="h5"
+        align="center"
+        gutterBottom
+        sx={{
+          color: theme.palette.primary.main,
+          fontWeight: 800,
+          fontFamily: 'Poppins, sans-serif',
+          letterSpacing: 1.2,
+        }}
+      >
         Announcements
       </Typography>
-      <TableContainer component={Paper} sx={{ boxShadow: 'none', background: 'transparent', mt: 3 }}>
-        <Table>
+      <TableContainer
+        component={Paper}
+        sx={{
+          boxShadow: '0 8px 32px 0 rgba(30,64,175,0.10)',
+          background: 'transparent',
+          borderRadius: 4,
+          border: 'none',
+          p: 0,
+          width: '100%',
+          minWidth: 0,
+          overflowX: 'auto',
+          mx: 0,
+        }}
+      >
+        <Table sx={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '15%' }}>Priority</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '25%' }}>Title</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '40%' }}>Content</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '10%' }}>From</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, width: '10%' }}>Date</TableCell>
+            <TableRow
+              sx={{
+                background: 'linear-gradient(90deg, #e3eafc 60%, #dbeafe 100%)',
+                height: 68,
+              }}
+            >
+              <TableCell align="left" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.9, fontSize: '1.05rem', color: theme.palette.primary.main, py: 1.5, px: 3, border: 'none' }}>Priority</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.9, fontSize: '1.05rem', color: theme.palette.primary.main, maxWidth: 180, wordBreak: 'break-word', py: 1.5, px: 3, border: 'none' }}>Title</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.9, color: theme.palette.primary.main, maxWidth: 260, wordBreak: 'break-word', fontSize: '1.05rem', py: 1.5, px: 3, border: 'none' }}>Content</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.9, fontSize: '1.12rem', color: theme.palette.primary.main, py: 2.5, px: 3, border: 'none' }}>Target</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.9, fontSize: '1.12rem', color: theme.palette.primary.main, py: 2.5, px: 3, border: 'none' }}>Created</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {messagesLoading ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
-                  <CircularProgress size={28} />
+                <TableCell colSpan={5} align="center" sx={{ py: 5, border: 'none' }}>
+                  <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
             ) : messages.length > 0 ? (
               messages.map((row, idx) => {
                 const priorityColor = row.priority === 3 ? '#d32f2f' : row.priority === 2 ? '#f57c00' : '#1976d2';
                 const priorityText = row.priority === 3 ? 'URGENT' : row.priority === 2 ? 'IMPORTANT' : 'NORMAL';
-                
+                // Use a soft background color for the whole row based on priority
+                const rowBg = row.priority === 3 ? '#ffebee' : row.priority === 2 ? '#fffde7' : '#e3f2fd';
                 return (
-                  <TableRow key={idx} sx={{ 
-                    backgroundColor: row.priority === 3 ? '#ffebee' : row.priority === 2 ? '#fff3e0' : 'inherit',
-                    '&:hover': { backgroundColor: row.priority === 3 ? '#ffcdd2' : row.priority === 2 ? '#ffe0b2' : '#f5f5f5' }
-                  }}>
-                    <TableCell>
+                  <TableRow
+                    key={idx}
+                    hover
+                    sx={{
+                      background: rowBg,
+                      transition: 'background 0.2s',
+                      height: 72,
+                      border: 'none',
+                      '&:hover': {
+                        background: row.priority === 3 ? '#ffcdd2' : row.priority === 2 ? '#ffe0b2' : '#bbdefb',
+                      },
+                    }}
+                  >
+                    <TableCell sx={{ py: 2.2, px: 3, border: 'none' }}>
                       <Chip 
                         label={priorityText} 
-                        size="small" 
+                        size="medium"
                         sx={{ 
                           backgroundColor: priorityColor, 
                           color: 'white', 
-                          fontWeight: 600,
-                          fontSize: '0.75rem'
+                          fontWeight: 700,
+                          fontSize: '1.01rem',
+                          letterSpacing: 0.7,
+                          height: 36,
+                          borderRadius: 99,
+                          px: 2.5,
+                          boxShadow: '0 1px 4px 0 rgba(30,64,175,0.08)'
                         }} 
                       />
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: theme.palette.text.primary }}>{row.title}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ lineHeight: 1.4 }}>
+                    <TableCell sx={{ fontWeight: 800, color: theme.palette.text.primary, maxWidth: 180, wordBreak: 'break-word', fontSize: '0.95rem', py: 1.2, px: 3, border: 'none' }}>{row.title}</TableCell>
+                    <TableCell sx={{ maxWidth: 260, wordBreak: 'break-word', color: theme.palette.text.secondary, fontSize: '0.95rem', py: 1.2, px: 3, border: 'none' }}>
+                      <Tooltip title={row.content} placement="top" arrow>
+                        <Typography variant="body2" sx={{ lineHeight: 1.6, cursor: 'pointer' }}>
                         {row.content}
                       </Typography>
+                      </Tooltip>
                       {row.tags && row.tags.length > 0 && (
-                        <Box sx={{ mt: 1 }}>
+                        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                           {row.tags.map((tag: string, tagIdx: number) => (
                             <Chip 
                               key={tagIdx} 
                               label={tag} 
                               size="small" 
                               variant="outlined" 
-                              sx={{ mr: 0.5, mb: 0.5, fontSize: '0.7rem' }} 
+                              sx={{ fontSize: '0.9rem', borderRadius: 99, color: theme.palette.primary.main, borderColor: theme.palette.primary.light, px: 1.5, height: 26 }}
                             />
                           ))}
                         </Box>
                       )}
                     </TableCell>
-                    <TableCell>{row.sender_name}</TableCell>
-                    <TableCell>{row.created_at ? dayjs(row.created_at).format('YYYY-MM-DD') : ''}</TableCell>
+                    <TableCell sx={{ py: 2.2, px: 3, border: 'none' }}>
+                      <Chip
+                        label={row.target_audience?.toUpperCase()}
+                        size="medium"
+                        variant="outlined"
+                        color={row.target_audience === 'all' ? 'default' : row.target_audience === 'students' ? 'success' : 'info'}
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.98rem',
+                          borderRadius: 99,
+                          height: 32,
+                          px: 2,
+                          boxShadow: 'none',
+                          backgroundColor: 'transparent',
+                          color: theme.palette.text.primary,
+                          borderColor: theme.palette.divider,
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '1.04rem', minWidth: 120, py: 2.2, px: 3, border: 'none' }}>
+                      {row.created_at ? dayjs(row.created_at).format('YYYY-MM-DD') : ''}
+                    </TableCell>
                   </TableRow>
                 );
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={5} align="center">No announcements found.</TableCell>
+                <TableCell colSpan={5} align="center" sx={{ py: 5, border: 'none' }}>
+                  No announcements found.
+                </TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -838,116 +923,143 @@ function StudentDashboardPageContent() {
   );
 
   const resultsContent = (
-    <Box sx={{ ...professionalBoxSx(theme), maxWidth: 1200 }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box
+      p={{ xs: 2, sm: 3 }}
+      borderRadius={3}
+      boxShadow={2}
+      sx={{
+        background: '#fff',
+        width: '100%',
+        mx: 0,
+        border: 'none',
+        fontFamily: 'Poppins, sans-serif',
+        minHeight: 320,
+      }}
+    >
+      <Typography
+        variant="h5"
+        align="center"
+        gutterBottom
+        sx={{
+          color: '#111',
+          fontWeight: 800,
+          fontFamily: 'Poppins, sans-serif',
+          letterSpacing: 1.2,
+        }}
+      >
         My Results
       </Typography>
-      <TableContainer component={Paper} sx={{ boxShadow: 'none', background: 'transparent', mt: 3 }}>
+      <TableContainer
+        component={Paper}
+        sx={{
+          boxShadow: 'none',
+          background: '#fff',
+          borderRadius: 3,
+          border: 'none',
+          p: 0,
+          width: '100%',
+          minWidth: 0,
+          overflowX: 'auto',
+          mx: 0,
+          mt: 3,
+        }}
+      >
         <Table>
           <TableHead>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Student Name</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Exam Name</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Total Questions</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Correct Answers</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Marks Obtained</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Total Marks</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Percentage</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Time Taken</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Completed On</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Review</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary }}>Marked for Review</TableCell>
+            <TableRow sx={{ background: '#f5f5f5', height: 60 }}>
+              <TableCell align="left" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Student Name</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Exam Name</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Total Qs</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Correct</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Marks</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Total</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>%</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Time Taken</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Completed</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Review</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Marked</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {resultsLoading ? (
               <TableRow>
-                <TableCell colSpan={10} align="center">
-                  <CircularProgress size={28} />
+                <TableCell colSpan={11} align="center" sx={{ py: 5, border: 'none', color: '#111' }}>
+                  <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
             ) : results.length > 0 ? (
               results.map((row, idx) => {
-                console.log(`Processing result ${idx}:`, row);
-                
-                // Use the fields from your actual schema
                 const studentName = row.user_name || user?.firstName || '-';
                 const examName = row.quizzes?.quiz_title || '-';
-                const totalQuestions = row.total_questions || 0;
-                const correctAnswers = row.correct_count || (Array.isArray(row.correct_answers) ? row.correct_answers.length : (row.correct_answers ? Object.keys(row.correct_answers).length : 0));
-                const marksObtained = row.score || 0;
-                const totalMarks = row.total_marks || row.quizzes?.total_marks || totalQuestions;
-                const percentage = row.percentage || (totalMarks > 0 ? Math.round((marksObtained / totalMarks) * 100) : 0);
-                
-                // Calculate time taken using the correct field names
-                const startTime = row.start_time ? new Date(row.start_time) : null;
-                const endTime = row.completed_at ? new Date(row.completed_at) : row.submitted_at ? new Date(row.submitted_at) : null;
-                const timeTaken = startTime && endTime ? 
-                  Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) : // minutes
-                  row.quizzes?.duration || 0;
-                
-                console.log(`Result ${idx} processed:`, {
-                  studentName,
-                  examName,
-                  correctAnswers,
-                  marksObtained,
-                  totalMarks,
-                  percentage,
-                  timeTaken
-                });
-                
-                const markedForReview = row.marked_for_review || row.marked_questions || {};
-                const questionList = row.questions || row.quiz_questions || [];
-                const questionOrderMap = Array.isArray(questionList)
-                  ? questionList.reduce((acc, q, i) => { acc[q.id] = { order: i + 1, text: q.question_text }; return acc; }, {})
-                  : {};
-                
-                return (
-                  <TableRow key={idx}>
-                    <TableCell>{studentName}</TableCell>
-                    <TableCell>{examName}</TableCell>
-                    <TableCell>{totalQuestions}</TableCell>
-                    <TableCell>{correctAnswers}</TableCell>
-                    <TableCell>{marksObtained}</TableCell>
-                    <TableCell>{totalMarks}</TableCell>
-                    <TableCell>{percentage}%</TableCell>
-                    <TableCell>{(() => {
+                // Defensive: get questions array if available
+                const quizId = row.quiz_id || row.quizzes?.id;
+                const questions = questionsMap && questionsMap[quizId] ? questionsMap[quizId] : [];
+                const totalQuestions = questions.length > 0 ? questions.length : (row.total_questions || 0);
+                const correctAnswers = typeof row.correct_count === 'number' ? row.correct_count : (Array.isArray(row.correct_answers) ? row.correct_answers.length : (row.correct_answers ? Object.keys(row.correct_answers).length : 0));
+                // Use values from attempts table if present
+                const marksObtained = typeof row.score === 'number' ? row.score : 0;
+                const totalMarks = typeof row.total_marks === 'number' ? row.total_marks : (row.quizzes?.total_marks || 0);
+                const safeMarksObtained = isNaN(marksObtained) ? 0 : marksObtained;
+                const safeTotalMarks = isNaN(totalMarks) ? 0 : totalMarks;
+                const percentage = typeof row.percentage === 'number'
+                  ? row.percentage.toFixed(2)
+                  : (safeTotalMarks > 0 ? ((safeMarksObtained / safeTotalMarks) * 100).toFixed(2) : '0.00');
+                // Time calculation
+                let timeTaken = '-';
                       const startTime = row.start_time ? new Date(row.start_time) : null;
-                      const endTime = row.completed_at ? new Date(row.completed_at) : row.submitted_at ? new Date(row.submitted_at) : null;
+                const endTime = row.completed_at
+                  ? new Date(row.completed_at)
+                  : row.submitted_at
+                    ? new Date(row.submitted_at)
+                    : null;
+
                       if (startTime && endTime && !isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
                         const diff = Math.max(0, endTime.getTime() - startTime.getTime());
                         const mins = Math.floor(diff / 60000);
                         const secs = Math.floor((diff % 60000) / 1000) % 60;
-                        return `${mins}m ${secs}s`;
-                      }
-                      return '-';
-                    })()}</TableCell>
-                    <TableCell>{row.submitted_at ? dayjs(row.submitted_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
-                    <TableCell>
+                  timeTaken = `${mins}m ${secs}s`;
+                }
+                const markedForReview = row.marked_for_review || row.marked_questions || {};
+                const questionOrderMap = questions.reduce((acc, q, i) => { acc[q.id] = i + 1; return acc; }, {});
+                const marked = Object.keys(markedForReview).filter(qid => markedForReview[qid]);
+                return (
+                  <TableRow
+                    key={idx}
+                    hover
+                    sx={{
+                      background: '#fff',
+                      transition: 'background 0.2s',
+                      borderBottom: '1px solid #eee',
+                      '&:hover': {
+                        background: '#f5f5f5',
+                      },
+                    }}
+                  >
+                    <TableCell sx={{ fontWeight: 700, color: '#111', border: 'none', px: 3 }}>{studentName}</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#111', border: 'none', px: 3 }}>{examName}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{totalQuestions}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{correctAnswers}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{safeMarksObtained.toFixed(2)}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{safeTotalMarks.toFixed(2)}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#111' }}>{percentage}%</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{timeTaken}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{row.submitted_at ? dayjs(row.submitted_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3 }}>
                       <Button
                         variant="outlined"
                         color="primary"
                         size="small"
                         onClick={() => router.push(`/result/${row.id}`)}
-                        sx={{ borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif' }}
+                        sx={{ borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif', color: '#111', borderColor: '#bbb', '&:hover': { background: '#eee', borderColor: '#111' } }}
                       >
                         Review
                       </Button>
                     </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const markedForReview = row.marked_for_review || row.marked_questions || {};
-                        const quizId = row.quiz_id || row.quizzes?.id;
-                        const questions = questionsMap[quizId] || [];
-                        // Map question IDs to their order (1-based)
-                        const questionOrderMap = questions.reduce((acc, q, i) => { acc[q.id] = i + 1; return acc; }, {});
-                        const marked = Object.keys(markedForReview).filter(qid => markedForReview[qid]);
-                        if (marked.length === 0) {
-                          return <Chip label="None" size="small" color="default" variant="outlined" />;
-                        }
-                        // Show as Q-2, Q-5, etc.
-                        return (
-                          <Box display="flex" flexWrap="wrap" gap={1}>
+                    <TableCell align="center" sx={{ border: 'none', px: 3 }}>
+                      {marked.length === 0 ? (
+                        <Chip label="None" size="small" color="default" variant="outlined" sx={{ color: '#111', borderColor: '#bbb' }} />
+                      ) : (
+                        <Box display="flex" flexWrap="wrap" gap={1} justifyContent="center">
                             {marked.map(qid => (
                               <Chip
                                 key={qid}
@@ -955,19 +1067,20 @@ function StudentDashboardPageContent() {
                                 size="small"
                                 color="warning"
                                 variant="outlined"
-                                sx={{ fontWeight: 600 }}
+                              sx={{ fontWeight: 600, color: '#111', borderColor: '#bbb', background: 'transparent' }}
                               />
                             ))}
                           </Box>
-                        );
-                      })()}
+                      )}
                     </TableCell>
                   </TableRow>
                 );
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={10} align="center">No results found.</TableCell>
+                <TableCell colSpan={11} align="center" sx={{ py: 5, border: 'none', color: '#111' }}>
+                  No results found.
+                </TableCell>
               </TableRow>
             )}
           </TableBody>

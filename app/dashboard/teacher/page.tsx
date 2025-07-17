@@ -138,6 +138,8 @@ function TeacherDashboardPage() {
   const theme = useTheme();
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [results, setResults] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -207,18 +209,91 @@ function TeacherDashboardPage() {
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
   const [recordsKey, setRecordsKey] = useState(0);
 
+  const [questionsMap, setQuestionsMap] = useState<Record<number, any[]>>({});
+  const [sectionNames, setSectionNames] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoading(true);
+    setError('');
+    setResults([]);
+    (async () => {
+      // Fetch all quizzes for the teacher
+      const { data: quizData } = await supabase
+        .from('quizzes')
+        .select('id, quiz_title')
+        .eq('user_id', user.id);
+      setQuizzes((quizData || []).map(q => ({
+        ...q,
+        user_id: user.id,
+        quiz_title: q.quiz_title || '',
+        id: q.id,
+      })));
+      // Fetch all attempts for quizzes created by this teacher
+      const { data, error } = await supabase
+        .from('attempts')
+        .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, answers, quizzes(quiz_title, user_id)`)
+        .order('submitted_at', { ascending: false });
+      if (error) {
+        setError(error.message || 'Error fetching results');
+        setLoading(false);
+        return;
+      }
+      const filtered = (data || []).filter((row: any) => row.quizzes?.user_id === user.id);
+      setResults(filtered);
+      // Extract unique students
+      const uniqueStudents = Array.from(new Set(filtered.map((row: any) => row.user_name)));
+      setStudents(uniqueStudents);
+      // Fetch all questions for all quizzes
+      const quizIds = Array.from(new Set(filtered.map((r: any) => r.quiz_id).filter(Boolean)));
+      const map: Record<number, any[]> = {};
+      await Promise.all(quizIds.map(async (quizId) => {
+        const { data } = await supabase
+          .from('questions')
+          .select('id, question_text, options, marks, correct_answers')
+          .eq('quiz_id', quizId)
+          .order('id', { ascending: true });
+        if (data) map[quizId] = data;
+      }));
+      setQuestionsMap(map);
+      // After fetching questions, fetch sections for the quiz
+      if (quizIds.length > 0) {
+        const { data: sections } = await supabase
+          .from('sections')
+          .select('id, name, quiz_id')
+          .in('quiz_id', quizIds);
+        if (sections) {
+          const mapping: Record<number, string> = {};
+          sections.forEach((section: any) => {
+            mapping[section.id] = section.name;
+          });
+          setSectionNames(mapping);
+        }
+      }
+      setLoading(false);
+    })();
+  }, [user?.id]);
+
   const handleDeleteStudent = async () => {
-    if (!studentToDelete?.id) return;
+    // Log the student object for debugging
+    console.log('Deleting student:', studentToDelete);
+    // Try all possible id fields
+    const clerkId = studentToDelete?.id || studentToDelete?.clerkId || studentToDelete?.userId || studentToDelete?._id;
+    if (!clerkId) {
+      setError('No valid student id found.');
+      return;
+    }
     try {
       const res = await fetch('/api/delete-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: studentToDelete.id }),
+        body: JSON.stringify({ id: clerkId }),
       });
       if (res.ok) {
+        // Refresh the students list directly
         const refreshRes = await fetch('/api/clerk-users?limit=1000');
         const refreshData = await refreshRes.json();
-
+        setStudents(Array.isArray(refreshData) ? refreshData.filter((u: any) => u.role === 'student') : []);
         setStudentDeleteDialogOpen(false);
         setStudentToDelete(null);
       } else {
@@ -918,14 +993,63 @@ function TeacherDashboardPage() {
                       </TableRow>
                       ))
                     ) : recentResults.length > 0 ? (
-                      recentResults.map((row, idx) => (
+                      recentResults.map((row, idx) => {
+                        const studentName = row.user_name || '-';
+                        const examName = row.quizzes?.quiz_title || '-';
+                        const quizId = row.quiz_id || row.quizzes?.id;
+                        const questions = questionsMap && questionsMap[quizId] ? questionsMap[quizId] : [];
+                        const totalQuestions = questions.length > 0 ? questions.length : (row.total_questions || 0);
+                        // Always define answersObj at the top
+                        const answersObj = typeof row.answers === 'string' ? JSON.parse(row.answers || '{}') : row.answers || {};
+                        // Recalculate marks if row.score or row.quizzes?.total_marks is missing or zero
+                        let marksObtained = typeof row.score === 'number' && row.score > 0 ? row.score : 0;
+                        let totalMarks = typeof row.quizzes?.total_marks === 'number' && row.quizzes.total_marks > 0 ? row.quizzes.total_marks : 0;
+                        if (totalMarks === 0 && Array.isArray(questions) && questions.length > 0) {
+                          totalMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+                        }
+                        if (marksObtained === 0 || totalMarks === 0) {
+                          // Define answersObj inside this block so it is in scope
+                          const answersObj = typeof row.answers === 'string' ? JSON.parse(row.answers || '{}') : row.answers || {};
+                          marksObtained = 0;
+                          totalMarks = 0;
+                          questions.forEach((q: any, idx: number) => {
+                            const options = typeof q.options === 'string' ? JSON.parse(q.options || '[]') : q.options || [];
+                            const correctAnswersArr = typeof q.correct_answers === 'string' ? JSON.parse(q.correct_answers || '[]') : q.correct_answers;
+                            // Try both by question ID and by index
+                            let userAns = (answersObj && (answersObj[String(q.id)] ?? answersObj[q.id] ?? answersObj[idx])) || [];
+                            let userIndices = Array.isArray(userAns) ? userAns : [];
+                            if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(options)) {
+                              userIndices = userIndices.map((val: string) => {
+                                const idx2: number = options.findIndex((opt: any) => opt.text === val);
+                                return idx2 !== -1 ? idx2 : null;
+                              }).filter((idx2: number | null) => idx2 !== null);
+                            }
+                            let correctIndices: number[] = [];
+                            if (Array.isArray(options) && options.length > 0) {
+                              correctIndices = options.map((opt: any, idx: number) => (opt.isCorrect ? idx : null)).filter((idx: number | null) => idx !== null);
+                            } else if (Array.isArray(correctAnswersArr)) {
+                              correctIndices = correctAnswersArr;
+                            }
+                            const questionMarks = q.marks || 1;
+                            totalMarks += questionMarks;
+                            const correctSelected = userIndices.filter((a: number) => correctIndices.includes(a)).length;
+                            if (correctSelected === correctIndices.length && userIndices.length === correctIndices.length) {
+                              marksObtained += questionMarks;
+                            }
+                          });
+                        }
+                        const safeMarksObtained = isNaN(marksObtained) ? 0 : marksObtained;
+                        const safeTotalMarks = isNaN(totalMarks) ? 0 : totalMarks;
+                        const percentage = safeTotalMarks > 0 ? ((safeMarksObtained / safeTotalMarks) * 100).toFixed(2) : '0.00';
+                        return (
                         <TableRow key={idx}>
                           <TableCell>{row.submitted_at ? format(new Date(row.submitted_at), 'MMM dd, yyyy') : '-'}</TableCell>
-                          <TableCell>{row.user_name || '-'}</TableCell>
-                          <TableCell>{row.quizzes?.quiz_title || '-'}</TableCell>
-                          <TableCell>{row.score !== undefined && row.quizzes?.total_marks ? `${Math.round((row.score / row.quizzes.total_marks) * 100)}%` : '-'}</TableCell>
+                            <TableCell>{studentName}</TableCell>
+                            <TableCell>{examName}</TableCell>
+                            <TableCell>{percentage}%</TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     ) : (
                       <TableRow>
                         <TableCell colSpan={4} align="center">No recent results found.</TableCell>
@@ -1031,7 +1155,13 @@ function TeacherDashboardPage() {
         {currentTab === 'results' && (
           <Box>
             <Typography variant="h5" fontWeight={700} mb={2}>Results Section</Typography>
-            <ExamResultsTable />
+            <ExamResultsTable
+              results={results}
+              students={students}
+              quizzes={quizzes}
+              questionsMap={questionsMap}
+              sectionNames={sectionNames}
+            />
           </Box>
         )}
         {currentTab === 'records' && (
@@ -1236,66 +1366,38 @@ function AnnouncementForm({ fname }: { fname: string }) {
   );
 }
 
-function ExamResultsTable() {
-  const { user } = useUser();
-  const [results, setResults] = useState<any[]>([]);
+function ExamResultsTable({
+  results,
+  students,
+  quizzes,
+  questionsMap,
+  sectionNames
+}: {
+  results: any[],
+  students: any[],
+  quizzes: any[],
+  questionsMap: Record<number, any[]>,
+  sectionNames: Record<number, string>
+}) {
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [page, setPage] = useState(0);
-  const rowsPerPage = 10;
-  // Filter state
-  const [quizzes, setQuizzes] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(null);
-  const theme = useTheme();
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10;
+  // New state for details dialog
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<any | null>(null);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    
-    const fetchResults = async () => {
-    setLoading(true);
-    setError('');
-    setResults([]);
-      
-      try {
-        // Fetch quizzes and results in parallel
-        const [quizResult, resultsResult] = await Promise.all([
-          supabase
-        .from('quizzes')
-        .select('id, quiz_title')
-            .eq('user_id', user.id),
-          supabase
-        .from('attempts')
-            .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, quizzes(quiz_title, user_id)`)
-            .order('submitted_at', { ascending: false })
-        ]);
-
-        if (resultsResult.error) {
-          setError(resultsResult.error.message || 'Error fetching results');
-        return;
-      }
-
-        setQuizzes(quizResult.data || []);
-        const filtered = (resultsResult.data || []).filter((row: any) => row.quizzes?.user_id === user.id);
-      setResults(filtered);
-        
-      // Extract unique students
-      const uniqueStudents = Array.from(new Set(filtered.map((row: any) => row.user_name)));
-      setStudents(uniqueStudents);
-      } catch (err) {
-        setError('Failed to fetch results');
-      } finally {
-      setLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, [user?.id]);
-
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
+  const handleOpenDetails = (result: any) => {
+    setSelectedResult(result);
+    setDetailsDialogOpen(true);
+  };
+  const handleCloseDetails = () => {
+    setDetailsDialogOpen(false);
+    setSelectedResult(null);
   };
 
   // Filtering logic
@@ -1355,23 +1457,65 @@ function ExamResultsTable() {
         {loading && <CircularProgress />}
         {error && <Alert severity="error">{error}</Alert>}
         {filteredResults.length > 0 ? (
-          <>
+          <TableContainer sx={{ maxWidth: '100%', overflowX: 'auto', borderRadius: 2 }}>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Quiz Title</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Student Name</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Score</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Started At</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>End time</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Duration (min)</TableCell>
-                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Marked for Review</TableCell>
+                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 160, pl: 3 }}>Quiz Title</TableCell>
+                  <TableCell sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 140 }}>Student Name</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 90 }}>Score</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 120 }}>Started At</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 120 }}>End Time</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 110 }}>Duration (min)</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 140 }}>Marked for Review</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '1rem', minWidth: 80 }}>Details</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginatedResults.map((row, i) => {
                   const startedAt = row.start_time ? new Date(row.start_time) : null;
                   const submittedAt = row.submitted_at ? new Date(row.submitted_at) : null;
+                  // Accurate calculation logic (copied from student result page)
+                  const questions = questionsMap[row.quiz_id] || [];
+                  const totalQuestions = questions.length;
+                  let correctAnswers = 0;
+                  let marksObtained = 0;
+                  let totalMarks = 0;
+                  if (totalMarks === 0 && Array.isArray(questions) && questions.length > 0) {
+                    totalMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+                  }
+                  if (marksObtained === 0 || totalMarks === 0) {
+                    // Define answersObj inside this block so it is in scope
+                    const answersObj = typeof row.answers === 'string' ? JSON.parse(row.answers || '{}') : row.answers || {};
+                    marksObtained = 0;
+                    totalMarks = 0;
+                    questions.forEach((q: any, idx: number) => {
+                      const options = typeof q.options === 'string' ? JSON.parse(q.options || '[]') : q.options || [];
+                      const correctAnswersArr = typeof q.correct_answers === 'string' ? JSON.parse(q.correct_answers || '[]') : q.correct_answers;
+                      // Try both by question ID and by index
+                      let userAns = (answersObj && (answersObj[String(q.id)] ?? answersObj[q.id] ?? answersObj[idx])) || [];
+                    let userIndices = Array.isArray(userAns) ? userAns : [];
+                      if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(options)) {
+                        userIndices = userIndices.map((val: string) => {
+                          const idx2: number = options.findIndex((opt: any) => opt.text === val);
+                          return idx2 !== -1 ? idx2 : null;
+                        }).filter((idx2: number | null) => idx2 !== null);
+                    }
+                    let correctIndices: number[] = [];
+                      if (Array.isArray(options) && options.length > 0) {
+                        correctIndices = options.map((opt: any, idx: number) => (opt.isCorrect ? idx : null)).filter((idx: number | null) => idx !== null);
+                      } else if (Array.isArray(correctAnswersArr)) {
+                        correctIndices = correctAnswersArr;
+                    }
+                    const questionMarks = q.marks || 1;
+                    totalMarks += questionMarks;
+                    const correctSelected = userIndices.filter((a: number) => correctIndices.includes(a)).length;
+                    if (correctSelected === correctIndices.length && userIndices.length === correctIndices.length) {
+                      marksObtained += questionMarks;
+                    }
+                  });
+                  }
+                  const percentage = totalMarks > 0 ? Math.round((marksObtained / totalMarks) * 100) : 0;
                   let duration = '-';
                   if (
                     startedAt &&
@@ -1382,41 +1526,322 @@ function ExamResultsTable() {
                   ) {
                     duration = Math.floor((submittedAt.getTime() - startedAt.getTime()) / 60000).toString();
                   }
+                  const safeMarksObtained = isNaN(marksObtained) ? 0 : marksObtained;
+                  const safeTotalMarks = isNaN(totalMarks) ? 0 : totalMarks;
                   return (
                     <TableRow key={row.id} hover sx={{ transition: 'background 0.2s', '&:hover': { background: theme => theme.palette.action.hover } }}>
-                      <TableCell>{row.quizzes?.quiz_title || 'Untitled Quiz'}</TableCell>
-                      <TableCell>{row.user_name}</TableCell>
-                      <TableCell>{row.score}</TableCell>
-                      <TableCell>{startedAt && !isNaN(startedAt.getTime()) ? startedAt.toLocaleString() : '-'}</TableCell>
-                      <TableCell>{submittedAt && !isNaN(submittedAt.getTime()) ? submittedAt.toLocaleString() : '-'}</TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: duration === '-' ? 'text.disabled' : 'primary.main' }}>{duration}</TableCell>
-                      <TableCell>
+                      <TableCell sx={{ pl: 3, fontWeight: 600, fontSize: '0.98rem', verticalAlign: 'middle' }}>{row.quizzes?.quiz_title || 'Untitled Quiz'}</TableCell>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.98rem', verticalAlign: 'middle' }}>{row.user_name}</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.98rem', verticalAlign: 'middle' }}>{(typeof row.score === 'number' ? row.score : 0)}/{totalMarks}</TableCell>
+                      <TableCell align="center" sx={{ fontSize: '0.98rem', verticalAlign: 'middle' }}>{startedAt && !isNaN(startedAt.getTime()) ? startedAt.toLocaleString() : '-'}</TableCell>
+                      <TableCell align="center" sx={{ fontSize: '0.98rem', verticalAlign: 'middle' }}>{submittedAt && !isNaN(submittedAt.getTime()) ? submittedAt.toLocaleString() : '-'}</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 600, color: duration === '-' ? 'text.disabled' : 'primary.main', fontSize: '0.98rem', verticalAlign: 'middle' }}>{duration}</TableCell>
+                      <TableCell align="center" sx={{ fontSize: '0.98rem', verticalAlign: 'middle' }}>
                         {row.marked_for_review && Object.keys(row.marked_for_review).filter(qid => row.marked_for_review[qid]).length > 0
                           ? Object.keys(row.marked_for_review).filter(qid => row.marked_for_review[qid]).map(qid => `Q${Number(qid) + 1}`).join(', ')
                           : 'None'}
+                      </TableCell>
+                      {/* Details button */}
+                      <TableCell align="center" sx={{ verticalAlign: 'middle' }}>
+                        <Tooltip title="View Details">
+                          <IconButton color="primary" onClick={() => handleOpenDetails(row)}>
+                            <VisibilityIcon />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-            <Box display="flex" justifyContent="center" mt={2}>
-              <TablePagination
-                component="div"
-                count={filteredResults.length}
-                page={page}
-                onPageChange={handleChangePage}
-                rowsPerPage={rowsPerPage}
-                rowsPerPageOptions={[rowsPerPage]}
-                labelRowsPerPage={''}
-                showFirstButton
-                showLastButton
-              />
-            </Box>
-          </>
+          </TableContainer>
         ) : (
           <Typography>No results found.</Typography>
         )}
+        {/* Details Dialog */}
+        <Dialog open={detailsDialogOpen} onClose={handleCloseDetails} maxWidth="md" fullWidth>
+          <DialogTitle>Attempt Details</DialogTitle>
+          <DialogContent dividers>
+            {selectedResult ? (
+              <Box>
+                {/* Group questions by section name and render details as before */}
+                {(() => {
+                  const questionsBySection: Record<string, any[]> = {};
+                  (questionsMap[selectedResult.quiz_id] || []).forEach((q: any) => {
+                    let section = 'General';
+                    if (selectedResult.sections && Object.keys(selectedResult.sections).length > 0) {
+                      section = selectedResult.sections[q.id] || 'General';
+                    } else if (q.section_id && sectionNames && Object.keys(sectionNames).length > 0) {
+                      section = sectionNames[q.section_id] || `Section ${q.section_id}`;
+                    }
+                    if (!questionsBySection[section]) questionsBySection[section] = [];
+                    questionsBySection[section].push(q);
+                  });
+                  const sectionMarks: Record<string, { obtained: number; total: number }> = {};
+                  let overallObtained = 0;
+                  let overallTotal = 0;
+                  Object.entries(questionsBySection).forEach(([section, qs]) => {
+                    let obtained = 0;
+                    let total = 0;
+                    (qs as any[]).forEach((q: any) => {
+                      let userIndices = selectedResult.answers?.[q.id];
+                      if (!Array.isArray(userIndices)) userIndices = [];
+                      if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(q.options)) {
+                        userIndices = userIndices.map((val: string) => {
+                          const idx2: number = q.options.findIndex((opt: any) => opt.text === val);
+                          return idx2 !== -1 ? idx2 : null;
+                        }).filter((idx2: number | null) => idx2 !== null);
+                      }
+                      let correctIndices: number[] = [];
+                      if (Array.isArray(q.options) && q.options.length > 0) {
+                        correctIndices = q.options.map((opt: any, idx: number) => (opt.isCorrect ? idx : null)).filter((idx: number | null) => idx !== null);
+                      } else if (q.correct_answers && Array.isArray(q.correct_answers)) {
+                        correctIndices = q.correct_answers;
+                      }
+                      const questionMarks = q.marks || 1;
+                      total += questionMarks;
+                      overallTotal += questionMarks;
+                      const isCorrect =
+                        userIndices.length === correctIndices.length &&
+                        userIndices.every((idx: number) => correctIndices.includes(idx)) &&
+                        correctIndices.every((idx: number) => userIndices.includes(idx));
+                      if (isCorrect) {
+                        obtained += questionMarks;
+                        overallObtained += questionMarks;
+                      }
+                    });
+                    sectionMarks[section] = { obtained: Math.round(obtained * 100) / 100, total };
+                  });
+                  const candidateName = selectedResult.user_name || 'Unknown Candidate';
+                  const quizTitle = selectedResult.quizzes?.quiz_title || 'Untitled Quiz';
+                  const overallPercent = overallTotal > 0 ? Math.round((overallObtained / overallTotal) * 100) : 0;
+                  return (
+                    <Box mb={3}>
+                      <Paper elevation={3} sx={{ p: 3, borderRadius: 4, mb: 3, background: 'linear-gradient(120deg, #f8fafc 60%, #e3e8ef 100%)', boxShadow: '0 4px 24px 0 rgba(30,64,175,0.07)' }}>
+                        <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" mb={2} gap={2}>
+                          <Box>
+                            <Typography variant="h5" fontWeight={800} color="primary.main" sx={{ mb: 0.5, letterSpacing: 0.5 }}>
+                              {candidateName}
+                            </Typography>
+                            <Typography variant="subtitle1" color="text.secondary" fontWeight={600}>
+                              Quiz: {quizTitle}
+                            </Typography>
+                          </Box>
+                          <Box textAlign="right">
+                            <Typography variant="h6" fontWeight={700} color="success.main">
+                              Total Score: {Math.round(overallObtained * 100) / 100} / {overallTotal}
+                            </Typography>
+                            <Typography variant="body2" color="primary.main" fontWeight={700}>
+                              Percentage: {overallPercent}%
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Divider sx={{ my: 2 }} />
+                        <Typography variant="h6" fontWeight={700} mb={2} sx={{ letterSpacing: 0.5 }}>
+                          Section-wise Marks
+                        </Typography>
+                        <Stack direction="row" spacing={2} flexWrap="wrap">
+                          {Object.entries(sectionMarks)
+                            .filter(([section]) => section && section !== 'General')
+                            .map(([section, marks]) => (
+                              <Box
+                                key={section}
+                                sx={{
+                                  background: 'linear-gradient(120deg, #e3f2fd 60%, #f1f8e9 100%)',
+                                  borderRadius: 3,
+                                  boxShadow: 3,
+                                  p: 2.5,
+                                  minWidth: 170,
+                                  mb: 1.5,
+                                  mr: 1.5,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  border: '1.5px solid #90caf9',
+                                  transition: 'box-shadow 0.2s',
+                                  '&:hover': {
+                                    boxShadow: 6,
+                                    borderColor: '#1976d2',
+                                  },
+                                }}
+                              >
+                                <Typography variant="subtitle2" fontWeight={700} color="primary.main" sx={{ fontSize: 18, mb: 0.5, letterSpacing: 0.3 }}>
+                                  {section}
+                                </Typography>
+                                <Typography variant="h5" fontWeight={800} color="success.main" sx={{ fontSize: 28, mb: 0.5 }}>
+                                  {marks.obtained} <span style={{ color: '#888', fontWeight: 500, fontSize: 20 }}>/ {marks.total}</span>
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.2 }}>
+                                  Marks Scored
+                                </Typography>
+                              </Box>
+                            ))}
+                        </Stack>
+                      </Paper>
+                    </Box>
+                  );
+                })()}
+                {/* Questions List */}
+                <Stack spacing={3} mt={2}>
+                  {Array.isArray(questionsMap[selectedResult.quiz_id]) && questionsMap[selectedResult.quiz_id].length > 0 ? (
+                    questionsMap[selectedResult.quiz_id].map((q: any, idx: number) => {
+                      // Determine correct indices
+                      let correctIndices: number[] = [];
+                      if (Array.isArray(q.options) && q.options.length > 0) {
+                        correctIndices = q.options.map((opt: any, i: number) => (opt.isCorrect ? i : null)).filter((i: number | null) => i !== null);
+                      } else if (q.correct_answers && Array.isArray(q.correct_answers)) {
+                        correctIndices = q.correct_answers;
+                      }
+                      // Student's answer indices
+                      let userIndices = Array.isArray(selectedResult.answers?.[q.id]) ? selectedResult.answers[q.id] : [];
+                      if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(q.options)) {
+                        userIndices = userIndices.map((val: string) => {
+                          const idx2: number = q.options.findIndex((opt: any) => opt.text === val);
+                          return idx2 !== -1 ? idx2 : null;
+                        }).filter((idx2: number | null) => idx2 !== null);
+                      }
+                      // Compare answers
+                      const isCorrect = userIndices.length === correctIndices.length && userIndices.every((idx: number) => correctIndices.includes(idx));
+                      return (
+                        <Card key={q.id} sx={{
+                          mb: 2,
+                          borderRadius: 3,
+                          borderLeft: `6px solid ${isCorrect ? '#43a047' : '#d32f2f'}`,
+                          boxShadow: 2,
+                          background: isCorrect ? 'rgba(76, 175, 80, 0.07)' : 'rgba(244, 67, 54, 0.07)',
+                          p: 2.5,
+                        }}>
+                          <Box display="flex" alignItems="center" mb={1}>
+                            <Typography variant="h6" fontWeight={700} color={isCorrect ? 'success.main' : 'error.main'}>
+                              Q{idx + 1}:
+                            </Typography>
+                            <Typography variant="subtitle1" fontWeight={600} ml={2} color="text.primary">
+                              {q.question_text}
+                            </Typography>
+                          </Box>
+                          {/* Options List */}
+                          <Box ml={2} mb={1}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" mb={0.5}>
+                              Options:
+                            </Typography>
+                            <Stack spacing={1}>
+                              {Array.isArray(q.options) && q.options.length > 0 ? (
+                                q.options.map((opt: any, optIdx: number) => {
+                                  const isOptionCorrect = correctIndices.includes(optIdx);
+                                  const isOptionSelected = userIndices.includes(optIdx);
+                                  return (
+                                    <Chip
+                                      key={optIdx}
+                                      label={opt.text}
+                                      color={isOptionCorrect ? 'success' : isOptionSelected ? 'primary' : 'default'}
+                                      variant={isOptionCorrect || isOptionSelected ? 'filled' : 'outlined'}
+                                      sx={{
+                                        fontWeight: isOptionCorrect ? 700 : 500,
+                                        fontSize: '1rem',
+                                        opacity: 1,
+                                        minWidth: 80,
+                                        letterSpacing: 0.1,
+                                        border: isOptionCorrect
+                                          ? '2px solid #43a047'
+                                          : isOptionSelected
+                                          ? '2px solid #1565c0'
+                                          : undefined,
+                                        color: isOptionCorrect
+                                          ? '#2e7d32'
+                                          : isOptionSelected
+                                          ? '#1565c0'
+                                          : undefined,
+                                        background: isOptionCorrect
+                                          ? 'rgba(46, 125, 50, 0.12)'
+                                          : isOptionSelected
+                                          ? 'rgba(21, 101, 192, 0.12)'
+                                          : undefined,
+                                        mr: 1,
+                                        mb: 0.5,
+                                      }}
+                                      icon={isOptionCorrect ? <CheckCircleIcon sx={{ color: '#2e7d32' }} /> : isOptionSelected ? <VisibilityIcon sx={{ color: '#1565c0' }} /> : undefined}
+                                    />
+                                  );
+                                })
+                              ) : (
+                                <Typography variant="body2" color="text.disabled">No options found</Typography>
+                              )}
+                            </Stack>
+                          </Box>
+                          {/* Your Answer */}
+                          <Box ml={2} mb={1}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary">Your Answer:</Typography>
+                            {userIndices.length > 0 ? (
+                              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                {userIndices.map((ansIdx: number, i: number) => (
+                                  <li key={i} style={{ color: correctIndices.includes(ansIdx) ? '#2e7d32' : '#d32f2f', fontWeight: 600 }}>
+                                    {Array.isArray(q.options) && q.options[ansIdx] ? q.options[ansIdx].text : 'N/A'}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <Typography variant="body2" color="text.disabled">No answer given</Typography>
+                            )}
+                          </Box>
+                          {/* Correct Answer */}
+                          <Box ml={2}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary">
+                              Correct Answer{Array.isArray(q.correct_answers) && q.correct_answers.length > 1 ? 's' : ''}:
+                            </Typography>
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
+                              {Array.isArray(q.correct_answers) && q.correct_answers.length > 0 && Array.isArray(q.options) ? (
+                                q.correct_answers.map((ans: number | string, i: number) => {
+                                  // If ans is a number and in bounds, show the text
+                                  if (typeof ans === 'number' && q.options[ans]) {
+                                    return (
+                                      <li key={i} style={{ color: '#2e7d32', fontWeight: 600 }}>
+                                        {q.options[ans].text}
+                                      </li>
+                                    );
+                                  }
+                                  // If ans is a string, try to find the option with that text
+                                  if (typeof ans === 'string') {
+                                    const found = q.options.find((opt: any) => opt.text === ans);
+                                    return (
+                                      <li key={i} style={{ color: '#2e7d32', fontWeight: 600 }}>
+                                        {found ? found.text : ans}
+                                      </li>
+                                    );
+                                  }
+                                  return (
+                                    <li key={i} style={{ color: '#2e7d32', fontWeight: 600 }}>
+                                      N/A
+                                    </li>
+                                  );
+                                })
+                              ) : (
+                                <li style={{ color: '#2e7d32', fontWeight: 600 }}>N/A</li>
+                              )}
+                            </ul>
+                            {q.explanation && (
+                              <Box ml={2} mt={1}>
+                                <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                                  Explanation: {q.explanation}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </Card>
+                      );
+                    })
+                  ) : (
+                    <Typography color="text.secondary">No questions found for this quiz.</Typography>
+                  )}
+                </Stack>
+              </Box>
+            ) : (
+              <Typography color="text.secondary">No attempt selected.</Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDetails} variant="outlined">Close</Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     </LocalizationProvider>
   );
@@ -1430,7 +1855,6 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
   const [form, setForm] = useState({ 
     firstName: '', 
     lastName: '', 
-    gender: '',
     email: '', 
     password: '', 
     confirmPassword: '', 
@@ -1536,7 +1960,6 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
         body: JSON.stringify({
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
-          gender: form.gender,
           email: form.email.trim().toLowerCase(),
           password: form.password,
           role: form.role,
@@ -1573,7 +1996,6 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
         setForm({ 
           firstName: '', 
           lastName: '', 
-          gender: '',
           email: '', 
           password: '', 
           confirmPassword: '', 
@@ -1612,6 +2034,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
 
   // ... after other useState hooks in RecordsSection ...
   const [isPwnedPassword, setIsPwnedPassword] = useState(false);
+  const [deleteSuccessOpen, setDeleteSuccessOpen] = useState(false);
 
   // Auto-close logic for 2.5s
   useEffect(() => {
@@ -1622,24 +2045,29 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
   }, [successSnackbarOpen]);
 
   // ... after the useEffect for add success ...
-  const [deleteSuccessOpen, setDeleteSuccessOpen] = useState(false);
   const [studentDeleteDialogOpen, setStudentDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
 
   const handleDeleteStudent = async () => {
-    if (!studentToDelete?.id) return;
+    // Log the student object for debugging
+    console.log('Deleting student:', studentToDelete);
+    // Try all possible id fields
+    const clerkId = studentToDelete?.id || studentToDelete?.clerkId || studentToDelete?.userId || studentToDelete?._id;
+    if (!clerkId) {
+      setError('No valid student id found.');
+      return;
+    }
     try {
       const res = await fetch('/api/delete-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: studentToDelete.id }),
+        body: JSON.stringify({ id: clerkId }),
       });
       if (res.ok) {
         // Refresh the students list directly
         const refreshRes = await fetch('/api/clerk-users?limit=1000');
         const refreshData = await refreshRes.json();
         setStudents(Array.isArray(refreshData) ? refreshData.filter((u: any) => u.role === 'student') : []);
-        setDeleteSuccessOpen(true);
         setStudentDeleteDialogOpen(false);
         setStudentToDelete(null);
       } else {
@@ -1664,11 +2092,11 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
 
   // ... after the useEffect for add success ...
   useEffect(() => {
-    if (deleteSuccessOpen) {
-      const timer = setTimeout(() => setDeleteSuccessOpen(false), 2500);
+    if (successSnackbarOpen) {
+      const timer = setTimeout(() => setSuccessSnackbarOpen(false), 2500);
       return () => clearTimeout(timer);
     }
-  }, [deleteSuccessOpen]);
+  }, [successSnackbarOpen]);
 
   // Professional Green Success Dialog
   return (
@@ -1780,69 +2208,13 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
           <Table>
             <TableHead>
                 <TableRow sx={{ background: theme.palette.mode === 'dark' ? theme.palette.grey[900] : theme.palette.grey[50] }}>
-                  <TableCell sx={{ 
-                    fontWeight: 700, 
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    ID
-                  </TableCell>
-                  <TableCell sx={{ 
-                    fontWeight: 700, 
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Full Name
-                  </TableCell>
-                  <TableCell sx={{ 
-                    fontWeight: 700, 
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Email
-                  </TableCell>
-                  <TableCell sx={{ 
-                    fontWeight: 700, 
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Role
-                  </TableCell>
-                  <TableCell sx={{ 
-                    fontWeight: 700, 
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Gender
-                  </TableCell>
-                  <TableCell sx={{ 
-                    fontWeight: 700, 
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Created At
-                  </TableCell>
-                  <TableCell sx={{ 
-                    fontWeight: 700, 
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Actions
-                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Full Name</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Username</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Role</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Created At</TableCell>
+                  <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1859,27 +2231,18 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       },
                       transition: 'all 0.2s ease'
                     }}>
-                      <TableCell sx={{ 
-                        fontWeight: 600, 
-                        color: theme.palette.text.primary,
-                        fontFamily: 'monospace',
-                        fontSize: '0.875rem'
-                      }}>
+                      <TableCell sx={{ fontWeight: 600, color: theme.palette.text.primary, fontFamily: 'monospace', fontSize: '0.875rem' }}>
                         #{stu.id}
                       </TableCell>
-                      <TableCell sx={{ 
-                        fontWeight: 600, 
-                        color: theme.palette.text.primary,
-                        fontSize: '0.95rem'
-                      }}>
+                      <TableCell sx={{ fontWeight: 600, color: theme.palette.text.primary, fontSize: '0.95rem' }}>
                         <Typography sx={{ color: theme.palette.text.primary }}>
                           {(stu.firstName || stu.first_name || stu.fname || '') + ' ' + (stu.lastName || stu.last_name || stu.lname || '')}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ 
-                        color: theme.palette.text.secondary,
-                        fontSize: '0.875rem'
-                      }}>
+                      <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '0.875rem' }}>
+                        {stu.username || stu.uname || '-'}
+                      </TableCell>
+                      <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '0.875rem' }}>
                         {stu.email}
                       </TableCell>
                       <TableCell>
@@ -1888,23 +2251,10 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                           size="small" 
                           color="primary" 
                           variant="outlined"
-                          sx={{ 
-                            fontWeight: 600,
-                            fontSize: '0.75rem',
-                            textTransform: 'uppercase'
-                          }}
+                          sx={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}
                         />
                       </TableCell>
-                      <TableCell sx={{ 
-                        color: theme.palette.text.secondary,
-                        fontSize: '0.875rem'
-                      }}>
-                        {stu.gender || '-'}
-                      </TableCell>
-                      <TableCell sx={{ 
-                        color: theme.palette.text.secondary,
-                        fontSize: '0.875rem'
-                      }}>
+                      <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '0.875rem' }}>
                         {stu.created_at
                           ? new Date(stu.created_at).toLocaleString('en-US', {
                               year: 'numeric',
@@ -1944,11 +2294,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                       <Box textAlign="center">
-                        <PersonIcon sx={{ 
-                          fontSize: 64, 
-                          color: theme.palette.text.disabled, 
-                          mb: 2 
-                        }} />
+                        <PersonIcon sx={{ fontSize: 64, color: theme.palette.text.disabled, mb: 2 }} />
                         <Typography variant="h6" color="text.secondary" fontWeight={600} mb={1}>
                           No Students Found
                         </Typography>
@@ -1991,30 +2337,45 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-            border: `1px solid ${theme.palette.divider}`
+            borderRadius: 4,
+            boxShadow: 6,
+            background: '#fff',
+            p: 0,
+            maxWidth: 540,
+            width: '100%',
+            m: { xs: 1, sm: 2 },
+            overflow: 'hidden',
           }
         }}
       >
         <DialogTitle sx={{
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-          color: 'white',
           fontWeight: 700,
           fontSize: '1.5rem',
           py: 3,
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12
+          px: 4,
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          borderBottom: t => `1px solid ${t.palette.divider}`,
+          textAlign: 'left',
+          letterSpacing: 0.2
         }}>
-          <Box display="flex" alignItems="center" gap={2}>
-            <AddIcon sx={{ fontSize: 28 }} />
-            Add New Student
-          </Box>
-          <Typography variant="subtitle2" component="p" sx={{ color: 'rgba(255,255,255,0.85)', fontWeight: 400, mt: 1, ml: 5 }}>
+          Add New Student
+        </DialogTitle>
+        <Box sx={{ px: 4, pt: 1, pb: 2, bgcolor: 'background.paper' }}>
+          <Typography variant="subtitle2" sx={{ color: 'text.secondary', fontWeight: 400, fontSize: 15 }}>
             Fill in the details below to create a new student account.
           </Typography>
-        </DialogTitle>
-        <DialogContent sx={{ p: 4 }}>
+        </Box>
+        <DialogContent sx={{
+          p: { xs: 2, sm: 4 },
+          background: '#fff',
+          minWidth: { xs: 280, sm: 400 },
+          maxWidth: 500,
+          mx: 'auto',
+          width: '100%',
+        }}>
           <form onSubmit={handleAddStudent}>
             <Stack spacing={3} divider={<Divider flexItem sx={{ my: 0 }} />}>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-start">
@@ -2026,9 +2387,9 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                   required
                   fullWidth
                   autoFocus
+                  variant="outlined"
                   helperText={!form.firstName ? 'Required' : ''}
                   error={!form.firstName && submitting}
-                  sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
                 />
                 <TextField
                   name="lastName"
@@ -2037,35 +2398,19 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                   onChange={handleFormChange}
                   required
                   fullWidth
+                  variant="outlined"
                   helperText={!form.lastName ? 'Required' : ''}
                   error={!form.lastName && submitting}
-                  sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
                 />
               </Stack>
-              <FormControl component="fieldset" required>
-                <FormLabel component="legend">Gender</FormLabel>
-                <RadioGroup
-                  row
-                  name="gender"
-                  value={form.gender}
-                  onChange={handleFormChange}
-                >
-                  <FormControlLabel value="male" control={<Radio />} label="Male" />
-                  <FormControlLabel value="female" control={<Radio />} label="Female" />
-                  <FormControlLabel value="other" control={<Radio />} label="Other" />
-                </RadioGroup>
-                {submitting && !form.gender && (
-                  <Typography variant="caption" color="error">Gender is required</Typography>
-                )}
-              </FormControl>
               <TextField
                 name="username"
                 label="Username (optional)"
                 value={form.username}
                 onChange={handleFormChange}
                 fullWidth
+                variant="outlined"
                 helperText="Optional: Used for login if provided."
-                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               />
               <TextField
                 name="email"
@@ -2075,9 +2420,9 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                 onChange={handleFormChange}
                 required
                 fullWidth
+                variant="outlined"
                 helperText={!form.email ? 'Required' : (!form.email.includes('@') ? 'Enter a valid email address' : '')}
                 error={(!form.email || !form.email.includes('@')) && submitting}
-                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               />
               <TextField
                 name="password"
@@ -2090,11 +2435,12 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                 }}
                 required
                 fullWidth
+                variant="outlined"
                 error={isPwnedPassword}
                 helperText={isPwnedPassword ? (
                   <Box display="flex" alignItems="center" color="error.main" gap={1}>
                     <WarningAmberIcon fontSize="small" />
-                    <span>This password has been found in a data breach. Please choose a different one.</span>
+                    <span>This password has been found in a data breach. Please choose a different, stronger password for your safety.</span>
                   </Box>
                 ) : 'At least 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special character'}
                 InputProps={{
@@ -2110,24 +2456,14 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                     </InputAdornment>
                   ),
                 }}
-                sx={{
-                  color: theme.palette.text.primary,
-                  '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
-                  '& .MuiInputBase-root': { color: theme.palette.text.primary },
-                  '& .MuiOutlinedInput-root': isPwnedPassword ? {
-                    '& fieldset': {
-                      borderColor: theme.palette.error.main,
-                      borderWidth: 2,
-                    },
-                  } : {},
-                }}
               />
+              {/* Password requirements card */}
               <Box sx={{ mb: 1, mt: -2 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block', fontWeight: 600 }}>
                   Password Requirements:
                 </Typography>
                 {form.password && (
-                  <Box sx={{ mb: 2, p: 2, borderRadius: 1, backgroundColor: theme.palette.grey[50], border: `1px solid ${theme.palette.divider}` }}>
+                  <Box sx={{ mb: 2, p: 2, borderRadius: 1, backgroundColor: 'grey.50', border: t => `1px solid ${t.palette.divider}` }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                       <Typography variant="caption" sx={{ fontWeight: 600, color: passwordStrength.color }}>
                         Password Strength: {passwordStrength.strength}
@@ -2139,7 +2475,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                     <Box sx={{ 
                       width: '100%', 
                       height: 4, 
-                      backgroundColor: theme.palette.grey[300], 
+                      backgroundColor: 'grey.300', 
                       borderRadius: 2,
                       overflow: 'hidden'
                     }}>
@@ -2162,7 +2498,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      backgroundColor: passwordValidation.length ? theme.palette.success.main : theme.palette.grey[300],
+                      backgroundColor: passwordValidation.length ? 'success.main' : 'grey.300',
                       color: 'white',
                       fontSize: '0.75rem',
                       fontWeight: 'bold'
@@ -2170,7 +2506,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       {passwordValidation.length ? '✓' : '!'}
                     </Box>
                     <Typography variant="caption" sx={{ 
-                      color: passwordValidation.length ? theme.palette.success.main : theme.palette.text.secondary,
+                      color: passwordValidation.length ? 'success.main' : 'text.secondary',
                       fontWeight: passwordValidation.length ? 600 : 400
                     }}>
                       At least 8 characters
@@ -2184,7 +2520,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      backgroundColor: passwordValidation.uppercase ? theme.palette.success.main : theme.palette.grey[300],
+                      backgroundColor: passwordValidation.uppercase ? 'success.main' : 'grey.300',
                       color: 'white',
                       fontSize: '0.75rem',
                       fontWeight: 'bold'
@@ -2192,7 +2528,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       {passwordValidation.uppercase ? '✓' : '!'}
                     </Box>
                     <Typography variant="caption" sx={{ 
-                      color: passwordValidation.uppercase ? theme.palette.success.main : theme.palette.text.secondary,
+                      color: passwordValidation.uppercase ? 'success.main' : 'text.secondary',
                       fontWeight: passwordValidation.uppercase ? 600 : 400
                     }}>
                       One uppercase letter (A-Z)
@@ -2206,7 +2542,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      backgroundColor: passwordValidation.lowercase ? theme.palette.success.main : theme.palette.grey[300],
+                      backgroundColor: passwordValidation.lowercase ? 'success.main' : 'grey.300',
                       color: 'white',
                       fontSize: '0.75rem',
                       fontWeight: 'bold'
@@ -2214,7 +2550,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       {passwordValidation.lowercase ? '✓' : '!'}
                     </Box>
                     <Typography variant="caption" sx={{ 
-                      color: passwordValidation.lowercase ? theme.palette.success.main : theme.palette.text.secondary,
+                      color: passwordValidation.lowercase ? 'success.main' : 'text.secondary',
                       fontWeight: passwordValidation.lowercase ? 600 : 400
                     }}>
                       One lowercase letter (a-z)
@@ -2228,7 +2564,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      backgroundColor: passwordValidation.number ? theme.palette.success.main : theme.palette.grey[300],
+                      backgroundColor: passwordValidation.number ? 'success.main' : 'grey.300',
                       color: 'white',
                       fontSize: '0.75rem',
                       fontWeight: 'bold'
@@ -2236,7 +2572,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       {passwordValidation.number ? '✓' : '!'}
                     </Box>
                     <Typography variant="caption" sx={{ 
-                      color: passwordValidation.number ? theme.palette.success.main : theme.palette.text.secondary,
+                      color: passwordValidation.number ? 'success.main' : 'text.secondary',
                       fontWeight: passwordValidation.number ? 600 : 400
                     }}>
                       One number (0-9)
@@ -2250,7 +2586,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      backgroundColor: passwordValidation.special ? theme.palette.success.main : theme.palette.grey[300],
+                      backgroundColor: passwordValidation.special ? 'success.main' : 'grey.300',
                       color: 'white',
                       fontSize: '0.75rem',
                       fontWeight: 'bold'
@@ -2258,7 +2594,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       {passwordValidation.special ? '✓' : '!'}
                     </Box>
                     <Typography variant="caption" sx={{ 
-                      color: passwordValidation.special ? theme.palette.success.main : theme.palette.text.secondary,
+                      color: passwordValidation.special ? 'success.main' : 'text.secondary',
                       fontWeight: passwordValidation.special ? 600 : 400
                     }}>
                       One special character (!@#$%^&*)
@@ -2274,6 +2610,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                 onChange={handleFormChange}
                 required
                 fullWidth
+                variant="outlined"
                 helperText={!form.confirmPassword ? 'Required' : (form.password !== form.confirmPassword ? 'Passwords do not match' : '')}
                 error={(!form.confirmPassword || form.password !== form.confirmPassword) && submitting}
                 InputProps={{
@@ -2282,28 +2619,28 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                       aria-label="toggle confirm password visibility"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       edge="end"
-                      sx={{ color: theme.palette.text.secondary }}
                     >
                       {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                     </IconButton>
                   ),
                 }}
-                sx={{ color: theme.palette.text.primary, '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, '& .MuiInputBase-root': { color: theme.palette.text.primary } }}
               />
               {formError && (
                 <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>{formError}</Alert>
               )}
             </Stack>
-            <DialogActions sx={{ pt: 3 }}>
+            <DialogActions sx={{ pt: 3, px: 0, pb: 0, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'flex-end' }}>
               <Button 
                 onClick={() => setAddOpen(false)} 
                 variant="outlined"
+                color="secondary"
                 disabled={submitting}
                 sx={{ 
                   borderRadius: 2,
                   px: 3,
                   py: 1.5,
-                  fontWeight: 600
+                  fontWeight: 600,
+                  minWidth: 120
                 }}
               >
                 Cancel
@@ -2319,17 +2656,15 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
                   py: 1.5, 
                   px: 4,
                   color: 'white', 
-                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                   borderRadius: 2,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  minWidth: 140,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
                   '&:hover': { 
-                    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 6px 16px rgba(0,0,0,0.2)'
+                    background: t => t.palette.primary.dark,
+                    boxShadow: '0 6px 16px rgba(0,0,0,0.13)'
                   },
                   '&:disabled': {
-                    background: theme.palette.action.disabledBackground,
-                    transform: 'none',
+                    background: t => t.palette.action.disabledBackground,
                     boxShadow: 'none'
                   },
                   transition: 'all 0.3s ease'

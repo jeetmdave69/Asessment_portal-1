@@ -181,7 +181,7 @@ export default function CreateQuizPage() {
             { text: '', image: null, isCorrect: false },
             { text: '', image: null, isCorrect: false },
           ],
-          section: sections[0] || "Section 1",
+          section: 'Section 1', // Use static string, not sections[0]
         },
       ],
     },
@@ -518,172 +518,87 @@ export default function CreateQuizPage() {
     }
   };
 
-  const QuestionAccordion = React.memo(function QuestionAccordion({ q, i, opts }: { q: any, i: number, opts: any[] }) {
+  const QuestionAccordion = React.memo(function QuestionAccordion({ q, i, optionFields }: { q: any, i: number, optionFields: any[] }) {
     // Memoize expensive watch calls
     const questionText = useWatch({ control, name: `questions.${i}.question` });
     const questionType = useWatch({ control, name: `questions.${i}.questionType` });
     const sectionId = useWatch({ control, name: `questions.${i}.section` });
     const marks = useWatch({ control, name: `questions.${i}.marks` });
     const questionImage = useWatch({ control, name: `questions.${i}.image` });
-    
     // Memoize section label
     const sectionLabel = React.useMemo(() => {
       return sections.includes(sectionId) ? sectionId : 'Unknown Section';
     }, [sectionId]);
-
     const isExpanded = expandedIndex === i;
     return (
       <Slide key={q.id} direction="up" in mountOnEnter unmountOnExit>
-        <Accordion
-          expanded={isExpanded}
-          onChange={() => setExpandedIndex(isExpanded ? -1 : i)}
-          sx={{ borderRadius: 3, boxShadow: 2, mb: 1, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}
-          id={`question-accordion-${i}`}
-        >
+        <Accordion expanded={isExpanded} onChange={() => setExpandedIndex(isExpanded ? -1 : i)} id={`question-accordion-${i}`}> 
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ flex: 1 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Chip label={`Question ${i + 1}`} variant="outlined" size="medium" sx={{ fontWeight: 600, fontSize: '1.05rem', bgcolor: 'background.paper', color: 'text.primary', borderColor: 'grey.400' }} />
-                <Typography fontWeight={600} sx={{ color: 'text.primary' }}>{questionText || `Question ${i + 1}`}</Typography>
-              </Stack>
-              <Stack direction="row" spacing={1} alignItems="center" mt={1}>
-                <Chip label={sectionLabel} variant="outlined" size="small" sx={{ bgcolor: 'background.paper', color: 'text.secondary', borderColor: 'grey.300', fontWeight: 500 }} />
-                <Chip label={questionType === 'multiple' ? 'Multiple' : 'Single'} variant="outlined" size="small" sx={{ bgcolor: 'background.paper', color: 'text.secondary', borderColor: 'grey.300' }} />
-                <Chip label={`Marks: ${marks}`} variant="outlined" size="small" sx={{ bgcolor: 'background.paper', color: 'text.secondary', borderColor: 'grey.300' }} />
-              </Stack>
-            </Box>
-            <Stack direction="row" spacing={1}>
-              <Tooltip title="Move Up"><span><IconButton disabled={i === 0} onClick={() => move(i, i - 1)}><ArrowUpwardIcon /></IconButton></span></Tooltip>
-              <Tooltip title="Move Down"><span><IconButton disabled={i === questionFields.length - 1} onClick={() => move(i, i + 1)}><ArrowDownwardIcon /></IconButton></span></Tooltip>
-              <Tooltip title="Duplicate Question"><span><IconButton color="info" onClick={() => {
-                const questions = methods.getValues('questions');
-                const toDuplicate = { ...questions[i], options: questions[i].options.map((o: any) => ({ ...o })) };
-                const newQuestions = [...questions.slice(0, i + 1), toDuplicate, ...questions.slice(i + 1)];
-                reset({ ...methods.getValues(), questions: newQuestions });
-              }}><AddIcon /></IconButton></span></Tooltip>
-              <Tooltip title="Delete Question"><span><IconButton color="error" onClick={() => setDeleteDialog({ open: true, index: i })}><DeleteIcon /></IconButton></span></Tooltip>
-            </Stack>
+            <Typography sx={{ width: '33%', flexShrink: 0 }}>{`Q${i + 1}: ${questionText || 'Untitled Question'}`}</Typography>
+            <Typography sx={{ color: 'text.secondary' }}>{sectionLabel}</Typography>
           </AccordionSummary>
           <AccordionDetails>
             {isExpanded ? (
-            <Stack spacing={2}>
-              <Controller
-                name={`questions.${i}.question`}
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    label="Question"
-                    {...field}
-                    fullWidth
-                    required
-                    error={!!errors.questions?.[i]?.question}
-                    helperText={errors.questions?.[i]?.question?.message}
-                  />
-                )}
-              />
-              
-              {/* Question image upload */}
-              <Box display="flex" alignItems="center" gap={2}>
-                {questionImage && typeof questionImage === 'string' && (
-                  <img src={questionImage} alt="Question" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #eee' }} />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  id={`question-image-${i}`}
-                  aria-label="Upload question image"
-                  onChange={async e => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setUploadingImageIndex({q: i, o: -1});
-                      setUploadError(null);
-                      try {
-                        const url = await uploadImageToSupabase(file, `quiz-questions`);
-                        setValue(`questions.${i}.image`, url);
-                      } catch (err: any) {
-                        setUploadError(err.message || 'Image upload failed');
-                      } finally {
-                        setUploadingImageIndex(null);
+              <Stack spacing={2}>
+                <TextField label="Question" {...register(`questions.${i}.question`)} fullWidth required error={!!errors.questions?.[i]?.question} helperText={errors.questions?.[i]?.question?.message || ''} />
+                {/* Question image upload */}
+                <Box display="flex" alignItems="center" gap={2}>
+                  {questionImage && typeof questionImage === 'string' && (
+                    <img src={questionImage} alt="Question" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #eee' }} />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    id={`question-image-${i}`}
+                    onChange={async e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setUploadingImageIndex({q: i, o: -1});
+                        setUploadError(null);
+                        try {
+                          const url = await uploadImageToSupabase(file, `quiz-questions`);
+                          setValue(`questions.${i}.image`, url);
+                        } catch (err: any) {
+                          setUploadError(err.message || 'Image upload failed');
+                        } finally {
+                          setUploadingImageIndex(null);
+                        }
                       }
-                    }
-                  }}
-                />
-                <label htmlFor={`question-image-${i}`}>
-                  <Tooltip title="Upload Image">
-                    <IconButton component="span" color="primary" disabled={!!uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === -1}>
-                      <ImageIcon />
-                    </IconButton>
-                  </Tooltip>
-                </label>
-                {uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === -1 && <LinearProgress sx={{ width: 40, mt: 1 }} />}
-                {questionImage && typeof questionImage === 'string' && (
-                  <IconButton color="error" onClick={() => setValue(`questions.${i}.image`, null)}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </Box>
-              
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <Controller
-                  name={`questions.${i}.questionType`}
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      label="Type"
-                      value={field.value as 'single' | 'multiple'}
-                      onChange={e => field.onChange(e.target.value as 'single' | 'multiple')}
-                      fullWidth
-                    >
-                      <MenuItem value="single">Single Correct</MenuItem>
-                      <MenuItem value="multiple">Multiple Correct</MenuItem>
-                    </Select>
-                  )}
-                />
-                <Controller
-                  name={`questions.${i}.marks`}
-                  control={control}
-                  render={({ field }) => (
-                    <TextField
-                      label="Marks"
-                      type="number"
-                      value={field.value}
-                      onChange={e => field.onChange(e.target.value)}
-                      fullWidth
-                      required
-                      error={!!errors.questions?.[i]?.marks}
-                      helperText={errors.questions?.[i]?.marks?.message}
-                    />
-                  )}
-                />
-              </Stack>
-              
-              <Controller
-                name={`questions.${i}.explanation`}
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    label="Explanation"
-                    {...field}
-                    fullWidth
-                    multiline
-                    minRows={2}
-                    error={!!errors.questions?.[i]?.explanation}
-                    helperText={errors.questions?.[i]?.explanation?.message}
+                    }}
                   />
-                )}
-              />
-              
-              {/* Enhanced Section Selection */}
-              <Controller
-                name={`questions.${i}.section`}
-                control={control}
-                render={({ field }) => (
-                  <FormControl fullWidth sx={{ mt: 2 }}>
-                    <InputLabel>Question Section *</InputLabel>
-                    <Select
+                  <label htmlFor={`question-image-${i}`}>
+                    <Tooltip title="Upload Image">
+                      <IconButton component="span" color="primary" disabled={!!uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === -1}>
+                        <ImageIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </label>
+                  {uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === -1 && <LinearProgress sx={{ width: 40, mt: 1 }} />}
+                  {questionImage && typeof questionImage === 'string' && (
+                    <IconButton color="error" onClick={() => setValue(`questions.${i}.image`, null)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                </Box>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                  <Select label="Type" value={questionType as 'single' | 'multiple'} onChange={e => setValue(`questions.${i}.questionType`, e.target.value as 'single' | 'multiple')} fullWidth>
+                    <MenuItem value="single">Single Correct</MenuItem>
+                    <MenuItem value="multiple">Multiple Correct</MenuItem>
+                  </Select>
+                  <TextField label="Marks" type="number" {...register(`questions.${i}.marks`)} fullWidth required error={!!errors.questions?.[i]?.marks} helperText={errors.questions?.[i]?.marks?.message || ''} />
+                </Stack>
+                <TextField label="Explanation" {...register(`questions.${i}.explanation`)} fullWidth multiline minRows={2} error={!!errors.questions?.[i]?.explanation} helperText={errors.questions?.[i]?.explanation?.message || ''} />
+                {/* Enhanced Section Selection */}
+                <Controller
+                  name={`questions.${i}.section`}
+                  control={control}
+                  render={({ field }) => (
+                    <FormControl fullWidth sx={{ mt: 2 }}>
+                      <InputLabel>Question Section *</InputLabel>
+                      <Select
                         value={field.value || sections[0]}
-                      label="Question Section *"
+                        label="Question Section *"
                         onChange={(e) => {
                           if (e.target.value === "__add_new__") {
                             setAddSectionDialog({ open: true, qIndex: i });
@@ -697,101 +612,78 @@ export default function CreateQuizPage() {
                           <MenuItem key={section} value={section}>{section}</MenuItem>
                         ))}
                         <MenuItem value="__add_new__" sx={{ fontStyle: 'italic', color: 'primary.main' }}>+ Add new section</MenuItem>
-                    </Select>
-                  </FormControl>
-                )}
-              />
-              
-              <Typography variant="subtitle2" sx={{ mt: 1 }}>Options</Typography>
-              <Stack spacing={1}>
-                {opts.map((opt, j) => (
-                  <Stack key={j} direction="row" spacing={2} alignItems="center" sx={{ border: opt.isCorrect ? '2px solid #1976d2' : '1px solid #eee', borderRadius: 2, p: 1, background: 'background.paper' }}>
-                    <Chip label={String.fromCharCode(65 + j)} color="default" />
-                    <Controller
-                      name={`questions.${i}.options.${j}.text`}
-                      control={control}
-                      render={({ field }) => (
-                        <TextField
-                          label={`Option ${j + 1}`}
-                          {...field}
-                          fullWidth
-                          required
-                          error={!!errors.questions?.[i]?.options?.[j]?.text}
-                          helperText={errors.questions?.[i]?.options?.[j]?.text?.message}
-                        />
-                      )}
-                    />
-                    {/* Image upload for option */}
-                    <Box>
-                      {opt.image && (
-                        <img
-                          src={opt.image}
-                          alt="Option"
-                          style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, marginRight: 8 }}
-                          onError={e => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/40?text=No+Img';
-                          }}
-                        />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        id={`option-image-${i}-${j}`}
-                        aria-label={`Upload image for option ${j + 1}`}
-                        onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (file) handleOptionImageUpload(i, j, file);
-                        }}
-                      />
-                      <label htmlFor={`option-image-${i}-${j}`}>
-                        <Tooltip title="Upload Image">
-                          <IconButton component="span" color="primary" disabled={!!uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === j}>
-                            <ImageIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </label>
-                      {uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === j && <LinearProgress sx={{ width: 40, mt: 1 }} />}
-                      {opt.image && (
-                        <IconButton color="error" onClick={() => {
-                          const options = [...opts];
-                          options[j].image = null;
-                          setValue(`questions.${i}.options`, options);
-                        }}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      )}
-                    </Box>
-                    {questionType === 'single' ? (
-                      <Tooltip title={opt.isCorrect ? 'Correct Answer' : 'Mark as Correct'}>
-                        <Radio
-                          checked={opt.isCorrect || false}
-                          onChange={() => {
-                            // Only one can be correct
-                            const updated = opts.map((o, idx) => ({ ...o, isCorrect: idx === j }));
-                            setValue(`questions.${i}.options`, updated);
-                          }}
-                          color="primary"
-                        />
-                      </Tooltip>
-                    ) : (
-                      <Tooltip title={opt.isCorrect ? 'Correct Answer' : 'Mark as Correct'}>
-                        <Checkbox
-                          checked={opt.isCorrect || false}
+                      </Select>
+                    </FormControl>
+                  )}
+                />
+                <Typography variant="subtitle2" sx={{ mt: 1 }}>Options</Typography>
+                <Stack spacing={1}>
+                  {optionFields.map((opt, j) => (
+                    <Stack key={j} direction="row" spacing={2} alignItems="center" sx={{ border: opt.isCorrect ? '2px solid #1976d2' : '1px solid #eee', borderRadius: 2, p: 1, background: 'background.paper' }}>
+                      <Chip label={String.fromCharCode(65 + j)} color="default" />
+                      <TextField label={`Option ${j + 1}`} {...register(`questions.${i}.options.${j}.text`)} fullWidth required error={!!errors.questions?.[i]?.options?.[j]?.text} helperText={errors.questions?.[i]?.options?.[j]?.text?.message || ''} />
+                      {/* Image upload for option */}
+                      <Box>
+                        {opt.image && (
+                          <img
+                            src={opt.image}
+                            alt="Option"
+                            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, marginRight: 8 }}
+                            onError={e => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/40?text=No+Img';
+                            }}
+                          />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          id={`option-image-${i}-${j}`}
                           onChange={e => {
-                            const updated = opts.map((o, idx) => idx === j ? { ...o, isCorrect: e.target.checked } : o);
-                            setValue(`questions.${i}.options`, updated);
+                            const file = e.target.files?.[0];
+                            if (file) handleOptionImageUpload(i, j, file);
                           }}
-                          color="primary"
                         />
-                      </Tooltip>
-                    )}
-                    <Tooltip title="Delete Option"><span><IconButton color="error" onClick={() => setValue(`questions.${i}.options`, opts.filter((_, idx) => idx !== j))}><DeleteIcon /></IconButton></span></Tooltip>
-                  </Stack>
-                ))}
-                <Button variant="outlined" onClick={() => setValue(`questions.${i}.options`, [...opts, { text: '', image: null, isCorrect: false }])} sx={{ mt: 1 }}>+ Add Option</Button>
+                        <label htmlFor={`option-image-${i}-${j}`}>
+                          <Tooltip title="Upload Image">
+                            <IconButton component="span" color="primary" disabled={!!uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === j}>
+                              <ImageIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </label>
+                        {uploadingImageIndex && uploadingImageIndex.q === i && uploadingImageIndex.o === j && <LinearProgress sx={{ width: 40, mt: 1 }} />}
+                      </Box>
+                      {/* Correct answer controls */}
+                      {questionType === 'single' ? (
+                        <Tooltip title={opt.isCorrect ? 'Correct Answer' : 'Mark as Correct'}>
+                          <Radio
+                            checked={opt.isCorrect || false}
+                            onChange={() => {
+                              // Only one can be correct
+                              const updated = optionFields.map((o, idx) => ({ ...o, isCorrect: idx === j }));
+                              setValue(`questions.${i}.options`, updated);
+                            }}
+                            color="primary"
+                          />
+                        </Tooltip>
+                      ) : (
+                        <Tooltip title={opt.isCorrect ? 'Correct Answer' : 'Mark as Correct'}>
+                          <Checkbox
+                            checked={opt.isCorrect || false}
+                            onChange={e => {
+                              const updated = optionFields.map((o, idx) => idx === j ? { ...o, isCorrect: e.target.checked } : o);
+                              setValue(`questions.${i}.options`, updated);
+                            }}
+                            color="primary"
+                          />
+                        </Tooltip>
+                      )}
+                      <Tooltip title="Delete Option"><span><IconButton color="error" onClick={() => setValue(`questions.${i}.options`, optionFields.filter((_, idx) => idx !== j))}><DeleteIcon /></IconButton></span></Tooltip>
+                    </Stack>
+                  ))}
+                  <Button variant="outlined" onClick={() => setValue(`questions.${i}.options`, [...optionFields, { text: '', image: null, isCorrect: false }])} sx={{ mt: 1 }}>+ Add Option</Button>
+                </Stack>
               </Stack>
-            </Stack>
             ) : null}
           </AccordionDetails>
         </Accordion>
@@ -1035,10 +927,9 @@ Cricket,Who is known as the "God of Cricket"?,Virat Kohli,Sachin Tendulkar,MS Dh
                 <Divider sx={{ my: 2 }} />
                 <Typography variant="h6" sx={{ color: 'primary.main', mb: 2 }}>Questions</Typography>
                 <Stack spacing={2}>
-                  {questionFields.map((q, i) => {
-                    const opts = watch(`questions.${i}.options`);
-                    return <QuestionAccordion key={q.id} q={q} i={i} opts={opts} />;
-                  })}
+                  {questionFields.map((q, i) => (
+                    <QuestionAccordion key={q.id} q={q} i={i} optionFields={methods.getValues(`questions.${i}.options`)} />
+                  ))}
                   <Button
                     variant="contained"
                     color="primary"
