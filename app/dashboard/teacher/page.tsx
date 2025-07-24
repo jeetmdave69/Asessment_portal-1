@@ -1764,7 +1764,7 @@ function ExamResultsTable({
                                   );
                                 })
                               ) : (
-                                <Typography variant="body2" color="text.disabled">No options found</Typography>
+                                <Typography variant="body2" color="error.main">No options found for this question.</Typography>
                               )}
                             </Stack>
                           </Box>

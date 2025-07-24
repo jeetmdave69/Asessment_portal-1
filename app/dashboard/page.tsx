@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import RoleRedirectSplash from "../../components/RoleRedirectSplash";
@@ -7,18 +7,20 @@ import RoleRedirectSplash from "../../components/RoleRedirectSplash";
 export default function Dashboard() {
   const { isLoaded, user } = useUser();
   const router = useRouter();
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
     const role = user?.publicMetadata?.role;
     if (!role) return router.push("/unauthorized");
-    setTimeout(() => {
-      if (role === "admin") router.push("/dashboard/admin");
-      else if (role === "teacher") router.push("/dashboard/teacher");
-      else if (role === "student") router.push("/dashboard/student");
-      else router.push("/unauthorized");
-    }, 1400); // Show splash for 1.4s
+    let url = "/unauthorized";
+    if (role === "admin") url = "/dashboard/admin";
+    else if (role === "teacher") url = "/dashboard/teacher";
+    else if (role === "student") url = "/dashboard/student";
+    setRedirectUrl(url);
   }, [isLoaded, user, router]);
+
+  if (!redirectUrl) return null;
 
   return (
     <RoleRedirectSplash
@@ -29,7 +31,7 @@ export default function Dashboard() {
         typeof user?.emailAddresses?.[0]?.emailAddress === 'string' ? user.emailAddresses[0].emailAddress :
         "User"
       }
-      role={typeof user?.publicMetadata?.role === 'string' ? user.publicMetadata.role : 'student'}
+      redirectUrl={redirectUrl}
     />
   );
 }

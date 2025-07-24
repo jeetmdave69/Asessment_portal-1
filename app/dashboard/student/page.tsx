@@ -64,6 +64,7 @@ import { ThemeModeProvider } from '@/providers/ThemeModeProvider';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 import Skeleton from '@mui/material/Skeleton';
+import LogoutSplash from '../../../components/LogoutSplash';
 
 const formatDateTime = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -161,6 +162,7 @@ function StudentDashboardPageContent() {
   const [resultsLoading, setResultsLoading] = useState(false);
 
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [showLogoutSplash, setShowLogoutSplash] = useState(false);
 
   const [quizProgress, setQuizProgress] = useState<Record<number, boolean>>({});
 
@@ -561,70 +563,13 @@ function StudentDashboardPageContent() {
     }
   }, [profileSuccess]);
 
-  if (loading || !user) {
-    // Professional skeleton loader for student dashboard
+  if (!mounted || !user) return null;
+
+  // Remove splash/skeleton loader: show minimal spinner on white bg if loading
+  if (loading) {
     return (
-      <Box
-        height="100vh"
-        display="flex"
-        flexDirection="column"
-        sx={{
-          background: '#fff',
-          minHeight: '100vh',
-          width: '100vw',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          zIndex: 9999,
-        }}
-      >
-        {/* Top Bar Skeleton */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={4}
-          p={3}
-          borderRadius={3}
-          sx={{
-            background: 'rgba(255,255,255,0.7)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            border: '1px solid #e3e6ef',
-            mt: 4,
-            mx: { xs: 2, sm: 6 },
-            minHeight: 90,
-          }}
-        >
-          <Box>
-            <Skeleton variant="text" width={220} height={38} sx={{ mb: 1 }} />
-            <Skeleton variant="text" width={180} height={24} />
-          </Box>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Skeleton variant="circular" width={44} height={44} />
-            <Skeleton variant="text" width={100} height={28} />
-          </Box>
-        </Box>
-
-        {/* Overview Cards Skeleton */}
-        <Grid container spacing={3} mb={4} px={{ xs: 2, sm: 6 }}>
-          {[1, 2, 3].map((i) => (
-            <Grid item xs={12} sm={4} key={i}>
-              <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
-                <Skeleton variant="circular" width={32} height={32} sx={{ mb: 1 }} />
-                <Skeleton variant="text" width={80} height={24} />
-                <Skeleton variant="rectangular" width={60} height={48} sx={{ my: 1 }} />
-                <Skeleton variant="text" width={120} height={18} />
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-
-        {/* Main Content Skeleton (e.g., instructions, tables) */}
-        <Card sx={{ mb: 4, p: 2, boxShadow: 2, mx: { xs: 2, sm: 6 } }}>
-          <Skeleton variant="text" width={180} height={28} sx={{ mb: 2 }} />
-          <Skeleton variant="rectangular" width="100%" height={120} sx={{ mb: 2 }} />
-          <Skeleton variant="rectangular" width="100%" height={60} />
-        </Card>
+      <Box height="100vh" display="flex" alignItems="center" justifyContent="center" sx={{ background: '#fff' }}>
+        <CircularProgress />
       </Box>
     );
   }
@@ -1167,13 +1112,7 @@ function StudentDashboardPageContent() {
         {/* Main Content Section Switcher */}
         {selectedSection === 'dashboard' && (
           <>
-            {/* Greeting */}
-            <Box display="flex" alignItems="center" gap={2} mb={3}>
-              {icon}
-              <Typography variant="h5" fontWeight={700} color={theme.palette.text.primary}>
-                {greet}, {user?.firstName || user?.fullName || 'Student'}!
-              </Typography>
-            </Box>
+            {/* Remove Greeting and make it formal */}
             {/* Overview Boxes */}
             <Grid container spacing={3} mb={4} alignItems="stretch">
               <Grid item xs={12} sm={4}>
@@ -1206,7 +1145,7 @@ function StudentDashboardPageContent() {
             </Grid>
 
             {/* General Instructions */}
-            <Box sx={professionalBoxSx(theme)}>
+            <Box sx={{ background: '#fff', borderRadius: 2, boxShadow: 1, p: 3, mb: 4, fontFamily: 'Poppins, sans-serif' }}>
               <Typography variant="h6" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
                 :: General Instructions ::
               </Typography>
@@ -1286,7 +1225,7 @@ function StudentDashboardPageContent() {
 
       {/* Logout Confirmation Dialog */}
       <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
-        <DialogTitle sx={{ color: theme.palette.text.primary, fontWeight: 700 }}>
+        <DialogTitle sx={{ color: '#002366', fontWeight: 700 }}>
           Log Out
         </DialogTitle>
         <DialogContent>
@@ -1304,7 +1243,7 @@ function StudentDashboardPageContent() {
           <Button
             onClick={() => {
               setLogoutDialogOpen(false);
-              signOut({ redirectUrl: "/sign-in" });
+              setShowLogoutSplash(true);
             }}
             color="error"
             variant="contained"
@@ -1313,6 +1252,27 @@ function StudentDashboardPageContent() {
           </Button>
         </DialogActions>
       </Dialog>
+      {showLogoutSplash && (
+        <Box
+          sx={{
+            position: 'fixed',
+            zIndex: 2000,
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(245,247,250,0.96)',
+          }}
+        >
+          <LogoutSplash
+            name={user?.firstName || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress || 'User'}
+            onComplete={() => signOut({ redirectUrl: "/sign-in" })}
+          />
+        </Box>
+      )}
     </Box>
   );
 }
