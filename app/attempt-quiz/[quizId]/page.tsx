@@ -326,7 +326,7 @@ export default function AttemptQuizPage() {
         if (sectionError) throw sectionError
         setSections(sectionData || [])
 
-        // Fetch questions
+        // Fetch questions (including options as jsonb)
         const { data: questionData, error: questionError } = await supabase
           .from('questions')
           .select('*')
@@ -339,11 +339,29 @@ export default function AttemptQuizPage() {
           id: q.id,
           question_text: q.question_text,
           image: q.image_url || q.image || null,
-          options: q.options.map((opt: any) => ({
-            text: opt.text,
-            isCorrect: opt.is_correct,
-            image: opt.image || null
-          })),
+          options: (() => {
+            if (Array.isArray(q.options)) {
+              return q.options.map((opt: any) => ({
+                text: opt.text,
+                isCorrect: opt.is_correct ?? opt.isCorrect,
+                image: opt.image || null
+              }));
+            } else if (typeof q.options === 'string') {
+              try {
+                const arr = JSON.parse(q.options);
+                if (Array.isArray(arr)) {
+                  return arr.map((opt: any) => ({
+                    text: opt.text,
+                    isCorrect: opt.is_correct ?? opt.isCorrect,
+                    image: opt.image || null
+                  }));
+                }
+              } catch (e) {
+                return [];
+              }
+            }
+            return [];
+          })(),
           section_id: q.section_id,
           marks: q.marks || 1,
           question_type: q.question_type || 'single',
@@ -1025,6 +1043,15 @@ export default function AttemptQuizPage() {
     }
   }, [quizId, quiz?.id]);
 
+  // --- AUTO SUBMISSION HANDLER ---
+  const handleAutoSubmit = useCallback(async () => {
+    setTimeUpDialogOpen(true);
+    setAutoSubmitting(true);
+    await confirmSubmit();
+    setAutoSubmitting(false);
+    // setTimeUpDialogOpen(false); // Keep dialog open until redirect for clarity
+  }, [confirmSubmit]);
+
   // Timer countdown effect (robust, ms-based)
   const timerWasPositive = useRef(false);
   useEffect(() => {
@@ -1056,14 +1083,14 @@ export default function AttemptQuizPage() {
       }
       // Only auto-submit if timer was ever positive and now reached 0
       if (remaining <= 0 && timerWasPositive.current) {
-        confirmSubmit();
+        handleAutoSubmit();
         timerWasPositive.current = false;
       }
     }
     timerId = setInterval(tick, 1000);
     tick(); // initial call
     return () => clearInterval(timerId);
-  }, [quizId, quiz, submitted]);
+  }, [quizId, quiz, submitted, handleAutoSubmit]);
   // --- TIMER REFACTOR END ---
 
   // Add a useEffect to always sync isOffline with navigator.onLine on mount and on online/offline events.
@@ -1650,7 +1677,24 @@ export default function AttemptQuizPage() {
               </Box>
               
               {/* Question options */}
-              {currentQuestion.question_type === 'single' ? (
+              {currentQuestion.options.length === 0 ? (
+                <Box sx={{
+                  mt: 2,
+                  mb: 2,
+                  p: 2,
+                  backgroundColor: '#fff3cd',
+                  border: '1px solid #ffeeba',
+                  borderRadius: 2,
+                  color: '#856404',
+                  fontWeight: 'bold',
+                  fontSize: '1.1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}>
+                  ⚠️ No options available for this question. Please contact your instructor or admin.
+                </Box>
+              ) : currentQuestion.question_type === 'single' ? (
                 <RadioGroup
                   value={typeof answers[currentQuestion.id]?.[0] === 'number' ? answers[currentQuestion.id]?.[0] : ''}
                   onChange={(e) => handleOptionSelect(currentQuestion.id, Number(e.target.value), currentQuestion.question_type)}

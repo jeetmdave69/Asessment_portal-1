@@ -1,0 +1,26 @@
+[33mf614d68[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m live login page and other improvements made on 19:15,17-07-2025
+[33m677d518[m made changes in the UI 14-07-2025 22:21PM
+[33m3148bb7[m minor bug fixes
+[33mc9ea2fd[m added announcement table
+[33mc4d86fc[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-2025-07-11-ui-announcement[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-2025-07-11-0312am-realtime-ui-polish[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-2025-07-11-0145am-final-ui-data-sync[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-2025-07-11-0048am-ui-data-sync[m[33m)[m ✨ UI Update: Restyled 'Student Records' header section, added announcement panel, and integrated student records display
+[33mfc1bac5[m 🚀 Final updates for deployment: UI fixes, ESLint cleanup, student dashboard update
+[33mfadfd61[m[33m ([m[1;33mtag: [m[1;33mrollback-2025-07-10-1930[m[33m, [m[1;32mfeature/quiz-enhancements-2025-07-09[m[33m)[m Fix ESLint config and Clerk usage in route.ts
+[33mdbf1590[m 🛠️ Fix: ESLint options removed, route.ts type error resolved
+[33m711ef8e[m[33m ([m[1;31morigin/feature/quiz-enhancements-2025-07-09[m[33m)[m 🔒 Save 2025-07-09: Added quiz management actions, preview feature, timer backend, result view improvements
+[33m3b6475e[m first commit
+[33m3d5174f[m first commit
+[33m9923e24[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-2025-07-02[m[33m, [m[1;33mtag: [m[1;33mcheckpoint-0e88f5f[m[33m, [m[1;32mcheckpoint-2025-06-25[m[33m)[m Robust quiz progress, real-time answer saving, and correct result scoring with index-based answers
+[33md258369[m 01-07-2025 backup commit with role based auth working
+[33m1c524a7[m Initial backup of assessment portal
+[33m0e88f5f[m 💾 Checkpoint: Saved stable version before changes (2025-06-25) 1:28am saved file
+[33m624ea91[m[33m ([m[1;32mbackup-2025-06-24[m[33m, [m[1;32mbackup-2025-06-22[m[33m)[m 🚀 Ready for Vercel deploy (2025-06-24)
+[33m18ec205[m[33m ([m[1;32mrestore-from-2025-06-24[m[33m)[m 💾 Added attempts table and fixed RLS policy for Clerk user_id (2025-06-22)
+[33me431009[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-2025-06-20-optimized-tabs[m[33m, [m[1;32mfix/quiz-publishing-not-working[m[33m)[m ⚡️ Optimized dashboard tab performance with dynamic imports
+[33m9590675[m fix: add uuid, x-date-pickers, dayjs, and update quiz API + theme
+[33m845633f[m fix: clean install and add missing deps
+[33m0625d58[m fix: add missing dependencies for Vercel deployment
+[33medbea0d[m[33m ([m[1;33mtag: [m[1;33mcheckpoint-2025-06-17-ui-toggle[m[33m)[m ✨ Implemented teacher dashboard, quiz stats, and fixed ThemeMode hook error
+[33m190fe35[m[33m ([m[1;33mtag: [m[1;33mv1.0-stable[m[33m, [m[1;32mbackup-before-rollback[m[33m)[m Backup: Stable working version on 2025-06-11
+[33mf6203e6[m ✨ Initial Commit: Full Assessment Portal
+[33m48570db[m 🚀 Checkpoint: working dashboard, create quiz, auth, loading screens
+[33m9c17d8f[m ✅ Checkpoint: Stable version with Clerk auth + MUI theme
