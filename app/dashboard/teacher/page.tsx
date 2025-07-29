@@ -1250,41 +1250,6 @@ function TeacherDashboardPage() {
           </Button>
         </DialogActions>
       </Dialog>
-      {/* Floating Settings Button */}
-      <IconButton
-        color="primary"
-        sx={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          zIndex: 1300,
-          bgcolor: theme.palette.background.paper,
-          boxShadow: 3,
-          '&:hover': { bgcolor: theme.palette.primary.light },
-        }}
-        onClick={settings.onOpenDrawer}
-        aria-label="Open settings"
-      >
-        <Iconify icon="solar:settings-bold" width={28} />
-      </IconButton>
-      <SettingsDrawer />
-      <Snackbar
-        open={copySnackbarOpen}
-        autoHideDuration={2000}
-        onClose={() => setCopySnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          icon={<CheckCircleIcon fontSize="inherit" sx={{ color: '#2e7d32' }} />}
-          severity="success"
-          sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', borderRadius: 2, fontWeight: 600, boxShadow: 3 }}
-          elevation={6}
-          variant="filled"
-          onClose={() => setCopySnackbarOpen(false)}
-        >
-          Access code copied to clipboard!
-        </Alert>
-      </Snackbar>
       {/* Delete Confirmation Dialog */}
       <Dialog open={studentDeleteDialogOpen} onClose={() => setStudentDeleteDialogOpen(false)}>
         <DialogTitle sx={{ color: theme.palette.error.main, fontWeight: 700 }}>Confirm Delete</DialogTitle>
@@ -1379,6 +1344,22 @@ function ExamResultsTable({
   questionsMap: Record<number, any[]>,
   sectionNames: Record<number, string>
 }) {
+  // Shared function to calculate marks consistently
+  const calculateQuestionMarks = (q: any, userIndices: number[], correctIndices: number[]) => {
+    const questionMarks = q.marks || 1;
+    
+    if (correctIndices.length > 1) {
+      // Multi-select question: if at least 1 correct answer is selected, give full marks
+      const correctAnswersSelected = userIndices.filter((idx: number) => correctIndices.includes(idx)).length;
+      return correctAnswersSelected > 0 ? questionMarks : 0;
+    } else {
+      // Single-select question: all-or-nothing
+      const isCorrect = userIndices.length === correctIndices.length &&
+        userIndices.every((idx: number) => correctIndices.includes(idx)) &&
+        correctIndices.every((idx: number) => userIndices.includes(idx));
+      return isCorrect ? questionMarks : 0;
+    }
+  };
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -1584,31 +1565,62 @@ function ExamResultsTable({
                     let obtained = 0;
                     let total = 0;
                     (qs as any[]).forEach((q: any) => {
-                      let userIndices = selectedResult.answers?.[q.id];
-                      if (!Array.isArray(userIndices)) userIndices = [];
-                      if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(q.options)) {
+                      // Parse answers robustly
+                      let answers = selectedResult.answers;
+                      if (typeof answers === 'string') {
+                        try {
+                          answers = JSON.parse(answers);
+                        } catch {
+                          answers = {};
+                        }
+                      }
+                      
+                      // Parse options robustly
+                      let options = q.options;
+                      if (typeof options === 'string') {
+                        try {
+                          options = JSON.parse(options);
+                        } catch {
+                          options = [];
+                        }
+                      }
+                      
+                      // Parse correct_answers robustly
+                      let correctAnswers = q.correct_answers;
+                      if (typeof correctAnswers === 'string') {
+                        try {
+                          correctAnswers = JSON.parse(correctAnswers);
+                        } catch {
+                          correctAnswers = [];
+                        }
+                      }
+                      
+                      // Determine correct indices
+                      let correctIndices: number[] = [];
+                      if (Array.isArray(options) && options.length > 0) {
+                        correctIndices = options.map((opt: any, i: number) => (opt.isCorrect ? i : null)).filter((i: number | null) => i !== null);
+                      } else if (Array.isArray(correctAnswers) && correctAnswers.length > 0) {
+                        correctIndices = correctAnswers;
+                      }
+                      
+                      // Student's answer indices
+                      let userIndices = Array.isArray(answers?.[q.id]) ? answers[q.id] : [];
+                      if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(options)) {
                         userIndices = userIndices.map((val: string) => {
-                          const idx2: number = q.options.findIndex((opt: any) => opt.text === val);
+                          const idx2: number = options.findIndex((opt: any) => opt.text === val);
                           return idx2 !== -1 ? idx2 : null;
                         }).filter((idx2: number | null) => idx2 !== null);
                       }
-                      let correctIndices: number[] = [];
-                      if (Array.isArray(q.options) && q.options.length > 0) {
-                        correctIndices = q.options.map((opt: any, idx: number) => (opt.isCorrect ? idx : null)).filter((idx: number | null) => idx !== null);
-                      } else if (q.correct_answers && Array.isArray(q.correct_answers)) {
-                        correctIndices = q.correct_answers;
-                      }
+                      
                       const questionMarks = q.marks || 1;
                       total += questionMarks;
                       overallTotal += questionMarks;
-                      const isCorrect =
-                        userIndices.length === correctIndices.length &&
-                        userIndices.every((idx: number) => correctIndices.includes(idx)) &&
-                        correctIndices.every((idx: number) => userIndices.includes(idx));
-                      if (isCorrect) {
-                        obtained += questionMarks;
-                        overallObtained += questionMarks;
-                      }
+                      
+                      // Use shared function for consistent marks calculation
+                      const obtainedMarks = calculateQuestionMarks(q, userIndices, correctIndices);
+                      
+                      obtained += obtainedMarks;
+                      overallObtained += obtainedMarks;
                     });
                     sectionMarks[section] = { obtained: Math.round(obtained * 100) / 100, total };
                   });
@@ -1685,23 +1697,61 @@ function ExamResultsTable({
                 <Stack spacing={3} mt={2}>
                   {Array.isArray(questionsMap[selectedResult.quiz_id]) && questionsMap[selectedResult.quiz_id].length > 0 ? (
                     questionsMap[selectedResult.quiz_id].map((q: any, idx: number) => {
+                      // Parse answers robustly
+                      let answers = selectedResult.answers;
+                      if (typeof answers === 'string') {
+                        try {
+                          answers = JSON.parse(answers);
+                        } catch {
+                          answers = {};
+                        }
+                      }
+                      
+                      // Parse options robustly
+                      let options = q.options;
+                      if (typeof options === 'string') {
+                        try {
+                          options = JSON.parse(options);
+                        } catch {
+                          options = [];
+                        }
+                      }
+                      
+                      // Parse correct_answers robustly
+                      let correctAnswers = q.correct_answers;
+                      if (typeof correctAnswers === 'string') {
+                        try {
+                          correctAnswers = JSON.parse(correctAnswers);
+                        } catch {
+                          correctAnswers = [];
+                        }
+                      }
+                      
                       // Determine correct indices
                       let correctIndices: number[] = [];
-                      if (Array.isArray(q.options) && q.options.length > 0) {
-                        correctIndices = q.options.map((opt: any, i: number) => (opt.isCorrect ? i : null)).filter((i: number | null) => i !== null);
-                      } else if (q.correct_answers && Array.isArray(q.correct_answers)) {
-                        correctIndices = q.correct_answers;
+                      if (Array.isArray(options) && options.length > 0) {
+                        correctIndices = options.map((opt: any, i: number) => (opt.isCorrect ? i : null)).filter((i: number | null) => i !== null);
+                      } else if (Array.isArray(correctAnswers) && correctAnswers.length > 0) {
+                        correctIndices = correctAnswers;
                       }
+                      
                       // Student's answer indices
-                      let userIndices = Array.isArray(selectedResult.answers?.[q.id]) ? selectedResult.answers[q.id] : [];
-                      if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(q.options)) {
+                      let userIndices = Array.isArray(answers?.[q.id]) ? answers[q.id] : [];
+                      if (userIndices.length && typeof userIndices[0] === 'string' && Array.isArray(options)) {
                         userIndices = userIndices.map((val: string) => {
-                          const idx2: number = q.options.findIndex((opt: any) => opt.text === val);
+                          const idx2: number = options.findIndex((opt: any) => opt.text === val);
                           return idx2 !== -1 ? idx2 : null;
                         }).filter((idx2: number | null) => idx2 !== null);
                       }
-                      // Compare answers
-                      const isCorrect = userIndices.length === correctIndices.length && userIndices.every((idx: number) => correctIndices.includes(idx));
+                      
+                      // Calculate marks for this question using shared function
+                      const questionMarks = q.marks || 1;
+                      const obtainedMarks = calculateQuestionMarks(q, userIndices, correctIndices);
+                      
+                      // Determine if question is completely correct for visual display
+                      const isCorrect = userIndices.length === correctIndices.length &&
+                        userIndices.every((idx: number) => correctIndices.includes(idx)) &&
+                        correctIndices.every((idx: number) => userIndices.includes(idx));
                       return (
                         <Card key={q.id} sx={{
                           mb: 2,
@@ -1719,14 +1769,28 @@ function ExamResultsTable({
                               {q.question_text}
                             </Typography>
                           </Box>
+                          {/* Question Type Indicator */}
+                          <Box ml={2} mb={1}>
+                            <Chip 
+                              label={correctIndices.length > 1 ? `Multi-select (${correctIndices.length} correct)` : 'Single-select'} 
+                              size="small" 
+                              color={correctIndices.length > 1 ? 'secondary' : 'primary'}
+                              sx={{ 
+                                fontWeight: 600, 
+                                fontSize: '0.75rem',
+                                bgcolor: correctIndices.length > 1 ? '#e3f2fd' : '#f3e5f5',
+                                color: correctIndices.length > 1 ? '#1565c0' : '#7b1fa2'
+                              }}
+                            />
+                          </Box>
                           {/* Options List */}
                           <Box ml={2} mb={1}>
                             <Typography variant="body2" fontWeight={600} color="text.secondary" mb={0.5}>
                               Options:
                             </Typography>
                             <Stack spacing={1}>
-                              {Array.isArray(q.options) && q.options.length > 0 ? (
-                                q.options.map((opt: any, optIdx: number) => {
+                              {Array.isArray(options) && options.length > 0 ? (
+                                options.map((opt: any, optIdx: number) => {
                                   const isOptionCorrect = correctIndices.includes(optIdx);
                                   const isOptionSelected = userIndices.includes(optIdx);
                                   return (
@@ -1770,38 +1834,54 @@ function ExamResultsTable({
                           </Box>
                           {/* Your Answer */}
                           <Box ml={2} mb={1}>
-                            <Typography variant="body2" fontWeight={600} color="text.secondary">Your Answer:</Typography>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary">
+                              Your Answer:
+                            </Typography>
                             {userIndices.length > 0 ? (
                               <ul style={{ margin: 0, paddingLeft: 18 }}>
                                 {userIndices.map((ansIdx: number, i: number) => (
                                   <li key={i} style={{ color: correctIndices.includes(ansIdx) ? '#2e7d32' : '#d32f2f', fontWeight: 600 }}>
-                                    {Array.isArray(q.options) && q.options[ansIdx] ? q.options[ansIdx].text : 'N/A'}
+                                    {Array.isArray(options) && options[ansIdx] ? options[ansIdx].text : 'N/A'}
                                   </li>
                                 ))}
                               </ul>
                             ) : (
-                              <Typography variant="body2" color="text.disabled">No answer given</Typography>
+                              <Box sx={{ 
+                                p: 1.5, 
+                                borderRadius: 2, 
+                                bgcolor: '#fff3cd', 
+                                border: '1px solid #ffeaa7',
+                                mt: 0.5
+                              }}>
+                                <Typography variant="body2" color="#856404" fontWeight={600} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <span role="img" aria-label="warning" style={{ fontSize: 16 }}>⚠️</span>
+                                  No option was selected for this question
+                                </Typography>
+                                <Typography variant="caption" color="#856404" sx={{ mt: 0.5, display: 'block' }}>
+                                  The student left this question unanswered
+                                </Typography>
+                              </Box>
                             )}
                           </Box>
                           {/* Correct Answer */}
                           <Box ml={2}>
                             <Typography variant="body2" fontWeight={600} color="text.secondary">
-                              Correct Answer{Array.isArray(q.correct_answers) && q.correct_answers.length > 1 ? 's' : ''}:
+                              Correct Answer{Array.isArray(correctAnswers) && correctAnswers.length > 1 ? 's' : ''}:
                             </Typography>
                             <ul style={{ margin: 0, paddingLeft: 18 }}>
-                              {Array.isArray(q.correct_answers) && q.correct_answers.length > 0 && Array.isArray(q.options) ? (
-                                q.correct_answers.map((ans: number | string, i: number) => {
+                              {Array.isArray(correctAnswers) && correctAnswers.length > 0 && Array.isArray(options) ? (
+                                correctAnswers.map((ans: number | string, i: number) => {
                                   // If ans is a number and in bounds, show the text
-                                  if (typeof ans === 'number' && q.options[ans]) {
+                                  if (typeof ans === 'number' && options[ans]) {
                                     return (
                                       <li key={i} style={{ color: '#2e7d32', fontWeight: 600 }}>
-                                        {q.options[ans].text}
+                                        {options[ans].text}
                                       </li>
                                     );
                                   }
                                   // If ans is a string, try to find the option with that text
                                   if (typeof ans === 'string') {
-                                    const found = q.options.find((opt: any) => opt.text === ans);
+                                    const found = options.find((opt: any) => opt.text === ans);
                                     return (
                                       <li key={i} style={{ color: '#2e7d32', fontWeight: 600 }}>
                                         {found ? found.text : ans}
@@ -1818,6 +1898,46 @@ function ExamResultsTable({
                                 <li style={{ color: '#2e7d32', fontWeight: 600 }}>N/A</li>
                               )}
                             </ul>
+                            {/* Question Marks */}
+                            <Box ml={2} mt={1}>
+                              <Box sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 1,
+                                p: 1.5,
+                                borderRadius: 2,
+                                bgcolor: obtainedMarks > 0 ? '#e8f5e8' : '#ffebee',
+                                border: `1px solid ${obtainedMarks > 0 ? '#c8e6c9' : '#ffcdd2'}`
+                              }}>
+                                <Typography variant="body2" fontWeight={700} color={obtainedMarks > 0 ? 'success.main' : 'error.main'}>
+                                  Marks: {obtainedMarks} / {questionMarks}
+                                </Typography>
+                                {obtainedMarks > 0 && (
+                                  <Chip 
+                                    label="✓ Correct" 
+                                    size="small" 
+                                    color="success"
+                                    sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                                  />
+                                )}
+                                {obtainedMarks === 0 && userIndices.length > 0 && (
+                                  <Chip 
+                                    label="✗ Incorrect" 
+                                    size="small" 
+                                    color="error"
+                                    sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                                  />
+                                )}
+                                {obtainedMarks === 0 && userIndices.length === 0 && (
+                                  <Chip 
+                                    label="⏭️ Skipped" 
+                                    size="small" 
+                                    color="warning"
+                                    sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                                  />
+                                )}
+                              </Box>
+                            </Box>
                             {q.explanation && (
                               <Box ml={2} mt={1}>
                                 <Typography variant="body2" color="text.secondary" fontStyle="italic">

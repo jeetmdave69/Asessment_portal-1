@@ -800,24 +800,6 @@ export default function AdminDashboardPage() {
           </DialogActions>
         </Dialog>
       </Box>
-      {/* Floating Settings Button */}
-      <IconButton
-        color="primary"
-        sx={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          zIndex: 1300,
-          bgcolor: 'background.paper',
-          boxShadow: 3,
-          '&:hover': { bgcolor: 'primary.light' },
-        }}
-        onClick={settings.onOpenDrawer}
-        aria-label="Open settings"
-      >
-        <Iconify icon="solar:settings-bold" width={28} />
-      </IconButton>
-      <SettingsDrawer />
     </Box>
   );
 }

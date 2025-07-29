@@ -260,12 +260,23 @@ export default function EditQuizPage() {
     if (!pendingData) return;
     setSaving(true);
     const data = pendingData;
+    // Validate duration is positive
+    const duration = parseInt(data.duration);
+    if (isNaN(duration) || duration <= 0) {
+      setSaveErrorMessage('Duration must be a positive number greater than 0');
+      setErrorToast(true);
+      setSaving(false);
+      setConfirmDialogOpen(false);
+      setPendingData(null);
+      return;
+    }
+
     // Detailed logging for debugging
     const quizUpdatePayload = {
       quiz_title: data.quizTitle,
         description: data.description,
         total_marks: parseInt(data.totalMarks),
-        duration: parseInt(data.duration),
+        duration: Math.max(1, duration), // Ensure minimum 1 minute
         start_time: data.startDateTime.toISOString(),
         end_time: data.expiryDateTime.toISOString(),
         shuffle_questions: data.shuffleQuestions,
@@ -391,7 +402,25 @@ export default function EditQuizPage() {
                     />
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                     <TextField label="Total Marks" type="number" {...register("totalMarks")} fullWidth helperText="Sum of all question marks." />
-                    <TextField label="Duration (mins)" type="number" {...register("duration")} fullWidth helperText="How long students have to complete the quiz." />
+                    <TextField 
+                      label="Duration (mins)" 
+                      type="number" 
+                      {...register("duration", {
+                        onChange: (e) => {
+                          const value = parseInt(e.target.value);
+                          if (value < 0) {
+                            e.target.value = '1'; // Reset to minimum value
+                            setValue("duration", "1");
+                            // Show error message
+                            setErrorToast(true);
+                            setSaveErrorMessage('Duration cannot be negative. Set to minimum 1 minute.');
+                          }
+                        }
+                      })} 
+                      fullWidth 
+                      helperText="How long students have to complete the quiz." 
+                      inputProps={{ min: 1 }}
+                    />
                   </Stack>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                     <DateTimePicker

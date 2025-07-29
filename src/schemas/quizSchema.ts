@@ -15,7 +15,12 @@ export const quizSchema = z.object({
   quizTitle: z.string().min(1, "Quiz title is required"),
   description: z.string().optional(),
   totalMarks: z.string().min(1, "Total marks is required"),
-  duration: z.string().min(1, "Duration is required"),
+  duration: z.string()
+    .min(1, "Duration is required")
+    .refine((val) => {
+      const num = parseInt(val);
+      return !isNaN(num) && num > 0;
+    }, "Duration must be a positive number greater than 0"),
   startDateTime: z.date({ required_error: "Start date is required" }),
   expiryDateTime: z.date({ required_error: "End date is required" }),
   shuffleQuestions: z.boolean(),

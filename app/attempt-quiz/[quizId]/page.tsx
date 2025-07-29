@@ -371,17 +371,30 @@ export default function AttemptQuizPage() {
         setQuestions(parsedQuestions)
 
         // Initialize time (persistent timer)
-        const durationInSeconds = (quizData.duration || 30) * 60;
+        // Ensure duration is positive and valid
+        const rawDuration = quizData.duration;
+        const validDuration = (rawDuration && rawDuration > 0) ? rawDuration : 30;
+        const durationInSeconds = validDuration * 60;
         setTotalTime(durationInSeconds);
         // Always set start time and duration in ms
         const startTimeMs = Date.now();
         localStorage.setItem(`quiz-${quizId}-startTime`, startTimeMs.toString());
         const durationMs = durationInSeconds * 1000;
         localStorage.setItem(`quiz-${quizId}-duration`, durationMs.toString());
-        // Timer state
-        const elapsed = Math.floor((Date.now() - startTimeMs) / 1000); // seconds
-        const remaining = durationInSeconds - elapsed;
-        setTimeLeft(remaining > 0 ? remaining : 0);
+        
+        // Ensure timer starts immediately
+        setTimeLeft(durationInSeconds);
+        
+        console.log('Timer initialization:', {
+          quizDataDuration: quizData.duration,
+          durationInSeconds,
+          durationMs,
+          startTimeMs,
+          startTimeKey: `quiz-${quizId}-startTime`,
+          durationKey: `quiz-${quizId}-duration`
+        });
+        
+
 
         // Load saved state
         const savedState = localStorage.getItem(`quiz-${quizId}-state`)
@@ -1055,8 +1068,15 @@ export default function AttemptQuizPage() {
   // Timer countdown effect (robust, ms-based)
   const timerWasPositive = useRef(false);
   useEffect(() => {
-    if (!quizId || !quiz) return;
-    if (submitted) return;
+    console.log('Timer useEffect triggered:', { quizId, quiz: !!quiz, submitted });
+    if (!quizId || !quiz) {
+      console.log('Timer not starting - missing quizId or quiz');
+      return;
+    }
+    if (submitted) {
+      console.log('Timer not starting - already submitted');
+      return;
+    }
     let timerId: NodeJS.Timeout;
     function tick() {
       const startKey = `quiz-${quizId}-startTime`;
@@ -1066,6 +1086,16 @@ export default function AttemptQuizPage() {
       const startTime = Number(localStorage.getItem(startKey));
       const duration = Number(localStorage.getItem(durationKey));
       let pausedDuration = Number(localStorage.getItem(pausedKey) || '0');
+      
+      // Debug logging
+      console.log('Timer Debug:', {
+        startTime,
+        duration,
+        startTimeStr: localStorage.getItem(startKey),
+        durationStr: localStorage.getItem(durationKey),
+        currentTime: Date.now()
+      });
+      
       // If currently paused, add current pause duration
       const pauseStartStr = localStorage.getItem(pauseStartKey);
       if (pauseStartStr) {
@@ -1074,9 +1104,34 @@ export default function AttemptQuizPage() {
           pausedDuration += Date.now() - pauseStart;
         }
       }
-      if (!startTime || !duration) return;
+      
+      if (!startTime || !duration || duration <= 0) {
+        console.log('Timer not initialized properly:', { startTime, duration });
+        // Clear invalid timer data and reinitialize
+        if (duration <= 0) {
+          console.log('Clearing invalid duration and reinitializing timer');
+          localStorage.removeItem(`quiz-${quizId}-startTime`);
+          localStorage.removeItem(`quiz-${quizId}-duration`);
+          // Set a default 30-minute timer
+          const defaultDurationMs = 30 * 60 * 1000;
+          localStorage.setItem(`quiz-${quizId}-startTime`, Date.now().toString());
+          localStorage.setItem(`quiz-${quizId}-duration`, defaultDurationMs.toString());
+          setTimeLeft(30 * 60); // 30 minutes in seconds
+        }
+        return;
+      }
+      
       const elapsed = Date.now() - startTime - pausedDuration;
       const remaining = Math.max(0, Math.floor((duration - elapsed) / 1000)); // in seconds
+      
+      console.log('Timer calculation:', {
+        elapsed,
+        remaining,
+        duration,
+        startTime,
+        pausedDuration
+      });
+      
       setTimeLeft(remaining);
       if (remaining > 0) {
         timerWasPositive.current = true;
@@ -1126,15 +1181,7 @@ export default function AttemptQuizPage() {
     }
   }, [questions, answers]);
 
-  // Ensure start_time is set in localStorage only once when quiz is started
-  useEffect(() => {
-    if (typeof window !== 'undefined' && quizId) {
-      const key = `quiz-${quizId}-startTime`;
-      if (!localStorage.getItem(key)) {
-        localStorage.setItem(key, Math.floor(Date.now() / 60000).toString());
-      }
-    }
-  }, [quizId]);
+
 
   if (loading) {
     return (

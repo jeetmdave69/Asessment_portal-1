@@ -25,6 +25,15 @@ function validateQuizData(data: any) {
     };
   }
 
+  // Validate duration is a positive number
+  const duration = parseInt(data.duration);
+  if (isNaN(duration) || duration <= 0) {
+    return {
+      isValid: false,
+      message: 'Duration must be a positive number greater than 0'
+    };
+  }
+
   if (!Array.isArray(data.questions) || data.questions.length === 0) {
     return {
       isValid: false,
@@ -114,7 +123,7 @@ export async function POST(req: NextRequest) {
       .insert([{
         title: quizTitle,
         description,
-        duration: parseInt(duration),
+        duration: Math.max(1, parseInt(duration)), // Ensure minimum 1 minute
         total_marks: parseInt(totalMarks) || 0,
         start_time: quizDateTime,
         end_time: quizExpiry,

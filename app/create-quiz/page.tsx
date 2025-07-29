@@ -852,10 +852,19 @@ Cricket,Who is known as the "God of Cricket"?,Virat Kohli,Sachin Tendulkar,MS Dh
                             label="Duration (mins)"
                             type="number"
                             value={field.value}
-                            onChange={e => field.onChange(e.target.value)}
+                            onChange={e => {
+                              const value = parseInt(e.target.value);
+                              if (value < 0) {
+                                field.onChange('1'); // Reset to minimum value
+                                showToast('Duration cannot be negative. Set to minimum 1 minute.', 'error');
+                              } else {
+                                field.onChange(e.target.value);
+                              }
+                            }}
                             fullWidth
                             helperText="How long students have to complete the quiz."
                             error={!!errors.duration}
+                            inputProps={{ min: 1 }}
                           />
                         )}
                       />

@@ -22,22 +22,4 @@ export const SettingsDrawer = () => {
     setState({ colorScheme: newMode });
   };
 
-  return (
-    <Drawer anchor="right" open={openDrawer} onClose={onCloseDrawer}>
-      <Box sx={{ width: 300, p: 2 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Settings</Typography>
-          <IconButton onClick={onCloseDrawer}>
-            <Close />
-          </IconButton>
-        </Box>
-        <Divider sx={{ my: 2 }} />
-
-        <Box display="flex" alignItems="center" justifyContent="space-between">
-          <Typography>Dark Mode</Typography>
-          <Switch checked={mode === 'dark'} onChange={handleToggleDarkMode} />
-        </Box>
-      </Box>
-    </Drawer>
-  );
 };

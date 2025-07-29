@@ -204,6 +204,36 @@ function StudentDashboardPageContent() {
   };
   const { greet, icon } = getGreeting();
 
+  // Motivational quotes with authors
+  const quotes = [
+    { quote: "Believe in yourself and all that you are. Have a great day of learning!", author: "Christian D. Larson" },
+    { quote: "Success is not the key to happiness. Happiness is the key to success.", author: "Albert Schweitzer" },
+    { quote: "The expert in anything was once a beginner.", author: "Helen Hayes" },
+    { quote: "Mistakes are proof that you are trying.", author: "Jennifer Lim" },
+    { quote: "Dream big and dare to fail.", author: "Norman Vaughan" },
+    { quote: "Your only limit is your mind.", author: "Napoleon Hill" },
+    { quote: "Push yourself, because no one else is going to do it for you.", author: "Les Brown" },
+    { quote: "Great things never come from comfort zones.", author: "Roy T. Bennett" },
+    { quote: "Learning never exhausts the mind.", author: "Leonardo da Vinci" },
+    { quote: "Education is the most powerful weapon which you can use to change the world.", author: "Nelson Mandela" },
+    { quote: "The beautiful thing about learning is that no one can take it away from you.", author: "B.B. King" },
+    { quote: "It always seems impossible until it’s done.", author: "Nelson Mandela" },
+    { quote: "Don’t let what you cannot do interfere with what you can do.", author: "John Wooden" },
+    { quote: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
+    { quote: "You don’t have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
+    { quote: "Opportunities don't happen, you create them.", author: "Chris Grosser" },
+    { quote: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
+    { quote: "Strive for progress, not perfection.", author: "David Perlmutter" },
+    { quote: "If you can dream it, you can do it.", author: "Walt Disney" },
+    { quote: "Quality is not an act, it is a habit.", author: "Aristotle" }
+  ];
+  const today = new Date();
+  const start = new Date(today.getFullYear(), 0, 0);
+  const diff = Number(today.getTime()) - Number(start.getTime());
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+  const quoteOfTheDay = quotes[dayOfYear % quotes.length];
+
   useEffect(() => {
     setMounted(true);
     fetchQuizzes();
@@ -1112,7 +1142,34 @@ function StudentDashboardPageContent() {
         {/* Main Content Section Switcher */}
         {selectedSection === 'dashboard' && (
           <>
-            {/* Remove Greeting and make it formal */}
+            {/* Greeting Section */}
+            <Box display="flex" alignItems="center" gap={2} mb={1.5}>
+              {/* Simple icon based on time of day */}
+              <Box>
+                {(() => {
+                  const hour = new Date().getHours();
+                  if (hour < 12) return <span role="img" aria-label="sun" style={{fontSize: 40}}>🌞</span>;
+                  if (hour < 17) return <span role="img" aria-label="afternoon" style={{fontSize: 40}}>🌤️</span>;
+                  return <span role="img" aria-label="moon" style={{fontSize: 40}}>🌙</span>;
+                })()}
+              </Box>
+              <Typography variant="h5" fontWeight={700} color={theme.palette.text.primary}>
+                {(() => {
+                  const hour = new Date().getHours();
+                  if (hour < 12) return 'Good Morning';
+                  if (hour < 17) return 'Good Afternoon';
+                  return 'Good Evening';
+                })()}, {user?.firstName || user?.fullName || 'Student'}!
+              </Typography>
+            </Box>
+            <Box sx={{ mt: 1, mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontStyle: 'italic', textAlign: 'center', color: '#222', fontWeight: 500 }}>
+                "{quoteOfTheDay.quote}"
+              </Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, textAlign: 'center', mt: 0.5, color: '#333' }}>
+                — {quoteOfTheDay.author}
+              </Typography>
+            </Box>
             {/* Overview Boxes */}
             <Grid container spacing={3} mb={4} alignItems="stretch">
               <Grid item xs={12} sm={4}>
@@ -1204,24 +1261,6 @@ function StudentDashboardPageContent() {
         {/* Results Section */}
         {selectedSection === 'results' && resultsContent}
       </Box>
-
-      {/* Floating Settings Button */}
-      <IconButton
-        color="primary"
-        sx={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          zIndex: 1300,
-          bgcolor: 'background.paper',
-          boxShadow: 3,
-          '&:hover': { bgcolor: 'primary.light' },
-        }}
-        onClick={settings.onOpenDrawer}
-        aria-label="Open settings"
-      >
-        <Iconify icon="solar:settings-bold" width={28} />
-      </IconButton>
 
       {/* Logout Confirmation Dialog */}
       <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)}>
