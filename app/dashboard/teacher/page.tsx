@@ -48,7 +48,8 @@ import {
   RadioGroup,
   FormControl,
   FormLabel,
-  FormControlLabel
+  FormControlLabel,
+  Badge
 } from '@mui/material';
 import { useClerk, useUser } from '@clerk/nextjs';
 import { ThemeToggleButton } from '@/components/ThemeToggleButton';
@@ -71,7 +72,8 @@ import {
   Visibility as VisibilityIcon,
   ContentCopy as ContentCopyIcon,
   CheckCircle as CheckCircleIcon,
-  WarningAmber as WarningAmberIcon
+  WarningAmber as WarningAmberIcon,
+  Notifications as NotificationsIcon
 } from '@mui/icons-material';
 import AddExamForm from '../../../components/dashboard/AddExamForm';
 import AddQuestionsForm from '../../../components/dashboard/AddQuestionsForm';
@@ -211,6 +213,9 @@ function TeacherDashboardPage() {
 
   const [questionsMap, setQuestionsMap] = useState<Record<number, any[]>>({});
   const [sectionNames, setSectionNames] = useState<Record<number, string>>({});
+
+  // Utility header notifications count (placeholder for now)
+  const [notificationCount, setNotificationCount] = useState<number>(0);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -621,8 +626,8 @@ function TeacherDashboardPage() {
   ];
 
   const helpContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Inter, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
         About & Help
       </Typography>
       <Box mt={3}>
@@ -803,7 +808,7 @@ function TeacherDashboardPage() {
   }
 
   return (
-    <Box sx={{ display: 'flex', fontFamily: 'Poppins, sans-serif' }}>
+    <Box sx={{ display: 'flex', fontFamily: 'Inter, sans-serif' }}>
       {/* Sidebar */}
       <Drawer
         variant="permanent"
@@ -862,7 +867,7 @@ function TeacherDashboardPage() {
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Poppins, sans-serif' }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Inter, sans-serif' }}>
         {/* Top Bar */}
         <Box
           display="flex"
@@ -876,47 +881,45 @@ function TeacherDashboardPage() {
             color: theme.palette.text.primary,
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
             border: `1px solid ${theme.palette.divider}`,
-            fontFamily: 'Poppins, sans-serif',
+            fontFamily: 'Inter, sans-serif',
           }}
         >
           <Box>
             <Typography variant="h4" fontWeight={700} letterSpacing={0.5} sx={{ 
               color: theme.palette.text.primary, 
-              fontFamily: 'Poppins, sans-serif',
+              fontFamily: 'Inter, sans-serif',
               mb: 0.5
             }}>
-              Teacher's Dashboard
+              {`${getGreeting()}, ${user?.firstName || user?.fullName || 'Teacher'}!`}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-              Welcome back! Manage your students, exams, and results.
+              Manage your students, exams, and results
             </Typography>
           </Box>
-          <Box>
-            <Box display="flex" alignItems="center" gap={2}>
-              <ThemeToggleButton />
-              <Avatar src={user.imageUrl} alt="pro" sx={{ mr: 1, border: '2px solid #e3e6ef', width: 44, height: 44 }} />
-              <Typography variant="subtitle1" fontWeight={600} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{user.firstName || user.fullName}</Typography>
-            </Box>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Tooltip title="Settings">
+              <IconButton color="primary" onClick={() => router.push('/dashboard/teacher?tab=settings')}>
+                <SettingsIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Notifications">
+              <IconButton color="inherit" onClick={() => router.push('/dashboard/teacher?tab=messages')}>
+                <Badge badgeContent={notificationCount} color="error">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+            <ThemeToggleButton />
+            <Tooltip title="Help">
+              <IconButton color="inherit" onClick={() => router.push('/dashboard/teacher?tab=help')}>
+                <HelpIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
 
         {currentTab === 'dashboard' && (
           <>
-            {/* Greeting Section */}
-            <Box display="flex" alignItems="center" gap={2} mb={3}>
-              {/* Simple icon based on time of day */}
-              <Box>
-                {(() => {
-                  const hour = new Date().getHours();
-                  if (hour < 12) return <span role="img" aria-label="sun" style={{fontSize: 40}}>🌞</span>;
-                  if (hour < 17) return <span role="img" aria-label="afternoon" style={{fontSize: 40}}>🌤️</span>;
-                  return <span role="img" aria-label="moon" style={{fontSize: 40}}>🌙</span>;
-                })()}
-              </Box>
-              <Typography variant="h5" fontWeight={700} color={theme.palette.text.primary}>
-                {getGreeting()}, {user?.firstName || user?.fullName || 'Teacher'}!
-              </Typography>
-            </Box>
             {/* Overview Boxes Row */}
             <Grid container spacing={3} mb={4}>
               <Grid item xs={12} sm={6} md={3}>
@@ -2226,7 +2229,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
       boxShadow: '0 4px 20px rgba(0,0,0,0.08)', 
       border: `1px solid ${theme.palette.divider}`,
       overflow: 'hidden',
-      fontFamily: 'Poppins, sans-serif' 
+      fontFamily: 'Inter, sans-serif' 
     }}>
       {/* Header Section */}
       <Box
@@ -3221,7 +3224,7 @@ function TeacherSettings({ user }: { user: any }) {
     boxShadow: theme.palette.mode === 'dark'
       ? '0 4px 24px 0 rgba(0,0,0,0.25)'
       : '0 4px 24px 0 rgba(30,64,175,0.07)',
-    fontFamily: 'Poppins, sans-serif',
+    fontFamily: 'Inter, sans-serif',
     transition: 'box-shadow 0.2s, border 0.2s, background 0.2s',
     '&:hover': {
       boxShadow: theme.palette.mode === 'dark'
@@ -3234,7 +3237,7 @@ function TeacherSettings({ user }: { user: any }) {
 
   return (
     <Box sx={professionalBoxSx(theme)}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
         My Profile
       </Typography>
       <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
@@ -3442,7 +3445,7 @@ function ExamsSection({ handleDeleteExam }: { handleDeleteExam: (quizId: number)
             color: '#fff', 
             fontWeight: 600, 
             borderRadius: 2, 
-            fontFamily: 'Poppins, sans-serif',
+            fontFamily: 'Inter, sans-serif',
             '&:hover': { background: '#001b4e' } 
           }}
         >
@@ -3814,9 +3817,9 @@ function AnnouncementsSection({ user }: { user: any }) {
   };
 
   return (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, width: '100%', mx: 0, border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, width: '100%', mx: 0, border: 'none', fontFamily: 'Inter, sans-serif' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+        <Typography variant="h5" sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
           Announcements
         </Typography>
         <Button
@@ -3828,7 +3831,7 @@ function AnnouncementsSection({ user }: { user: any }) {
             color: '#fff', 
             borderRadius: 2, 
             fontWeight: 600, 
-            fontFamily: 'Poppins, sans-serif',
+            fontFamily: 'Inter, sans-serif',
             '&:hover': { background: '#001b4e' }
           }}
         >
