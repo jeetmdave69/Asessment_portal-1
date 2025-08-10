@@ -626,8 +626,8 @@ function TeacherDashboardPage() {
   ];
 
   const helpContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Inter, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
         About & Help
       </Typography>
       <Box mt={3}>
@@ -808,7 +808,7 @@ function TeacherDashboardPage() {
   }
 
   return (
-    <Box sx={{ display: 'flex', fontFamily: 'Poppins, sans-serif' }}>
+    <Box sx={{ display: 'flex', fontFamily: 'Inter, sans-serif' }}>
       {/* Sidebar */}
       <Drawer
         variant="permanent"
@@ -867,7 +867,7 @@ function TeacherDashboardPage() {
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Poppins, sans-serif' }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Inter, sans-serif' }}>
         {/* Top Bar */}
         <Box
           display="flex"
@@ -881,13 +881,13 @@ function TeacherDashboardPage() {
             color: theme.palette.text.primary,
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
             border: `1px solid ${theme.palette.divider}`,
-            fontFamily: 'Poppins, sans-serif',
+            fontFamily: 'Inter, sans-serif',
           }}
         >
           <Box>
             <Typography variant="h4" fontWeight={700} letterSpacing={0.5} sx={{ 
               color: theme.palette.text.primary, 
-              fontFamily: 'Poppins, sans-serif',
+              fontFamily: 'Inter, sans-serif',
               mb: 0.5
             }}>
               {`${getGreeting()}, ${user?.firstName || user?.fullName || 'Teacher'}!`}
@@ -2229,7 +2229,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
       boxShadow: '0 4px 20px rgba(0,0,0,0.08)', 
       border: `1px solid ${theme.palette.divider}`,
       overflow: 'hidden',
-      fontFamily: 'Poppins, sans-serif' 
+      fontFamily: 'Inter, sans-serif' 
     }}>
       {/* Header Section */}
       <Box
@@ -3224,7 +3224,7 @@ function TeacherSettings({ user }: { user: any }) {
     boxShadow: theme.palette.mode === 'dark'
       ? '0 4px 24px 0 rgba(0,0,0,0.25)'
       : '0 4px 24px 0 rgba(30,64,175,0.07)',
-    fontFamily: 'Poppins, sans-serif',
+    fontFamily: 'Inter, sans-serif',
     transition: 'box-shadow 0.2s, border 0.2s, background 0.2s',
     '&:hover': {
       boxShadow: theme.palette.mode === 'dark'
@@ -3237,7 +3237,7 @@ function TeacherSettings({ user }: { user: any }) {
 
   return (
     <Box sx={professionalBoxSx(theme)}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
         My Profile
       </Typography>
       <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
@@ -3445,7 +3445,7 @@ function ExamsSection({ handleDeleteExam }: { handleDeleteExam: (quizId: number)
             color: '#fff', 
             fontWeight: 600, 
             borderRadius: 2, 
-            fontFamily: 'Poppins, sans-serif',
+            fontFamily: 'Inter, sans-serif',
             '&:hover': { background: '#001b4e' } 
           }}
         >
@@ -3817,9 +3817,9 @@ function AnnouncementsSection({ user }: { user: any }) {
   };
 
   return (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, width: '100%', mx: 0, border: 'none', fontFamily: 'Poppins, sans-serif' }}>
+    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, width: '100%', mx: 0, border: 'none', fontFamily: 'Inter, sans-serif' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
+        <Typography variant="h5" sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
           Announcements
         </Typography>
         <Button
@@ -3831,7 +3831,7 @@ function AnnouncementsSection({ user }: { user: any }) {
             color: '#fff', 
             borderRadius: 2, 
             fontWeight: 600, 
-            fontFamily: 'Poppins, sans-serif',
+            fontFamily: 'Inter, sans-serif',
             '&:hover': { background: '#001b4e' }
           }}
         >

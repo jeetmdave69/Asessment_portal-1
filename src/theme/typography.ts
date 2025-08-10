@@ -3,7 +3,7 @@
 import { TypographyOptions } from '@mui/material/styles/createTypography';
 
 export const typography: TypographyOptions = {
-  fontFamily: '"Public Sans", sans-serif',
+  fontFamily: '"Inter", sans-serif',
   fontWeightRegular: 400,
   fontWeightMedium: 600,
   fontWeightBold: 700,

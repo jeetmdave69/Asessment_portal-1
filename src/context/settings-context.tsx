@@ -20,7 +20,7 @@ const defaultSettings: SettingsState = {
   navColor: 'integrate',
   navLayout: 'vertical',
   primaryColor: '#1976d2',
-  fontFamily: 'Inter Variable',
+  fontFamily: 'Inter',
   fontSize: 16,
 };
 
