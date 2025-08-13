@@ -136,7 +136,7 @@ export default function SignInPage() {
             letterSpacing: '0.05em',
           }}
         >
-          Assessment Portal
+          OctaMind
         </Typography>
 
         {/* Modernized Subtitle */}

@@ -1,67 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @import url('https://fonts.googleapis.com/css?family=Montserrat:400,800');
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
-/* Global font family */
-* {
-  font-family: 'Poppins', sans-serif !important;
-  box-sizing: border-box;
+/* CSS Variables for design tokens */
+:root {
+  --brand: #3B82F6;
+  --ink: #0F172A;
+  --muted: #64748B;
+  --card: #FFFFFF;
+  --border: #E5E7EB;
+  --ring: rgba(59,130,246,0.35);
 }
 
-/* Custom Global Styles */
-html,
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Poppins', sans-serif;
-  height: 100%;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  overflow-x: hidden;
+/* Dark mode variables */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #F8FAFC;
+    --muted: #94A3B8;
+    --card: #1E293B;
+    --border: #334155;
+  }
 }
 
-/* Box sizing reset */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+/* Base styles */
+@layer base {
+  html,
+  body {
+    @apply antialiased bg-slate-50 text-slate-900;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* Box sizing reset */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  /* Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  p {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+  }
+
+  /* Links */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Buttons */
+  button {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    cursor: pointer;
+  }
+
+  /* Form elements */
+  input, textarea, select {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
 }
 
-/* Remove conflicting body styles */
-body {
-  font-family: 'Poppins', sans-serif;
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
+/* Component utilities */
+@layer components {
+  .card {
+    @apply bg-white rounded-xl border border-[var(--border)] shadow-soft;
+  }
+
+  .card-pad {
+    @apply p-5 md:p-6;
+  }
+
+  .title {
+    @apply text-slate-900 font-semibold;
+  }
+
+  .muted {
+    @apply text-slate-500;
+  }
+
+  .btn-primary {
+    @apply bg-[var(--brand)] text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-[var(--brand)] border border-[var(--brand)] px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:ring-offset-2;
+  }
+
+  .btn-neutral {
+    @apply bg-white text-slate-700 border border-slate-300 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2;
+  }
 }
 
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  margin: 0;
+/* Dashboard specific font */
+.dashboard-inter-font {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
 }
 
-p {
-  font-family: 'Poppins', sans-serif;
-  margin: 0;
-}
-
-/* Links */
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* Buttons */
-button {
-  font-family: 'Poppins', sans-serif;
-  cursor: pointer;
-}
-
-/* Form elements */
-input, textarea, select {
-  font-family: 'Poppins', sans-serif;
+.dashboard-inter-font * {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
 }
 
 /* Animation keyframes */

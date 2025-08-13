@@ -251,7 +251,7 @@ export default function LandingPage() {
                   WebkitTextFillColor: 'transparent',
                 }}
               >
-                Assessment Portal
+                OctaMind
               </Typography>
             </Box>
             <Button
@@ -1034,11 +1034,11 @@ export default function LandingPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <School sx={{ fontSize: 24, color: '#00d4ff' }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, color: 'white' }}>
-                  Assessment Portal
+                  OctaMind
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                © 2024 Assessment Portal. All rights reserved.
+                © 2024 OctaMind. All rights reserved.
         </Typography>
             </Box>
           </Container>

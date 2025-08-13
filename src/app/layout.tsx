@@ -1,12 +1,10 @@
-'use client';
-
 import { ReactNode } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { ThemeModeProvider } from '@/providers/ThemeModeProvider';
 
 export const metadata = {
-  title: 'Assessment Portal',
+  title: 'OctaMind',
   description: 'Create and manage assessments easily',
 };
 

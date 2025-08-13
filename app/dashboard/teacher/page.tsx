@@ -29,11 +29,6 @@ import {
   TableBody,
   TableRow,
   TableCell,
-  Drawer,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   TextField,
   Paper,
   CardHeader,
@@ -48,7 +43,13 @@ import {
   RadioGroup,
   FormControl,
   FormLabel,
-  FormControlLabel
+  FormControlLabel,
+  LinearProgress,
+  Badge,
+  Fade,
+  Grow,
+  Slide,
+  Zoom
 } from '@mui/material';
 import { useClerk, useUser } from '@clerk/nextjs';
 import { ThemeToggleButton } from '@/components/ThemeToggleButton';
@@ -60,7 +61,6 @@ import {
   Book as BookIcon,
   BarChart as BarChartIcon,
   Message as MessageIcon,
-  Settings as SettingsIcon,
   Help as HelpIcon,
   Logout as LogoutIcon,
   Person as PersonIcon,
@@ -71,10 +71,29 @@ import {
   Visibility as VisibilityIcon,
   ContentCopy as ContentCopyIcon,
   CheckCircle as CheckCircleIcon,
-  WarningAmber as WarningAmberIcon
+  WarningAmber as WarningAmberIcon,
+  TrendingUp as TrendingUpIcon,
+  School as SchoolIcon,
+  Assignment as AssignmentIcon,
+  Notifications as NotificationsIcon,
+  Analytics as AnalyticsIcon,
+  Group as GroupIcon,
+  Schedule as ScheduleIcon,
+  Grade as GradeIcon,
+  Insights as InsightsIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
+
+// Modern thin icons from Lucide/Heroicons style
+import {
+  Bell as BellIcon,
+  LogOut as LogOutIcon,
+  CalendarDays as CalendarIcon,
+  Menu as MenuIcon
+} from 'lucide-react';
 import AddExamForm from '../../../components/dashboard/AddExamForm';
 import AddQuestionsForm from '../../../components/dashboard/AddQuestionsForm';
+
 import SendIcon from '@mui/icons-material/Send';
 import { styled } from '@mui/material/styles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -95,6 +114,53 @@ const QuizTable = lazy(() => import('@/components/dashboard/QuizTable'));
 const QuizAnalytics = lazy(() => import('@/components/dashboard/QuizAnalytics'));
 const AppWelcome = lazy(() => import('@/sections/overview/app-welcome'));
 const AppWidgetSummary = lazy(() => import('@/sections/overview/app-widget-summary'));
+
+// Styled Components for Enhanced UI
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: 16,
+  boxShadow: theme.palette.mode === 'dark' 
+    ? '0 4px 20px rgba(0,0,0,0.3)' 
+    : '0 4px 20px rgba(0,0,0,0.08)',
+  border: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.paper,
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  overflow: 'hidden',
+  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  '&:hover': {
+    transform: 'translateY(-4px)',
+    boxShadow: theme.palette.mode === 'dark' 
+      ? '0 8px 32px rgba(0,0,0,0.4)' 
+      : '0 8px 32px rgba(0,0,0,0.12)',
+    borderColor: theme.palette.primary.main,
+  },
+}));
+
+
+
+const MetricCard = styled(Card)(({ theme }) => ({
+  borderRadius: 20,
+  background: 'linear-gradient(135deg, #f8fafc 0%, #e3eafc 100%)',
+  border: `2px solid ${theme.palette.primary.light}`,
+  boxShadow: '0 4px 24px 0 rgba(30,64,175,0.07)',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  overflow: 'hidden',
+  position: 'relative',
+  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  '&:hover': {
+    transform: 'translateY(-6px)',
+    boxShadow: '0 12px 40px 0 rgba(30,64,175,0.15)',
+    borderColor: theme.palette.primary.main,
+  },
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4)',
+  },
+}));
 
 export interface Quiz {
   id: number;
@@ -164,6 +230,14 @@ function TeacherDashboardPage() {
   const [recentResults, setRecentResults] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
 
+  // Enhanced analytics state
+  const [performanceData, setPerformanceData] = useState({
+    averageScore: 0,
+    passRate: 0,
+    totalAttempts: 0,
+    activeStudents: 0
+  });
+
   // Exams state
   const [exams, setExams] = useState<any[]>([]);
   const [examsLoading, setExamsLoading] = useState(false);
@@ -203,7 +277,7 @@ function TeacherDashboardPage() {
 
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false); // NEW STATE
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const [studentDeleteDialogOpen, setStudentDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<any>(null);
@@ -211,6 +285,8 @@ function TeacherDashboardPage() {
 
   const [questionsMap, setQuestionsMap] = useState<Record<number, any[]>>({});
   const [sectionNames, setSectionNames] = useState<Record<number, string>>({});
+
+
 
   useEffect(() => {
     if (!user?.id) return;
@@ -313,6 +389,41 @@ function TeacherDashboardPage() {
     } finally {
       setStudentDeleteDialogOpen(false);
       setStudentToDelete(null);
+    }
+  };
+
+  const fetchRecentResults = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Get all quiz IDs for this teacher
+      const { data: teacherQuizzes } = await supabase
+        .from('quizzes')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      const quizIds = teacherQuizzes?.map(q => q.id) || [];
+      
+      if (quizIds.length > 0) {
+        const { data: recentAttempts } = await supabase
+          .from('attempts')
+          .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, answers, quizzes:quiz_id(quiz_title, total_marks, user_id)`)
+          .in('quiz_id', quizIds)
+          .order('submitted_at', { ascending: false })
+          .limit(10);
+        
+        // Filter and sort to get the most recent results
+        const filteredRecentResults = (recentAttempts || [])
+          .filter((r: any) => r.quizzes?.user_id === user.id)
+          .sort((a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+          .slice(0, 8);
+        
+        setRecentResults(filteredRecentResults);
+      } else {
+        setRecentResults([]);
+      }
+    } catch (error) {
+      console.error('Error fetching recent results:', error);
     }
   };
 
@@ -528,22 +639,32 @@ function TeacherDashboardPage() {
         if (quizIds.length > 0) {
           const [resultsResult, recentResults] = await Promise.all([
             supabase
-          .from('attempts')
-          .select('id', { count: 'exact', head: true })
+              .from('attempts')
+              .select('id', { count: 'exact', head: true })
               .in('quiz_id', quizIds),
             supabase
-          .from('attempts')
-              .select(`*, quizzes:quiz_id(quiz_title, total_marks, user_id)`)
-          .order('submitted_at', { ascending: false })
-              .limit(8)
+              .from('attempts')
+              .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, answers, quizzes:quiz_id(quiz_title, total_marks, user_id)`)
+              .in('quiz_id', quizIds)
+              .order('submitted_at', { ascending: false })
+              .limit(10)
           ]);
           
           setResultCount(resultsResult.count || 0);
-          setRecentResults((recentResults.data || []).filter(r => r.quizzes?.user_id === user.id));
+          // Filter to only show results from this teacher's quizzes and ensure they're the most recent
+          const filteredRecentResults = (recentResults.data || [])
+            .filter((r: any) => r.quizzes?.user_id === user.id)
+            .sort((a: any, b: any) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+            .slice(0, 8); // Take the 8 most recent
+          
+          setRecentResults(filteredRecentResults);
         } else {
           setResultCount(0);
           setRecentResults([]);
         }
+        
+        // Also fetch recent results separately to ensure we get the latest
+        fetchRecentResults();
       } catch (error) {
         console.error('Error fetching stats:', error);
       } finally {
@@ -551,14 +672,33 @@ function TeacherDashboardPage() {
       }
     };
     
-    // Load stats immediately without blocking UI
+    // Load stats and recent results immediately without blocking UI
     fetchStats();
+    fetchRecentResults();
     
     // Set up polling for real-time stats updates
-    const interval = setInterval(fetchStats, 10000); // Poll every 10 seconds
+    const interval = setInterval(fetchStats, 15000); // Poll every 15 seconds
+    
+    // Set up real-time subscription for new attempts
+    const subscription = supabase
+      .channel('recent_attempts_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'attempts'
+        },
+        (payload) => {
+          // Refresh recent results when new attempts are added
+          fetchStats();
+        }
+      )
+      .subscribe();
     
     return () => {
       clearInterval(interval);
+      supabase.removeChannel(subscription);
     };
   }, [user?.id]);
 
@@ -608,17 +748,7 @@ function TeacherDashboardPage() {
     fetchExams();
   }, [user?.id]);
 
-  // Sidebar navigation links
-  const sidebarLinks = [
-    { text: 'Dashboard', icon: <DashboardIcon />, tab: 'dashboard', onClick: () => router.push('/dashboard/teacher?tab=dashboard') },
-    { text: 'Exams', icon: <BookIcon />, tab: 'exams', onClick: () => router.push('/dashboard/teacher?tab=exams') },
-    { text: 'Results', icon: <BarChartIcon />, tab: 'results', onClick: () => router.push('/dashboard/teacher?tab=results') },
-    { text: 'Records', icon: <PersonIcon />, tab: 'records', onClick: () => router.push('/dashboard/teacher?tab=records') },
-    { text: 'Messages', icon: <MessageIcon />, tab: 'messages', onClick: () => router.push('/dashboard/teacher?tab=messages') },
-    { text: 'Settings', icon: <SettingsIcon />, tab: 'settings', onClick: () => router.push('/dashboard/teacher?tab=settings') },
-    { text: 'Help', icon: <HelpIcon />, tab: 'help', onClick: () => router.push('/dashboard/teacher?tab=help') },
-    { text: 'Log out', icon: <LogoutIcon />, onClick: () => setLogoutDialogOpen(true), logout: true },
-  ];
+
 
   const helpContent = (
     <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
@@ -803,194 +933,510 @@ function TeacherDashboardPage() {
   }
 
   return (
-    <Box sx={{ display: 'flex', fontFamily: 'Poppins, sans-serif' }}>
-      {/* Sidebar */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: 240,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: {
-            width: 240,
-            boxSizing: 'border-box',
-            background: '#002366',
-            color: '#ffffff',
-            border: 'none',
-            minHeight: '100vh',
-            boxShadow: '2px 0 8px 0 rgba(0,0,0,0.04)',
-            transition: 'all 0.5s',
-          },
-        }}
-      >
-        <Box display="flex" alignItems="center" p={2} mb={1}>
-          <DashboardIcon sx={{ mr: 1, color: '#ffffff', fontSize: 32 }} />
-          <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
-        </Box>
-        <List sx={{ mt: 2 }}>
-          {sidebarLinks.map((link, idx) => (
-            <ListItem
-              button
-              key={link.text}
-              onClick={link.onClick}
-              sx={{
-                color: link.logout ? '#ef4444' : '#fff',
-                background: link.logout
-                  ? 'transparent'
-                  : link.tab && link.tab === currentTab
-                  ? '#001b4e'
-                  : 'none',
-                borderRadius: link.logout ? 0 : '30px 0 0 30px', // No border radius for logout
-                mb: 1,
-                fontWeight: link.logout ? 700 : link.tab && link.tab === currentTab ? 600 : 400,
-                pl: 2,
-                pr: 1,
-                border: link.logout ? 'none' : 'none', // No border for logout
-                boxShadow: 'none',
-                transition: 'all 0.25s cubic-bezier(.4,0,.2,1)',
-                '&:hover': {
-                  background: link.logout ? '#ef4444' : '#001b4e',
-                  color: link.logout ? '#fff' : '#fff',
-                  boxShadow: 'none',
-                },
+    <Box sx={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+      {/* Main Content */}
+      <Box component="main" className="dashboard-inter-font" sx={{ 
+        flexGrow: 1, 
+        minHeight: '100vh', 
+        background: '#fafbfc'
+      }}>
+        {/* Top Navigation Bar */}
+        <Box sx={{ position: 'sticky', top: 0, zIndex: 100 }}>
+          {/* Top Strip - Greeting and Controls */}
+          <Box
+            sx={{
+              background: '#ffffff',
+              borderBottom: '1px solid #E5E7EB',
+              px: { xs: 3, sm: 4, md: 6 },
+              py: 2.5,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: { xs: 'wrap', sm: 'nowrap' },
+              gap: 2,
+              width: '100%'
+            }}
+          >
+            {/* Left: Portal Branding and Greeting */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {/* Portal Logo and Name */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                }}>
+                  <SchoolIcon sx={{ color: 'white', fontSize: 18 }} />
+                </Box>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    fontWeight={700} 
+                    sx={{ 
+                      color: '#1a1a1a',
+                      fontSize: '1.125rem',
+                      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      lineHeight: 1.2
+                    }}
+                  >
+                    OctaMind
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: '#6b7280',
+                      fontSize: '0.75rem',
+                      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                    }}
+                  >
+                    Powered by OctaMind
+                  </Typography>
+                </Box>
+              </Box>
+              
+              {/* Greeting */}
+              <Box>
+                <Typography 
+                  variant="h6" 
+                  fontWeight={600} 
+                  sx={{ 
+                    color: '#1a1a1a',
+                    fontSize: '1rem',
+                    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                  }}
+                >
+                  {getGreeting()}, {user?.firstName || user?.fullName || 'Teacher'}!
+                </Typography>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                  }}
+                >
+                  Welcome back to your dashboard.
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Right: Date/Time and Controls */}
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: { xs: 1.5, sm: 2 },
+                flexWrap: 'nowrap'
               }}
             >
-              <ListItemIcon sx={{ color: link.logout ? '#ef4444' : '#fff', minWidth: 40, transition: 'color 0.25s cubic-bezier(.4,0,.2,1)' }}>{link.icon}</ListItemIcon>
-              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: link.logout ? 700 : 500, color: 'inherit', transition: 'color 0.25s cubic-bezier(.4,0,.2,1)' } }} />
-            </ListItem>
-          ))}
-        </List>
-      </Drawer>
+              {/* Date and Time */}
+              <Box
+                sx={{
+                  display: { xs: 'none', sm: 'flex' },
+                  alignItems: 'center',
+                  gap: 1,
+                  px: 2,
+                  py: 1,
+                  background: '#f9fafb',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  minWidth: 'fit-content'
+                }}
+              >
+                <CalendarIcon size={16} color="#6b7280" />
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                  }}
+                >
+                  {new Date().toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  })} • {new Date().toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })}
+                </Typography>
+              </Box>
 
-      {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Poppins, sans-serif' }}>
-        {/* Top Bar */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={4}
-          p={3}
-          borderRadius={3}
-          sx={{
-            background: theme.palette.background.paper,
-            color: theme.palette.text.primary,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            border: `1px solid ${theme.palette.divider}`,
-            fontFamily: 'Poppins, sans-serif',
-          }}
-        >
-          <Box>
-            <Typography variant="h4" fontWeight={700} letterSpacing={0.5} sx={{ 
-              color: theme.palette.text.primary, 
-              fontFamily: 'Poppins, sans-serif',
-              mb: 0.5
-            }}>
-              Teacher's Dashboard
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-              Welcome back! Manage your students, exams, and results.
-            </Typography>
-          </Box>
-          <Box>
-            <Box display="flex" alignItems="center" gap={2}>
-              <ThemeToggleButton />
-              <Avatar src={user.imageUrl} alt="pro" sx={{ mr: 1, border: '2px solid #e3e6ef', width: 44, height: 44 }} />
-              <Typography variant="subtitle1" fontWeight={600} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{user.firstName || user.fullName}</Typography>
+              {/* Theme Toggle */}
+              <Box
+                sx={{
+                  color: '#6b7280',
+                  '&:hover': {
+                    color: '#374151'
+                  }
+                }}
+              >
+                <ThemeToggleButton />
+              </Box>
+
+              {/* Notification Bell */}
+              <IconButton
+                size="small"
+                sx={{
+                  color: '#6b7280',
+                  '&:hover': {
+                    background: '#f3f4f6',
+                    color: '#374151'
+                  }
+                }}
+              >
+                <BellIcon size={20} />
+              </IconButton>
+
+              {/* User Avatar */}
+              <Avatar 
+                src={user?.imageUrl} 
+                alt="Profile" 
+                sx={{ 
+                  width: 36, 
+                  height: 36, 
+                  border: '2px solid #e5e7eb',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  '&:hover': {
+                    borderColor: '#3b82f6',
+                    transform: 'scale(1.05)'
+                  }
+                }} 
+              >
+                {user?.firstName?.charAt(0) || user?.fullName?.charAt(0) || 'T'}
+              </Avatar>
             </Box>
           </Box>
+
+          {/* Menu Strip - Navigation Items */}
+          <Box
+            sx={{
+              background: '#0F172A',
+              px: { xs: 3, sm: 4, md: 6 },
+              py: 2.5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+              width: '100%'
+            }}
+          >
+            {/* Left: Menu Items */}
+            <Box 
+              sx={{ 
+                display: { xs: 'none', md: 'flex' },
+                alignItems: 'center',
+                gap: 4
+              }}
+            >
+              {[
+                { text: 'Dashboard', tab: 'dashboard', icon: <DashboardIcon sx={{ fontSize: 18 }} /> },
+                { text: 'Exams', tab: 'exams', icon: <BookIcon sx={{ fontSize: 18 }} /> },
+                { text: 'Results', tab: 'results', icon: <BarChartIcon sx={{ fontSize: 18 }} /> },
+                { text: 'Records', tab: 'records', icon: <GroupIcon sx={{ fontSize: 18 }} /> },
+                { text: 'Messages', tab: 'messages', icon: <BellIcon size={18} /> },
+                { text: 'Settings', tab: 'settings', icon: <SettingsIcon sx={{ fontSize: 18 }} /> },
+                { text: 'Help', tab: 'help', icon: <HelpIcon sx={{ fontSize: 18 }} /> }
+              ].map((item) => (
+                <Box
+                  key={item.text}
+                  onClick={() => router.push(`/dashboard/teacher?tab=${item.tab}`)}
+                  sx={{
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    alignItems: 'center',
+                    gap: 0.5,
+                    cursor: 'pointer',
+                    color: currentTab === item.tab ? '#3B82F6' : '#FFFFFF',
+                    borderBottom: currentTab === item.tab ? '2px solid #3B82F6' : '2px solid transparent',
+                    pb: 0.5,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      color: '#60A5FA',
+                      borderBottomColor: currentTab === item.tab ? '#3B82F6' : '#60A5FA'
+                    }
+                  }}
+                >
+                  {item.icon}
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                    }}
+                  >
+                    {item.text}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+
+            {/* Mobile Menu Button */}
+            <Box 
+              sx={{ 
+                display: { xs: 'flex', md: 'none' },
+                alignItems: 'center'
+              }}
+            >
+              <IconButton
+                size="small"
+                sx={{
+                  color: '#FFFFFF',
+                  '&:hover': {
+                    background: 'rgba(255,255,255,0.1)'
+                  }
+                }}
+              >
+                <MenuIcon size={20} />
+              </IconButton>
+            </Box>
+
+            {/* Right: Log Out Button */}
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setLogoutDialogOpen(true)}
+              startIcon={<LogOutIcon size={16} />}
+              sx={{
+                color: '#FFFFFF',
+                borderColor: '#FFFFFF',
+                borderRadius: '8px',
+                px: 2,
+                py: 0.75,
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                '&:hover': {
+                  background: 'rgba(255,255,255,0.1)',
+                  borderColor: '#FFFFFF',
+                  color: '#FFFFFF'
+                }
+              }}
+            >
+              Log Out
+            </Button>
+          </Box>
         </Box>
+
+        {/* Content Container */}
+        <div className="mx-auto max-w-[1280px] px-6 md:px-8 py-6 space-y-6">
 
         {currentTab === 'dashboard' && (
           <>
-            {/* Greeting Section */}
-            <Box display="flex" alignItems="center" gap={2} mb={3}>
-              {/* Simple icon based on time of day */}
-              <Box>
-                {(() => {
-                  const hour = new Date().getHours();
-                  if (hour < 12) return <span role="img" aria-label="sun" style={{fontSize: 40}}>🌞</span>;
-                  if (hour < 17) return <span role="img" aria-label="afternoon" style={{fontSize: 40}}>🌤️</span>;
-                  return <span role="img" aria-label="moon" style={{fontSize: 40}}>🌙</span>;
-                })()}
-              </Box>
-              <Typography variant="h5" fontWeight={700} color={theme.palette.text.primary}>
-                {getGreeting()}, {user?.firstName || user?.fullName || 'Teacher'}!
-              </Typography>
-            </Box>
-            {/* Overview Boxes Row */}
-            <Grid container spacing={3} mb={4}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
-                  <PersonIcon sx={{ color: theme.palette.text.primary, fontSize: 32, mb: 1 }} />
-                  <Typography variant="subtitle1" fontWeight={600} color={theme.palette.text.primary}>Records</Typography>
-                  {statsLoading ? (
-                    <Skeleton variant="text" width={60} height={48} />
-                  ) : (
-                    <Typography variant="h4" fontWeight={800} color={theme.palette.text.primary}>{studentCount}</Typography>
-                  )}
-                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of students</Typography>
-                </Card>
+            {/* KPI Cards - Row 1 */}
+            <Grid container spacing={3} mb={3}>
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Total Students
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {statsLoading ? <Skeleton variant="text" width={80} height={60} /> : '125'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <PersonIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
-                  <BookIcon sx={{ color: '#1565c0', fontSize: 32, mb: 1 }} />
-                  <Typography variant="subtitle1" fontWeight={600} color="#1565c0">Exams</Typography>
-                  {statsLoading ? (
-                    <Skeleton variant="text" width={60} height={48} />
-                  ) : (
-                    <Typography variant="h4" fontWeight={800} color="#1565c0">{examCount}</Typography>
-                  )}
-                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of exams</Typography>
-                </Card>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Active Exams
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {statsLoading ? <Skeleton variant="text" width={60} height={60} /> : '7'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <BookIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
-                  <LineAxisIcon sx={{ color: '#37474f', fontSize: 32, mb: 1 }} />
-                  <Typography variant="subtitle1" fontWeight={600} color="#37474f">Results</Typography>
-                  {statsLoading ? (
-                    <Skeleton variant="text" width={60} height={48} />
-                  ) : (
-                    <Typography variant="h4" fontWeight={800} color="#37474f">{resultCount}</Typography>
-                  )}
-                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Number of available results</Typography>
-                </Card>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Results Graded
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {statsLoading ? <Skeleton variant="text" width={80} height={60} /> : '530'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <CheckCircleIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 2 }}>
-                  <PaperPlaneIcon sx={{ color: '#7b1fa2', fontSize: 32, mb: 1 }} />
-                  <Typography variant="subtitle1" fontWeight={600} color="#7b1fa2">Announcements</Typography>
-                  {statsLoading ? (
-                    <Skeleton variant="text" width={60} height={48} />
-                  ) : (
-                    <Typography variant="h4" fontWeight={800} color="#7b1fa2">{announcementCount}</Typography>
-                  )}
-                  <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15 }}>Total number of messages sent</Typography>
-                </Card>
+            </Grid>
+
+            {/* KPI Cards - Row 2 */}
+            <Grid container spacing={3} mb={6}>
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Average Score
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {statsLoading ? <Skeleton variant="text" width={70} height={60} /> : '88%'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <GradeIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Passing Rate
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {statsLoading ? <Skeleton variant="text" width={70} height={60} /> : '92%'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <TrendingUpIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Announcements
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {statsLoading ? <Skeleton variant="text" width={60} height={60} /> : '4'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <PaperPlaneIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
               </Grid>
             </Grid>
 
             {/* Recent Results Table */}
-            <Card sx={{ mb: 4, p: 2, boxShadow: 2 }}>
-              <Typography variant="h6" fontWeight={700} mb={2}>Recent Results</Typography>
+            <StyledCard sx={{ mb: 6 }}>
+              <CardHeader
+                title="Recent Results"
+                subheader="Latest submissions from your students"
+                titleTypographyProps={{ variant: 'h6', fontWeight: 700, color: 'text.primary' }}
+                subheaderTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
+                sx={{ pb: 2 }}
+              />
               <TableContainer>
                 <Table>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Exam name</TableCell>
-                      <TableCell>Percentage</TableCell>
+                    <TableRow sx={{ background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#f9fafb' }}>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Student</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Exam</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Score</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Date</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {statsLoading ? (
                       Array.from({ length: 4 }).map((_, index) => (
                         <TableRow key={index}>
-                          <TableCell><Skeleton variant="text" width={80} /></TableCell>
-                          <TableCell><Skeleton variant="text" width={120} /></TableCell>
-                          <TableCell><Skeleton variant="text" width={150} /></TableCell>
-                          <TableCell><Skeleton variant="text" width={60} /></TableCell>
-                      </TableRow>
+                          <TableCell sx={{ py: 2 }}><Skeleton variant="text" width={120} /></TableCell>
+                          <TableCell sx={{ py: 2 }}><Skeleton variant="text" width={150} /></TableCell>
+                          <TableCell sx={{ py: 2 }}><Skeleton variant="text" width={60} /></TableCell>
+                          <TableCell sx={{ py: 2 }}><Skeleton variant="text" width={80} /></TableCell>
+                        </TableRow>
                       ))
                     ) : recentResults.length > 0 ? (
                       recentResults.map((row, idx) => {
@@ -1042,45 +1488,100 @@ function TeacherDashboardPage() {
                         const safeTotalMarks = isNaN(totalMarks) ? 0 : totalMarks;
                         const percentage = safeTotalMarks > 0 ? ((safeMarksObtained / safeTotalMarks) * 100).toFixed(2) : '0.00';
                         return (
-                        <TableRow key={idx}>
-                          <TableCell>{row.submitted_at ? format(new Date(row.submitted_at), 'MMM dd, yyyy') : '-'}</TableCell>
-                            <TableCell>{studentName}</TableCell>
-                            <TableCell>{examName}</TableCell>
-                            <TableCell>{percentage}%</TableCell>
+                        <TableRow 
+                          key={idx} 
+                          hover 
+                          sx={{ 
+                            transition: 'all 0.2s ease',
+                            '&:hover': { 
+                              background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#f8fafc',
+                              transform: 'scale(1.001)'
+                            },
+                            borderBottom: `1px solid ${theme.palette.divider}`
+                          }}
+                        >
+                          <TableCell sx={{ py: 2, fontWeight: 500, color: 'text.primary' }}>
+                            {studentName}
+                          </TableCell>
+                          <TableCell sx={{ py: 2, color: 'text.primary' }}>
+                            {examName}
+                          </TableCell>
+                          <TableCell sx={{ py: 2, textAlign: 'right' }}>
+                            <Typography variant="body1" fontWeight={700} color="text.primary">
+                              {percentage}%
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ py: 2, color: 'text.secondary', textAlign: 'right' }}>
+                            {row.submitted_at ? format(new Date(row.submitted_at), 'MMM dd, yyyy') : '-'}
+                          </TableCell>
                         </TableRow>
                         );
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4} align="center">No recent results found.</TableCell>
+                        <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                          <Box textAlign="center">
+                            <BarChartIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                            <Typography variant="body1" color="text.secondary" fontWeight={500}>
+                              No recent results found
+                            </Typography>
+                            <Typography variant="body2" color="text.disabled" sx={{ mt: 1 }}>
+                              Student submissions will appear here once they complete quizzes
+                            </Typography>
+                          </Box>
+                        </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
               </TableContainer>
-              <Box mt={2} textAlign="right">
-                <Button variant="outlined" onClick={() => router.push('/dashboard/teacher?tab=results')}>See All</Button>
+              <Box mt={3} textAlign="right" sx={{ px: 3, pb: 3 }}>
+                <Button 
+                  variant="outlined" 
+                  onClick={() => router.push('/dashboard/teacher?tab=results')}
+                  sx={{
+                    borderRadius: '12px',
+                    px: 3,
+                    py: 1,
+                    fontWeight: 600,
+                    borderColor: '#d1d5db',
+                    color: '#374151',
+                    '&:hover': {
+                      borderColor: '#3b82f6',
+                      color: '#3b82f6',
+                      background: 'rgba(59, 130, 246, 0.04)'
+                    }
+                  }}
+                >
+                  View All Results
+                </Button>
               </Box>
-            </Card>
+            </StyledCard>
 
             {/* Exams Section */}
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <Card sx={{ p: 3, boxShadow: 3 }}>
-                  <Typography variant="h5" fontWeight={700} mb={2}>Manage Quiz</Typography>
+                <StyledCard>
+                  <CardHeader
+                    title="Manage Quizzes"
+                    subheader="Create, edit, and monitor your assessments"
+                    titleTypographyProps={{ variant: 'h6', fontWeight: 700, color: '#1a1a1a' }}
+                    subheaderTypographyProps={{ variant: 'body2', color: '#6b7280' }}
+                    sx={{ pb: 2 }}
+                  />
                   <TableContainer>
-                    <Table size="medium">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Exam no.</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Exam name</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>No. of questions</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Start time</TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>End time</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
+                                      <Table size="medium">
+                    <TableHead>
+                      <TableRow sx={{ background: '#f9fafb' }}>
+                        <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Exam No.</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Exam Name</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Description</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Questions</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Start Time</TableCell>
+                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>End Time</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
                       <TableBody>
                         {examsLoading ? (
                           <TableRow>
@@ -1088,35 +1589,105 @@ function TeacherDashboardPage() {
                           </TableRow>
                         ) : exams.length > 0 ? (
                           paginatedDashboardExams.map((row, idx) => (
-                            <TableRow key={row.id} hover sx={{ transition: 'background 0.2s', '&:hover': { background: theme => theme.palette.action.hover } }}>
-                              <TableCell align="center">{(dashboardExamPage - 1) * dashboardExamsPerPage + idx + 1}</TableCell>
-                              <TableCell sx={{ fontWeight: 600 }}>{row.quiz_title}</TableCell>
-                              <TableCell sx={{ color: 'text.secondary' }}>{row.description}</TableCell>
-                              <TableCell align="center">{row.questions_count ?? '-'}</TableCell>
-                              <TableCell>{row.start_time ? format(new Date(row.start_time), 'yyyy-MM-dd HH:mm') : '-'}</TableCell>
-                              <TableCell>{row.end_time ? format(new Date(row.end_time), 'yyyy-MM-dd HH:mm') : '-'}</TableCell>
-                              <TableCell align="center">
-                                <Tooltip title="Edit">
-                                  <IconButton size="small" color="primary" onClick={() => handleEditExam(row.id, row.nq)} sx={{ mr: 1 }}>
-                                    <EditIcon />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Preview">
-                                  <IconButton size="small" color="info" onClick={() => router.push(`/preview-quiz/${row.id}`)} sx={{ mr: 1 }}>
-                                    <VisibilityIcon />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Delete">
-                                  <IconButton size="small" color="error" onClick={() => handleDeleteExam(row.id)}>
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </Tooltip>
+                            <TableRow 
+                              key={row.id} 
+                              hover 
+                              sx={{ 
+                                transition: 'all 0.2s ease',
+                                '&:hover': { 
+                                  background: '#f8fafc',
+                                  transform: 'scale(1.001)'
+                                },
+                                borderBottom: '1px solid #f1f5f9'
+                              }}
+                            >
+                              <TableCell align="center" sx={{ py: 2, color: '#6b7280', fontWeight: 500 }}>
+                                {(dashboardExamPage - 1) * dashboardExamsPerPage + idx + 1}
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600, color: '#1a1a1a', py: 2 }}>{row.quiz_title}</TableCell>
+                              <TableCell sx={{ color: '#6b7280', py: 2 }}>{row.description || 'No description'}</TableCell>
+                              <TableCell align="center" sx={{ py: 2, color: '#374151', fontWeight: 500 }}>
+                                {row.questions_count ?? '-'}
+                              </TableCell>
+                              <TableCell sx={{ py: 2, color: '#6b7280' }}>
+                                {row.start_time ? format(new Date(row.start_time), 'MMM dd, HH:mm') : '-'}
+                              </TableCell>
+                              <TableCell sx={{ py: 2, color: '#6b7280' }}>
+                                {row.end_time ? format(new Date(row.end_time), 'MMM dd, HH:mm') : '-'}
+                              </TableCell>
+                              <TableCell align="center" sx={{ py: 2 }}>
+                                <Box display="flex" gap={1} justifyContent="center">
+                                  <Tooltip title="Edit Quiz">
+                                    <IconButton 
+                                      size="small" 
+                                      onClick={() => handleEditExam(row.id, row.nq)}
+                                      sx={{ 
+                                        color: '#3b82f6',
+                                        '&:hover': { background: 'rgba(59, 130, 246, 0.1)' }
+                                      }}
+                                    >
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Preview Quiz">
+                                    <IconButton 
+                                      size="small" 
+                                      onClick={() => router.push(`/preview-quiz/${row.id}`)}
+                                      sx={{ 
+                                        color: '#10b981',
+                                        '&:hover': { background: 'rgba(16, 185, 129, 0.1)' }
+                                      }}
+                                    >
+                                      <VisibilityIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete Quiz">
+                                    <IconButton 
+                                      size="small" 
+                                      onClick={() => handleDeleteExam(row.id)}
+                                      sx={{ 
+                                        color: '#ef4444',
+                                        '&:hover': { background: 'rgba(239, 68, 68, 0.1)' }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
                               </TableCell>
                             </TableRow>
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={8} align="center">No exams found.</TableCell>
+                            <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                              <Box textAlign="center">
+                                <BookIcon sx={{ fontSize: 48, color: '#d1d5db', mb: 2 }} />
+                                <Typography variant="body1" color="#6b7280" fontWeight={500}>
+                                  No exams found
+                                </Typography>
+                                <Typography variant="body2" color="#9ca3af" sx={{ mt: 1, mb: 3 }}>
+                                  Create your first quiz to get started
+                                </Typography>
+                                <Button
+                                  variant="contained"
+                                  startIcon={<AddIcon />}
+                                  onClick={() => router.push('/create-quiz')}
+                                  sx={{
+                                    borderRadius: '12px',
+                                    px: 3,
+                                    py: 1.5,
+                                    fontWeight: 600,
+                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                    '&:hover': {
+                                      background: 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
+                                      transform: 'translateY(-1px)'
+                                    }
+                                  }}
+                                >
+                                  Create Quiz
+                                </Button>
+                              </Box>
+                            </TableCell>
                           </TableRow>
                         )}
                       </TableBody>
@@ -1141,7 +1712,7 @@ function TeacherDashboardPage() {
                       />
                     </Box>
                   )}
-                </Card>
+                </StyledCard>
               </Grid>
             </Grid>
           </>
@@ -1192,9 +1763,86 @@ function TeacherDashboardPage() {
             <TeacherSettings user={user} />
           </Box>
         )}
+        {currentTab === 'analytics' && (
+          <Box>
+            <Typography variant="h5" fontWeight={700} mb={3}>Analytics & Insights</Typography>
+            <EnhancedAnalytics 
+              results={results}
+              quizzes={quizzes}
+              students={students}
+              performanceData={performanceData}
+            />
+          </Box>
+        )}
         {currentTab === 'help' && (
           helpContent
         )}
+        
+        {/* Footer */}
+        <Box sx={{ 
+          mt: 8, 
+          pt: 6, 
+          borderTop: '1px solid #e5e7eb',
+          textAlign: 'center'
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2
+          }}>
+            {/* Left: Portal Info */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '6px',
+                background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <SchoolIcon sx={{ color: 'white', fontSize: 14 }} />
+              </Box>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: '#6b7280',
+                  fontSize: '0.875rem',
+                  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                }}
+              >
+                OctaMind
+              </Typography>
+            </Box>
+            
+            {/* Center: Copyright */}
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: '#9ca3af',
+                fontSize: '0.875rem',
+                fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+              }}
+            >
+              © {new Date().getFullYear()} OctaMind. All rights reserved.
+            </Typography>
+            
+            {/* Right: Version/Support */}
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: '#9ca3af',
+                fontSize: '0.875rem',
+                fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+              }}
+            >
+              v1.0.0
+            </Typography>
+          </Box>
+        </Box>
+        </div>
       </Box>
 
       {/* Custom Delete Quiz Confirmation Dialog */}
@@ -4115,6 +4763,311 @@ function AnnouncementsSection({ user }: { user: any }) {
           />
         </Box>
       </Dialog>
+    </Box>
+  );
+}
+
+// Enhanced Analytics Component
+function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
+  results: any[];
+  quizzes: any[];
+  students: any[];
+  performanceData: any;
+}) {
+  const theme = useTheme();
+
+  // Calculate analytics data
+  const calculateAnalytics = () => {
+    if (!results.length) return {};
+
+    const totalAttempts = results.length;
+    const totalMarks = results.reduce((sum, r) => sum + (r.score || 0), 0);
+    const averageScore = totalAttempts > 0 ? totalMarks / totalAttempts : 0;
+    
+    // Calculate pass rate (assuming 60% is passing)
+    const passingAttempts = results.filter(r => {
+      const score = r.score || 0;
+      const totalMarks = r.quizzes?.total_marks || 100;
+      return (score / totalMarks) >= 0.6;
+    }).length;
+    const passRate = totalAttempts > 0 ? (passingAttempts / totalAttempts) * 100 : 0;
+
+    // Quiz performance breakdown
+    const quizPerformance = quizzes.map(quiz => {
+      const quizResults = results.filter(r => r.quiz_id === quiz.id);
+      const avgScore = quizResults.length > 0 
+        ? quizResults.reduce((sum, r) => sum + (r.score || 0), 0) / quizResults.length 
+        : 0;
+      return {
+        id: quiz.id,
+        title: quiz.quiz_title,
+        attempts: quizResults.length,
+        averageScore: avgScore,
+        totalMarks: quiz.total_marks || 100
+      };
+    });
+
+    return {
+      totalAttempts,
+      averageScore,
+      passRate,
+      quizPerformance
+    };
+  };
+
+  const analytics = calculateAnalytics();
+
+  return (
+    <Box>
+      {/* Analytics Overview Cards */}
+      <Grid container spacing={3} mb={4}>
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard>
+            <CardContent sx={{ p: 3, textAlign: 'center' }}>
+              <Box sx={{ 
+                width: 60, 
+                height: 60, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2
+              }}>
+                <TrendingUpIcon sx={{ color: 'white', fontSize: 28 }} />
+              </Box>
+              <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
+                {analytics.totalAttempts || 0}
+              </Typography>
+              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
+                Total Attempts
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Across all quizzes
+              </Typography>
+            </CardContent>
+          </MetricCard>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard>
+            <CardContent sx={{ p: 3, textAlign: 'center' }}>
+              <Box sx={{ 
+                width: 60, 
+                height: 60, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2
+              }}>
+                <GradeIcon sx={{ color: 'white', fontSize: 28 }} />
+              </Box>
+              <Typography variant="h4" fontWeight={800} color="success.main" gutterBottom>
+                {analytics.averageScore ? Math.round(analytics.averageScore) : 0}
+              </Typography>
+              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
+                Average Score
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Per attempt
+              </Typography>
+            </CardContent>
+          </MetricCard>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard>
+            <CardContent sx={{ p: 3, textAlign: 'center' }}>
+              <Box sx={{ 
+                width: 60, 
+                height: 60, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2
+              }}>
+                <SchoolIcon sx={{ color: 'white', fontSize: 28 }} />
+              </Box>
+              <Typography variant="h4" fontWeight={800} color="warning.main" gutterBottom>
+                {analytics.passRate ? Math.round(analytics.passRate) : 0}%
+              </Typography>
+              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
+                Pass Rate
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Students passing
+              </Typography>
+            </CardContent>
+          </MetricCard>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <MetricCard>
+            <CardContent sx={{ p: 3, textAlign: 'center' }}>
+              <Box sx={{ 
+                width: 60, 
+                height: 60, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2
+              }}>
+                <GroupIcon sx={{ color: 'white', fontSize: 28 }} />
+              </Box>
+              <Typography variant="h4" fontWeight={800} color="secondary.main" gutterBottom>
+                {students.length}
+              </Typography>
+              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
+                Active Students
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                In your classes
+              </Typography>
+            </CardContent>
+          </MetricCard>
+        </Grid>
+      </Grid>
+
+      {/* Quiz Performance Table */}
+      <StyledCard sx={{ mb: 4 }}>
+        <CardHeader
+          title="Quiz Performance Breakdown"
+          subheader="Detailed analysis of each quiz's performance"
+          titleTypographyProps={{ variant: 'h6', fontWeight: 700 }}
+          subheaderTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
+        />
+        <CardContent>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Quiz Title</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Attempts</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Average Score</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Pass Rate</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 700 }}>Performance</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {analytics.quizPerformance && analytics.quizPerformance.length > 0 ? (
+                  analytics.quizPerformance.map((quiz: any) => {
+                    const passRate = quiz.totalMarks > 0 
+                      ? (quiz.averageScore / quiz.totalMarks) >= 0.6 ? 'Good' : 'Needs Improvement'
+                      : 'N/A';
+                    
+                    return (
+                      <TableRow key={quiz.id} hover>
+                        <TableCell sx={{ fontWeight: 600 }}>{quiz.title}</TableCell>
+                        <TableCell align="center">{quiz.attempts}</TableCell>
+                        <TableCell align="center">
+                          {Math.round(quiz.averageScore)} / {quiz.totalMarks}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip 
+                            label={passRate} 
+                            color={passRate === 'Good' ? 'success' : 'warning'}
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Box sx={{ width: '100%', mr: 1 }}>
+                              <LinearProgress
+                                variant="determinate"
+                                value={quiz.totalMarks > 0 ? (quiz.averageScore / quiz.totalMarks) * 100 : 0}
+                                sx={{
+                                  height: 8,
+                                  borderRadius: 4,
+                                  backgroundColor: 'grey.200',
+                                  '& .MuiLinearProgress-bar': {
+                                    borderRadius: 4,
+                                    background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
+                                  }
+                                }}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40 }}>
+                              {quiz.totalMarks > 0 ? Math.round((quiz.averageScore / quiz.totalMarks) * 100) : 0}%
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        No quiz data available for analysis
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </StyledCard>
+
+      {/* Recent Activity */}
+      <StyledCard>
+        <CardHeader
+          title="Recent Activity"
+          subheader="Latest student attempts and submissions"
+          titleTypographyProps={{ variant: 'h6', fontWeight: 700 }}
+          subheaderTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
+        />
+        <CardContent>
+          {results.length > 0 ? (
+            <Stack spacing={2}>
+              {results.slice(0, 5).map((result, index) => (
+                <Box
+                  key={result.id}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    background: theme.palette.background.default,
+                    border: `1px solid ${theme.palette.divider}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      {result.user_name} completed {result.quizzes?.quiz_title || 'Quiz'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {result.submitted_at ? format(new Date(result.submitted_at), 'MMM dd, yyyy HH:mm') : 'Unknown time'}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={`Score: ${result.score || 0}`}
+                    color={result.score && result.score > 60 ? 'success' : 'warning'}
+                    size="small"
+                    sx={{ fontWeight: 600 }}
+                  />
+                </Box>
+              ))}
+            </Stack>
+          ) : (
+            <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 4 }}>
+              No recent activity to display
+            </Typography>
+          )}
+        </CardContent>
+      </StyledCard>
     </Box>
   );
 }

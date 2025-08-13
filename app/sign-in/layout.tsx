@@ -8,7 +8,7 @@ import { ThemeModeProvider } from '@/theme/theme-provider'; // Assuming this pat
 
 // ----------------------------------------------------------------------
 // Thematic "Live" Background Component (CSS-only, integrated into layout)
-// Creates a subtle, animated network/data flow effect for an Assessment Portal theme.
+// Creates a subtle, animated network/data flow effect for an OctaMind theme.
 // ----------------------------------------------------------------------
 const AssessmentPortalThematicBackground = () => {
   const theme = useTheme();

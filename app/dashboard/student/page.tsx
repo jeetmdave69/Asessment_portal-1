@@ -34,6 +34,13 @@ import {
   Snackbar,
   Alert,
   Card,
+  CardContent,
+  CardHeader,
+  AppBar,
+  Toolbar,
+  Badge,
+  Skeleton,
+  IconButton,
 } from '@mui/material';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
@@ -54,17 +61,25 @@ import {
   NightsStay as NightsStayIcon,
   PlayArrow as PlayArrowIcon,
   Replay as ReplayIcon,
+  Person as PersonIcon,
+  School as SchoolIcon,
+  Assignment as AssignmentIcon,
+  CheckCircle as CheckCircleIcon,
+  Star as StarIcon,
+  TrendingUp as TrendingUpIcon,
+  Announcement as AnnouncementIcon,
+  Notifications as NotificationsIcon,
 } from '@mui/icons-material';
 import SummaryCards from '../../../components/dashboard/SummaryCards';
 import { useSettingsContext } from '@/context/settings-context';
-import IconButton from '@mui/material/IconButton';
 import Iconify from '@/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
 import { ThemeModeProvider } from '@/providers/ThemeModeProvider';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import Skeleton from '@mui/material/Skeleton';
 import LogoutSplash from '../../../components/LogoutSplash';
+import { styled } from '@mui/material/styles';
+import { format } from 'date-fns';
 
 const formatDateTime = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -94,6 +109,25 @@ const boxStyles = [
   { bg: '#fff', color: '#1565c0', border: '1px solid #e3e6ef' },
   { bg: '#fff', color: '#37474f', border: '1px solid #e3e6ef' },
 ];
+
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: 16,
+  boxShadow: theme.palette.mode === 'dark' 
+    ? '0 4px 20px rgba(0,0,0,0.3)' 
+    : '0 4px 20px rgba(0,0,0,0.08)',
+  border: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.paper,
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  overflow: 'hidden',
+  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  '&:hover': {
+    transform: 'translateY(-4px)',
+    boxShadow: theme.palette.mode === 'dark' 
+      ? '0 8px 32px rgba(0,0,0,0.4)' 
+      : '0 8px 32px rgba(0,0,0,0.12)',
+    borderColor: theme.palette.primary.main,
+  },
+}));
 
 const professionalBoxSx = (theme: any) => ({
   background: theme.palette.mode === 'dark'
@@ -604,52 +638,102 @@ function StudentDashboardPageContent() {
     );
   }
 
-  const sidebarLinks = [
-    { text: 'Dashboard', icon: <DashboardIcon />, onClick: () => setSelectedSection('dashboard'), active: selectedSection === 'dashboard' },
-    { text: 'Exams', icon: <BookIcon />, onClick: () => setSelectedSection('exams'), active: selectedSection === 'exams' },
-    { text: 'Results', icon: <BarChartIcon />, onClick: () => setSelectedSection('results'), active: selectedSection === 'results' },
-    { text: 'Messages', icon: <MessageIcon />, onClick: () => setSelectedSection('messages'), active: selectedSection === 'messages' },
-    { text: 'Settings', icon: <SettingsIcon />, onClick: () => setSelectedSection('settings'), active: selectedSection === 'settings' },
-    { text: 'Help', icon: <HelpIcon />, onClick: () => setSelectedSection('help'), active: selectedSection === 'help' },
-    { text: 'Log out', icon: <LogoutIcon />, onClick: () => setLogoutDialogOpen(true), logout: true },
-  ];
+
 
   const helpContent = (
-    <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
-        About & Help
+    <StyledCard>
+      <CardHeader
+        title="About & Help"
+        titleTypographyProps={{ variant: 'h5', fontWeight: 700, color: 'text.primary' }}
+        sx={{ pb: 2 }}
+      />
+      <CardContent>
+        <Box mt={2}>
+          <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 600, mb: 3, fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+            How to use
       </Typography>
-      <Box mt={3}>
-        <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontWeight: 600, mb: 2 }}>How to use</Typography>
         <Box component="ol" sx={{ pl: 3 }}>
-          <li><Typography variant="subtitle1" fontWeight={600}>How to logout?</Typography>
-            <Typography variant="body2">Click on the logout button at the left bottom on the navigation bar.</Typography></li>
-          <li><Typography variant="subtitle1" fontWeight={600}>How to edit my profile details?</Typography>
-            <Typography variant="body2">Click on the settings option from the left navigation bar. After filling the required columns, click on update.</Typography></li>
-          <li><Typography variant="subtitle1" fontWeight={600}>How to view the results?</Typography>
-            <Typography variant="body2">Go to the results option from the left navigation bar to view the results.</Typography></li>
-          <li><Typography variant="subtitle1" fontWeight={600}>How to attempt exams?</Typography>
-            <Typography variant="body2">Navigate to the exams tab by clicking on the exams button from the left navigation bar. Tests can be attempted from here.</Typography></li>
-          <li><Typography variant="subtitle1" fontWeight={600}>How to view announcements?</Typography>
-            <Typography variant="body2">Click on the messages option from the left navigation bar.</Typography></li>
+            <li style={{ marginBottom: 16 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                How to logout?
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                Click on the logout button at the left bottom on the navigation bar.
+              </Typography>
+            </li>
+            <li style={{ marginBottom: 16 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                How to edit my profile details?
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                Click on the settings option from the left navigation bar. After filling the required columns, click on update.
+              </Typography>
+            </li>
+            <li style={{ marginBottom: 16 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                How to view the results?
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                Go to the results option from the left navigation bar to view the results.
+              </Typography>
+            </li>
+            <li style={{ marginBottom: 16 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                How to attempt exams?
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                Navigate to the exams tab by clicking on the exams button from the left navigation bar. Tests can be attempted from here.
+              </Typography>
+            </li>
+            <li style={{ marginBottom: 16 }}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                How to view announcements?
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                Click on the messages option from the left navigation bar.
+              </Typography>
+            </li>
         </Box>
       </Box>
-    </Box>
+      </CardContent>
+    </StyledCard>
   )
 
   const settingsContent = (
-    <Box sx={professionalBoxSx(theme)}>
-      <Typography variant="h5" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
-        My Profile
-      </Typography>
-      <Box display="flex" flexDirection="column" alignItems="center" mb={2}>
-        <Avatar src={profileForm.profile_picture || user.imageUrl} alt="pro" sx={{ width: 80, height: 80, border: '2px solid #e3e6ef', mb: 1 }} />
+    <StyledCard>
+      <CardHeader
+        title="My Profile"
+        titleTypographyProps={{ variant: 'h5', fontWeight: 700, color: 'text.primary' }}
+        sx={{ pb: 2 }}
+      />
+      <CardContent>
+        <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
+          <Avatar src={profileForm.profile_picture || user.imageUrl} alt="pro" sx={{ width: 80, height: 80, border: '2px solid #E5E7EB', mb: 2 }} />
         <Box display="flex" gap={1}>
-          <Button variant="outlined" size="small" onClick={() => fileInputRef.current?.click()} disabled={profileLoading}>
+            <Button 
+              variant="outlined" 
+              size="small" 
+              onClick={() => fileInputRef.current?.click()} 
+              disabled={profileLoading}
+              sx={{ 
+                borderRadius: 2, 
+                fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' 
+              }}
+            >
             {profileLoading ? 'Uploading...' : 'Change Photo'}
           </Button>
           {profileForm.profile_picture && (
-            <Button variant="outlined" size="small" color="error" onClick={handleDeleteProfilePic} disabled={profileLoading}>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                color="error" 
+                onClick={handleDeleteProfilePic} 
+                disabled={profileLoading}
+                sx={{ 
+                  borderRadius: 2, 
+                  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' 
+                }}
+              >
               Delete Photo
             </Button>
           )}
@@ -671,6 +755,7 @@ function StudentDashboardPageContent() {
           fullWidth
           margin="normal"
           required
+            sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         />
         <TextField
           label="Email"
@@ -680,6 +765,7 @@ function StudentDashboardPageContent() {
           fullWidth
           margin="normal"
           required
+            sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         />
         <TextField
           label="Date of Birth"
@@ -691,6 +777,7 @@ function StudentDashboardPageContent() {
           margin="normal"
           InputLabelProps={{ shrink: true }}
           required
+            sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         />
         <TextField
           label="Gender (M or F)"
@@ -701,13 +788,23 @@ function StudentDashboardPageContent() {
           margin="normal"
           inputProps={{ maxLength: 1 }}
           required
+            sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         />
         <Button
           type="submit"
           variant="contained"
-          color="primary"
           fullWidth
-          sx={{ mt: 2, fontWeight: 600, borderRadius: 2, background: '#002366', color: '#fff', '&:hover': { background: '#001b4e' } }}
+            sx={{ 
+              mt: 3, 
+              fontWeight: 600, 
+              borderRadius: 2, 
+              background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', 
+              color: '#fff', 
+              fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+              '&:hover': { 
+                background: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)' 
+              } 
+            }}
           disabled={profileLoading}
         >
           {profileLoading ? 'Updating…' : 'Update'}
@@ -735,7 +832,8 @@ function StudentDashboardPageContent() {
           {profileError}
         </Alert>
       </Snackbar>
-    </Box>
+      </CardContent>
+    </StyledCard>
   );
 
   const messagesContent = (
@@ -1065,79 +1163,225 @@ function StudentDashboardPageContent() {
   );
 
   return (
-    <Box display="flex" sx={{ fontFamily: 'Poppins, sans-serif' }}>
-      {/* Sidebar */}
-      <Drawer
-        variant="permanent"
+    <Box sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+      {/* Main Content */}
+      <Box component="main" sx={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+        {/* Top Navigation Bar */}
+        <AppBar position="static" elevation={0} sx={{ background: '#FFFFFF', borderBottom: '1px solid #E5E7EB' }}>
+          <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 4 } }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                }}>
+                  <SchoolIcon sx={{ color: 'white', fontSize: 18 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" fontWeight={700} sx={{ color: '#1a1a1a', fontSize: '1.125rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', lineHeight: 1.2 }}>
+                    OctaMind
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                    Powered by OctaMind
+                  </Typography>
+                </Box>
+              </Box>
+              <Box>
+                <Typography variant="h6" fontWeight={600} sx={{ color: '#1a1a1a', fontSize: '1rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                  {(() => {
+                    const hour = new Date().getHours();
+                    if (hour < 12) return 'Good Morning';
+                    if (hour < 17) return 'Good Afternoon';
+                    return 'Good Evening';
+                  })()}, {user?.firstName || user?.fullName || 'Student'}!
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                  Welcome back to your dashboard.
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                {format(new Date(), 'MMM dd, yyyy • h:mm a')}
+              </Typography>
+              <IconButton sx={{ color: '#6b7280' }}>
+                <Badge badgeContent={announcementsCount} color="primary">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+              <Avatar src={profileForm.profile_picture || user.imageUrl} alt="Profile" sx={{ width: 40, height: 40, border: '2px solid #E5E7EB' }} />
+            </Box>
+          </Toolbar>
+        </AppBar>
+
+        {/* Dark Navigation Menu */}
+        <Box sx={{ background: '#1E293B', px: { xs: 2, md: 4 }, py: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto' }}>
+            <Button
+              onClick={() => setSelectedSection('dashboard')}
         sx={{
-          width: 240,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: {
-            width: 240,
-            boxSizing: 'border-box',
-            background: '#002366',
-            color: '#ffffff',
-            border: 'none',
-            minHeight: '100vh',
-            boxShadow: '2px 0 8px 0 rgba(0,0,0,0.04)',
-            transition: 'all 0.5s',
-          },
-        }}
-      >
-        <Box display="flex" alignItems="center" p={2} mb={1}>
-          <DashboardIcon sx={{ mr: 1, color: '#ffffff', fontSize: 32 }} />
-          <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Welcome</Typography>
-        </Box>
-        <List sx={{ mt: 2 }}>
-          {sidebarLinks.map((link, idx) => (
-            <ListItem
-              button
-              key={link.text}
-              onClick={link.onClick}
-              sx={{
-                color: link.logout ? '#ff5252' : '#ffffff',
-                background: link.active ? '#001b4e' : 'none',
-                borderRadius: '30px 0 0 30px',
-                mb: 1,
-                fontWeight: link.active ? 600 : 400,
-                pl: 2,
-                pr: 1,
-                '&:hover': { background: link.logout ? '#fff0f0' : '#001b4e' },
-                transition: 'all 0.4s',
+                color: selectedSection === 'dashboard' ? '#3B82F6' : '#94A3B8',
+                background: 'transparent',
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                fontWeight: selectedSection === 'dashboard' ? 600 : 500,
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+                borderBottom: selectedSection === 'dashboard' ? '2px solid #3B82F6' : '2px solid transparent',
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  color: '#3B82F6',
+                },
+                minWidth: 'auto',
+                whiteSpace: 'nowrap',
               }}
             >
-              <ListItemIcon sx={{ color: link.logout ? '#ff5252' : '#ffffff', minWidth: 40 }}>{link.icon}</ListItemIcon>
-              <ListItemText primary={link.text} sx={{ '.MuiTypography-root': { fontSize: 16, fontWeight: 500, color: link.logout ? '#ff5252' : '#ffffff' } }} />
-            </ListItem>
-          ))}
-        </List>
-      </Drawer>
-
-      {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 3 }, minHeight: '100vh', background: theme.palette.background.default, fontFamily: 'Poppins, sans-serif' }}>
-        {/* Top Bar */}
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={4}
-          p={2}
-          borderRadius={2}
+              Dashboard
+            </Button>
+            <Button
+              onClick={() => setSelectedSection('exams')}
+              sx={{
+                color: selectedSection === 'exams' ? '#3B82F6' : '#94A3B8',
+                background: 'transparent',
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                fontWeight: selectedSection === 'exams' ? 600 : 500,
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+                borderBottom: selectedSection === 'exams' ? '2px solid #3B82F6' : '2px solid transparent',
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  color: '#3B82F6',
+                },
+                minWidth: 'auto',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Exams
+            </Button>
+            <Button
+              onClick={() => setSelectedSection('results')}
           sx={{
-            background: theme.palette.background.paper,
-            color: theme.palette.text.primary,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-            border: 'none',
-            fontFamily: 'Poppins, sans-serif',
-          }}
-        >
-          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>Student Dashboard</Typography>
-          <Box display="flex" alignItems="center" gap={2}>
-            <ThemeToggleButton />
-            <Avatar src={profileForm.profile_picture || user.imageUrl} alt="pro" sx={{ mr: 2, border: '2px solid #e3e6ef', width: 44, height: 44 }} />
-            <Typography variant="subtitle1" fontWeight={600} sx={{ color: theme.palette.text.primary, fontFamily: 'Poppins, sans-serif' }}>{user.firstName}</Typography>
+                color: selectedSection === 'results' ? '#3B82F6' : '#94A3B8',
+                background: 'transparent',
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                fontWeight: selectedSection === 'results' ? 600 : 500,
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+                borderBottom: selectedSection === 'results' ? '2px solid #3B82F6' : '2px solid transparent',
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  color: '#3B82F6',
+                },
+                minWidth: 'auto',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Results
+            </Button>
+            <Button
+              onClick={() => setSelectedSection('messages')}
+              sx={{
+                color: selectedSection === 'messages' ? '#3B82F6' : '#94A3B8',
+                background: 'transparent',
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                fontWeight: selectedSection === 'messages' ? 600 : 500,
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+                borderBottom: selectedSection === 'messages' ? '2px solid #3B82F6' : '2px solid transparent',
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  color: '#3B82F6',
+                },
+                minWidth: 'auto',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Messages
+            </Button>
+            <Button
+              onClick={() => setSelectedSection('settings')}
+              sx={{
+                color: selectedSection === 'settings' ? '#3B82F6' : '#94A3B8',
+                background: 'transparent',
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                fontWeight: selectedSection === 'settings' ? 600 : 500,
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+                borderBottom: selectedSection === 'settings' ? '2px solid #3B82F6' : '2px solid transparent',
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  color: '#3B82F6',
+                },
+                minWidth: 'auto',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Settings
+            </Button>
+            <Button
+              onClick={() => setSelectedSection('help')}
+              sx={{
+                color: selectedSection === 'help' ? '#3B82F6' : '#94A3B8',
+                background: 'transparent',
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                fontWeight: selectedSection === 'help' ? 600 : 500,
+                px: 2,
+                py: 1,
+                borderRadius: 1,
+                borderBottom: selectedSection === 'help' ? '2px solid #3B82F6' : '2px solid transparent',
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  color: '#3B82F6',
+                },
+                minWidth: 'auto',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Help
+            </Button>
+            <Box sx={{ ml: 'auto' }}>
+              <Button
+                onClick={() => setLogoutDialogOpen(true)}
+                sx={{
+                  color: '#EF4444',
+                  background: 'transparent',
+                  textTransform: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  px: 2,
+                  py: 1,
+                  borderRadius: 1,
+                  '&:hover': {
+                    background: 'rgba(239, 68, 68, 0.1)',
+                  },
+                  minWidth: 'auto',
+                }}
+                endIcon={<LogoutIcon sx={{ fontSize: 16 }} />}
+              >
+                LOG OUT
+              </Button>
+            </Box>
           </Box>
         </Box>
+
+        {/* Main Content Container */}
+        <div className="mx-auto max-w-[1280px] px-6 md:px-8 py-6 space-y-6">
 
         {/* Main Content Section Switcher */}
         {selectedSection === 'dashboard' && (
@@ -1218,8 +1462,13 @@ function StudentDashboardPageContent() {
         {selectedSection === 'exams' && (
           <>
             {/* Access Quiz by Code - moved to top */}
-            <Box mb={6} p={4} borderRadius={3} bgcolor={theme.palette.background.paper} boxShadow={1} border="none" sx={{ fontFamily: 'Poppins, sans-serif' }}>
-              <Typography variant="h6" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700 }}>Access Quiz by Code</Typography>
+            <StyledCard sx={{ mb: 6 }}>
+              <CardHeader
+                title="Access Quiz by Code"
+                titleTypographyProps={{ variant: 'h6', fontWeight: 700, color: 'text.primary' }}
+                sx={{ pb: 2 }}
+              />
+              <CardContent>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   label="Access Code"
@@ -1228,13 +1477,29 @@ function StudentDashboardPageContent() {
                   onChange={(e) => setAccessCode(e.target.value)}
                   error={!!codeError}
                   helperText={codeError}
-                  sx={{ fontFamily: 'Poppins, sans-serif' }}
-                />
-                <Button variant="contained" disabled={codeLoading} onClick={handleAccessCodeSubmit} sx={{ minWidth: 160, background: theme.palette.primary.main, color: '#fff', borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif', '&:hover': { background: theme.palette.primary.dark } }}>
+                    sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
+                  />
+                  <Button 
+                    variant="contained" 
+                    disabled={codeLoading} 
+                    onClick={handleAccessCodeSubmit} 
+                    sx={{ 
+                      minWidth: 160, 
+                      background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', 
+                      color: '#fff', 
+                      borderRadius: 2, 
+                      fontWeight: 600, 
+                      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', 
+                      '&:hover': { 
+                        background: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)' 
+                      } 
+                    }}
+                  >
                   {codeLoading ? 'Checking…' : 'Begin'}
                 </Button>
               </Stack>
-            </Box>
+              </CardContent>
+            </StyledCard>
             <Snackbar
               open={showCodeErrorSnackbar}
               autoHideDuration={3500}
@@ -1260,6 +1525,27 @@ function StudentDashboardPageContent() {
 
         {/* Results Section */}
         {selectedSection === 'results' && resultsContent}
+        </div>
+
+        {/* Footer */}
+        <Box sx={{ mt: 8, pt: 6, borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ width: 24, height: 24, borderRadius: '6px', background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <SchoolIcon sx={{ color: 'white', fontSize: 14 }} />
+              </Box>
+              <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+                OctaMind
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ color: '#9ca3af', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+              © {new Date().getFullYear()} OctaMind. All rights reserved.
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#9ca3af', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+              v1.0.0
+            </Typography>
+          </Box>
+        </Box>
       </Box>
 
       {/* Logout Confirmation Dialog */}
