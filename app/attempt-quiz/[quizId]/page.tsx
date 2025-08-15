@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -41,6 +41,67 @@ import {
   Collapse,
   Snackbar
 } from '@mui/material'
+import { Roboto_Slab, Inter, Poppins } from 'next/font/google'
+
+// Font configurations
+// UI Color tokens - Professional Exam Portal Theme
+const UI = {
+  bg: '#F8F9FA',          // light gray background
+  card: '#FFFFFF',        // pure white cards
+  border: '#DEE2E6',      // subtle gray border
+  text: '#212529',        // dark gray text
+  subtext: '#6C757D',     // medium gray text
+  muted: '#868E96',       // light gray text
+  shadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+
+  // brand - professional blue
+  primary: '#0D6EFD',     // Bootstrap blue
+  primaryHover: '#0B5ED7',
+  focus: '#0D6EFD',
+
+  // timer - professional colors
+  danger: '#DC3545',      // Bootstrap red
+  timerTrack: '#E9ECEF',
+  timerFill: '#0D6EFD',
+
+  // option states - subtle and professional
+  optBg: '#F8F9FA',
+  optHover: '#E9ECEF',
+  optSelectedBg: '#E7F3FF',
+  optSelectedBorder: '#0D6EFD',
+
+  // palette status colors - professional palette
+  answered: '#198754',    // Bootstrap green
+  unanswered: '#6C757D',  // Bootstrap gray
+  flagged: '#DC3545',     // Bootstrap red
+  review: '#FFC107',      // Bootstrap warning
+  current: '#0D6EFD',     // Bootstrap primary
+  
+  // legacy compatibility
+  navy: '#212529',
+  deepBlue: '#0D6EFD',
+  bookmarked: '#FD7E14',
+};
+
+const robotoSlab = Roboto_Slab({ 
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  display: 'swap'
+})
+
+const inter = Inter({ 
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap'
+})
+
+const poppins = Poppins({ 
+  subsets: ['latin'],
+  weight: ['600'],
+  display: 'swap'
+})
+
+import { CssBaseline } from '@mui/material'
 import { motion } from 'framer-motion'
 import { supabase } from '@/utils/supabaseClient'
 import { useUser } from '@clerk/nextjs'
@@ -135,17 +196,17 @@ const THEMES = {
 
 // Add navigation and difficulty color constants
 const NAV_COLORS = {
-  attempted: '#1976d2', // Blue for answered
-  unattempted: '#e0e0e0', // Light gray for unanswered
-  current: '#002366', // Deep blue for current
-  flagged: '#f44336', // Red for flagged
-  bookmarked: '#ffb300', // Amber for bookmarked
-  markedForReview: '#7b1fa2', // Purple for review
-  borderAttempted: '#1565c0',
-  borderUnattempted: '#bdbdbd',
-  borderCurrent: '#002366',
-  borderMarkedForReview: '#7b1fa2',
-  borderBookmarked: '#ffb300'
+  answered: UI.answered,
+  unattempted: UI.unanswered,
+  current: UI.current,
+  flagged: UI.flagged,
+  bookmarked: '#FB923C',        // orange outline
+  markedForReview: UI.review,
+  borderAttempted: '#15803D',
+  borderUnattempted: '#94A3B8',
+  borderCurrent: UI.current,
+  borderMarkedForReview: UI.review,
+  borderBookmarked: '#FB923C'
 }
 
 const QuestionButton = ({
@@ -156,6 +217,7 @@ const QuestionButton = ({
   isFlagged,
   isBookmarked,
   isMarkedForReview,
+  isVisited,
   onClick,
   disabled
 }: {
@@ -166,68 +228,82 @@ const QuestionButton = ({
   isFlagged: boolean
   isBookmarked: boolean
   isMarkedForReview: boolean
+  isVisited: boolean
   onClick: () => void
   disabled: boolean
 }) => {
-  // Determine color scheme
-  let bgcolor = NAV_COLORS.unattempted
-  let color = '#212121'
-  let border = `1px solid ${NAV_COLORS.borderUnattempted}`
-  
-  if (isCurrent) {
-    bgcolor = NAV_COLORS.current
-    border = `2px solid ${NAV_COLORS.borderCurrent}`
-    color = '#ffffff'
-  } else if (isMarkedForReview) {
-    bgcolor = NAV_COLORS.markedForReview
-    border = `1px solid ${NAV_COLORS.borderMarkedForReview}`
-    color = '#ffffff'
-  } else if (isBookmarked) {
-    bgcolor = NAV_COLORS.bookmarked
-    border = `1px solid ${NAV_COLORS.borderBookmarked}`
-  } else if (isAnswered) {
-    bgcolor = NAV_COLORS.attempted
-    border = `1px solid ${NAV_COLORS.borderAttempted}`
-    color = '#ffffff'
-  } else if (isFlagged) {
-    bgcolor = NAV_COLORS.flagged
-    border = `1px solid ${NAV_COLORS.borderUnattempted}`
-    color = '#ffffff'
-  }
+  // Determine color scheme based on new UI system
+  let bg = UI.unanswered, color = UI.text, border = `1px solid ${UI.border}`;
+  if (isCurrent) { bg = UI.current; color = '#fff'; border = `2px solid ${UI.current}`; }
+  else if (isMarkedForReview) { bg = UI.review; color = '#fff'; border = `1px solid ${UI.review}`; }
+  else if (isFlagged) { bg = UI.flagged; color = '#fff'; border = `1px solid ${UI.flagged}`; }
+  else if (isAnswered) { bg = UI.answered; color = '#fff'; border = `1px solid ${UI.answered}`; }
+  else if (isVisited && !isAnswered) { bg = UI.flagged; color = '#fff'; border = `1px solid ${UI.flagged}`; }
 
   return (
-    <Box position="relative" sx={{ display: 'inline-block', m: 0.5 }}>
+    <Box position="relative" sx={{ display: 'inline-block' }}>
       <Button
         size="small"
         variant="contained"
         sx={{
-          minWidth: 36,
-          minHeight: 36,
-          borderRadius: '4px',
-          fontSize: '0.875rem',
-          fontWeight: isCurrent ? 700 : 500,
-          boxShadow: isCurrent ? 2 : 0,
+          width: 40, height: 40, minWidth: 40, minHeight: 40,
+          borderRadius: 2,
+          fontSize: 14,
+          fontWeight: 800,
+          lineHeight: 1,
+          bgcolor: bg,
+          color,
           border,
-          bgcolor,
-          color: isAnswered ? 'primary' : 'inherit',
-          transition: 'all 0.2s',
-          p: 0,
-          '&:hover': {
-            transform: 'scale(1.05)'
-          }
+          boxShadow: 'none',
+          '&:hover': { filter: 'brightness(.98)' },
+          '&:focus-visible': { outline: `3px solid ${UI.focus}`, outlineOffset: 2 }
         }}
         onClick={onClick}
         disabled={disabled}
       >
         {idx + 1}
       </Button>
+      
+      {/* Status indicators */}
       {isFlagged && (
-        <FlagIcon sx={{
+        <Box sx={{
           position: 'absolute',
-          top: -6,
-          right: -6,
-          color: '#f44336',
-          fontSize: '0.75rem'
+          top: -3,
+          right: -3,
+          width: 10,
+          height: 10,
+          backgroundColor: UI.flagged,
+          borderRadius: '50%',
+          border: '1px solid #fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+        }} />
+      )}
+      
+      {isBookmarked && (
+        <Box sx={{
+          position: 'absolute',
+          top: -3,
+          right: -3,
+          width: 10,
+          height: 10,
+          backgroundColor: UI.bookmarked,
+          borderRadius: '50%',
+          border: '1px solid #fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+        }} />
+      )}
+      
+      {isMarkedForReview && (
+        <Box sx={{
+          position: 'absolute',
+          top: -3,
+          right: -3,
+          width: 10,
+          height: 10,
+          backgroundColor: UI.review,
+          borderRadius: '50%',
+          border: '1px solid #fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
         }} />
       )}
     </Box>
@@ -247,6 +323,7 @@ export default function AttemptQuizPage() {
   const [flagged, setFlagged] = useState<Record<number, boolean>>({})
   const [bookmarked, setBookmarked] = useState<Record<number, boolean>>({})
   const [markedForReview, setMarkedForReview] = useState<Record<number, boolean>>({})
+  const [visitedQuestions, setVisitedQuestions] = useState<Record<number, boolean>>({})
   const [currentSection, setCurrentSection] = useState<number | null>(null)
   const [currentQuestionId, setCurrentQuestionId] = useState<number>(0)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
@@ -278,6 +355,8 @@ export default function AttemptQuizPage() {
   const [showLastMinuteWarning, setShowLastMinuteWarning] = useState(false)
   const [restoredNotification, setRestoredNotification] = useState(false)
   const [showSubmitThankYou, setShowSubmitThankYou] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
 
   // Refs
   const questionRefs = useRef<Record<number, HTMLDivElement | null>>({})
@@ -399,7 +478,7 @@ export default function AttemptQuizPage() {
         // Load saved state
         const savedState = localStorage.getItem(`quiz-${quizId}-state`)
         if (savedState) {
-          const { answers, flags, bookmarks, reviews } = JSON.parse(savedState)
+          const { answers, flags, bookmarks, reviews, visited } = JSON.parse(savedState)
           // Ensure all indices are numbers
           const fixedAnswers: Record<number, number[]> = {};
           for (const [qid, arr] of Object.entries(answers || {})) {
@@ -409,14 +488,9 @@ export default function AttemptQuizPage() {
           setFlagged(typeof flags === 'string' ? JSON.parse(flags) : (flags || {}))
           setBookmarked(typeof bookmarks === 'string' ? JSON.parse(bookmarks) : (bookmarks || {}))
           setMarkedForReview(typeof reviews === 'string' ? JSON.parse(reviews) : (reviews || {}))
-          // Only show restored notification if there is actual data
-          const hasRestored = (
-            Object.keys(fixedAnswers).length > 0 ||
-            Object.keys(flags || {}).length > 0 ||
-            Object.keys(bookmarks || {}).length > 0 ||
-            Object.keys(reviews || {}).length > 0
-          );
-          setRestoredNotification(hasRestored);
+          setVisitedQuestions(typeof visited === 'string' ? JSON.parse(visited) : (visited || {}))
+          // Don't show restored notification - answers are restored silently
+          setRestoredNotification(false);
         } else {
           setRestoredNotification(false);
         }
@@ -424,8 +498,6 @@ export default function AttemptQuizPage() {
         if ((sectionData || []).length > 0) {
           setCurrentSection(sectionData[0].id)
         }
-
-        setRestoredNotification(true);
       } catch (error) {
         console.error('Error loading quiz:', error, JSON.stringify(error, null, 2));
         setErrorPopup('Failed to load quiz. Please try again.');
@@ -481,6 +553,8 @@ export default function AttemptQuizPage() {
   // Navigation handlers
   const goToQuestion = (questionId: number) => {
     setCurrentQuestionId(questionId);
+    // Mark question as visited
+    setVisitedQuestions(prev => ({ ...prev, [questionId]: true }));
     // Find the section of the selected question
     const q = questions.find(q => q.id === questionId);
     if (q) setCurrentSection(q.section_id);
@@ -496,6 +570,8 @@ export default function AttemptQuizPage() {
       const nextQ = questions[idx + 1];
       setCurrentQuestionId(nextQ.id);
       setCurrentSection(nextQ.section_id);
+      // Mark next question as visited
+      setVisitedQuestions(prev => ({ ...prev, [nextQ.id]: true }));
     }
   };
 
@@ -505,6 +581,8 @@ export default function AttemptQuizPage() {
       const prevQ = questions[idx - 1];
       setCurrentQuestionId(prevQ.id);
       setCurrentSection(prevQ.section_id);
+      // Mark previous question as visited
+      setVisitedQuestions(prev => ({ ...prev, [prevQ.id]: true }));
     }
   };
 
@@ -527,8 +605,17 @@ export default function AttemptQuizPage() {
     setAnswers(prev => {
       let newAnswers;
       if (questionType === 'single') {
-        newAnswers = { ...prev, [questionId]: [optionIdx] };
+        // For single choice: allow unselecting by clicking the same option again
+        const currentAnswers = prev[questionId] || [];
+        if (currentAnswers.includes(optionIdx)) {
+          // If clicking the same option, unselect it
+          newAnswers = { ...prev, [questionId]: [] };
+        } else {
+          // Otherwise, select the new option
+          newAnswers = { ...prev, [questionId]: [optionIdx] };
+        }
       } else {
+        // For multiple choice: toggle selection
         const currentAnswers = prev[questionId] || [];
         newAnswers = {
           ...prev,
@@ -746,6 +833,7 @@ export default function AttemptQuizPage() {
           flagged: progress.flagged,
           bookmarked: progress.bookmarked,
           marked_for_review: progress.markedForReview,
+          visited: progress.visited,
           start_time: (() => {
             const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
             if (!startTime) return undefined;
@@ -760,9 +848,13 @@ export default function AttemptQuizPage() {
 
   // Watch for changes and auto-save
   useEffect(() => {
-    debouncedSaveProgress({ answers, flagged, bookmarked, markedForReview });
+    setIsAutoSaving(true);
+    debouncedSaveProgress({ answers, flagged, bookmarked, markedForReview, visited: visitedQuestions });
+    // Hide indicator after 2 seconds
+    const timer = setTimeout(() => setIsAutoSaving(false), 2000);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answers, flagged, bookmarked, markedForReview, currentQuestionId]);
+  }, [answers, flagged, bookmarked, markedForReview, visitedQuestions, currentQuestionId]);
 
   // Throttled saveProgress function (at most once every 2 seconds)
   const throttledSaveProgress = useCallback(
@@ -775,6 +867,7 @@ export default function AttemptQuizPage() {
         flagged: flagged || {},
         bookmarked: bookmarked || {},
         marked_for_review: markedForReview || {},
+        visited: visitedQuestions || {},
         start_time: (() => {
           const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
           if (!startTime) return undefined;
@@ -790,7 +883,7 @@ export default function AttemptQuizPage() {
         body: JSON.stringify(payload)
       });
     }, 2000),
-    [quizId, user?.id, answers, flagged, bookmarked, markedForReview]
+    [quizId, user?.id, answers, flagged, bookmarked, markedForReview, visitedQuestions]
   );
 
   // Save progress (throttled) on any change
@@ -810,6 +903,7 @@ export default function AttemptQuizPage() {
         flagged: flagged || {},
         bookmarked: bookmarked || {},
         marked_for_review: markedForReview || {},
+        visited: visitedQuestions || {},
         start_time: (() => {
           const startTime = localStorage.getItem(`quiz-${quizId}-startTime`);
           if (!startTime) return undefined;
@@ -829,7 +923,7 @@ export default function AttemptQuizPage() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [quizId, user?.id, answers, flagged, bookmarked, markedForReview]);
+  }, [quizId, user?.id, answers, flagged, bookmarked, markedForReview, visitedQuestions]);
 
   // Backend validation: On submission, check time and attempt count
   const confirmSubmit = async () => {
@@ -1181,7 +1275,258 @@ export default function AttemptQuizPage() {
     }
   }, [questions, answers]);
 
+  // Toast notifications for exam progress (reduced frequency)
+  useEffect(() => {
+    if (!timeLeft || !totalTime) return;
+    
+    const progressPercentage = ((totalTime - timeLeft) / totalTime) * 100;
+    const answeredCount = Object.keys(answers).length;
+    
+    // Only show time warning once at 80% completion
+    if (progressPercentage >= 80 && progressPercentage < 81 && !showLastMinuteWarning) {
+      const minutesLeft = Math.ceil(timeLeft / 60);
+      setToastMessage(`Only ${minutesLeft} minutes left!`);
+      setShowLastMinuteWarning(true); // Prevent showing again
+    }
+    
+    // Only show progress message once every 10 questions (instead of 5)
+    if (answeredCount > 0 && answeredCount % 10 === 0 && !toastMessage) {
+      setToastMessage('Nice work! Keep going.');
+    }
+    
+    // Only show motivation message once at 15 min mark
+    if (totalTime >= 3600 && timeLeft <= 900 && timeLeft > 840 && !toastMessage) {
+      setToastMessage('Breathe & refocus — you\'re doing great.');
+    }
+  }, [timeLeft, totalTime, answers, showLastMinuteWarning, toastMessage]);
 
+  // Auto-hide toast after 2 seconds (faster)
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') goToNextQuestionFlat();
+      if (e.key === 'ArrowLeft') goToPrevQuestionFlat();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [currentQuestionId, questions]);
+
+  // Letter badge component for options
+  const letterBadge = (char: string) => (
+    <Box sx={{
+      width: 36, height: 36, borderRadius: '50%',
+      display: 'grid', placeItems: 'center',
+      fontWeight: 700, color: UI.text,
+      border: `1px solid ${UI.border}`, background: '#FFF', mr: 2
+    }}>{char}</Box>
+  );
+
+  // Create a helper component for the palette body
+  const PaletteBody = () => (
+    <Box sx={{ p: 2, backgroundColor: '#F8F9FA' }}>
+
+
+      {/* Header */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 2,
+          background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+          pb: 10/8,
+          mb: 1,
+          borderRadius: 2,
+          p: 1.5,
+          border: `1px solid ${UI.border}`,
+        }}
+      >
+        <Typography
+          sx={{
+            fontFamily: inter.style.fontFamily,
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: .2,
+            color: UI.navy,
+            textAlign: 'center',
+          }}
+        >
+          Question Palette
+        </Typography>
+      </Box>
+
+      {/* Sections */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, pb: 6 }}>
+        {sections.map((section) => {
+          const sectionQuestions = questionsBySection[section.id] || []
+          const sectionAnswered = sectionQuestions.filter((q) => answers[q.id]).length
+          const sectionMarks =
+            typeof section.marks === 'number'
+              ? section.marks
+              : sectionQuestions.reduce((sum, q) => sum + (typeof q.marks === 'number' ? q.marks : 1), 0)
+
+          return (
+            <Box
+              key={section.id}
+              sx={{
+                border: `1px solid ${UI.border}`,
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: 0,
+                p: 1,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              }}
+            >
+              {/* Section header (smaller, neutral) */}
+              <Box
+                onClick={() => toggleSection(section.id)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1,
+                  px: 1,
+                  py: .75,
+                  borderRadius: 0,
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                  border: `1px solid ${UI.border}`,
+                  '&:hover': { 
+                    background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontFamily: inter.style.fontFamily,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: UI.text,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {section.name}
+                </Typography>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: .75 }}>
+                  <Chip
+                    label={`${sectionAnswered}/${sectionQuestions.length}`}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: 11,
+                      background: 'linear-gradient(135deg, #0B5FFF 0%, #0A53E4 100%)',
+                      color: '#ffffff',
+                      borderRadius: 0,
+                      fontWeight: 700,
+                      boxShadow: '0 2px 4px rgba(11, 95, 255, 0.3)',
+                    }}
+                  />
+                                    <Typography variant="caption" sx={{ color: UI.muted, fontSize: 11, fontFamily: inter.style.fontFamily }}>
+                            {sectionMarks} Marks
+                          </Typography>
+                  {expandedSections[section.id] ? (
+                    <ExpandMoreIcon sx={{ fontSize: 18, color: UI.muted }} />
+                  ) : (
+                    <ChevronRightIcon sx={{ fontSize: 18, color: UI.muted }} />
+                  )}
+                </Box>
+              </Box>
+
+              {/* EXACT 5-column grid */}
+              <Collapse in={expandedSections[section.id]} timeout="auto" unmountOnExit>
+                <Box
+                  sx={{
+                    mt: 1,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(5, 1fr)',
+                    gap: 1.5,
+                    alignItems: 'start',
+                  }}
+                >
+                                      {sectionQuestions.map((q, idx) => (
+                      <QuestionButton
+                        key={q.id}
+                        q={q}
+                        idx={idx}
+                        isCurrent={currentQuestionId === q.id}
+                        isAnswered={!!answers[q.id]}
+                        isFlagged={!!flagged[q.id]}
+                        isBookmarked={!!bookmarked[q.id]}
+                        isMarkedForReview={!!markedForReview[q.id]}
+                        isVisited={!!visitedQuestions[q.id]}
+                        onClick={() => goToQuestion(q.id)}
+                        disabled={submitted}
+                      />
+                    ))}
+                </Box>
+              </Collapse>
+            </Box>
+          )
+        })}
+      </Box>
+
+      {/* Sticky footer: actions + legend (tiny) */}
+      <Box
+        sx={{
+          position: 'sticky',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: `linear-gradient(180deg, rgba(241,245,249,0), #f1f5f9 30%)`,
+          pt: 1.5,
+          borderTop: `1px solid ${UI.border}`,
+          borderRadius: '0',
+        }}
+      >
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            fullWidth
+            sx={{ borderColor: UI.primary, color: UI.primary, fontSize: 12, fontWeight: 700 }}
+            onClick={() => {}}
+          >
+            REVIEW
+          </Button>
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={handleSubmit}
+            startIcon={<CheckCircleIcon />}
+            sx={{ background: UI.primary, '&:hover': { background: UI.primaryHover }, fontSize: 12, fontWeight: 800 }}
+          >
+            SUBMIT
+        </Button>
+        </Box>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, mt: 1 }}>
+                    {[
+            { c: UI.answered, t: 'Answered' },
+            { c: UI.flagged, t: 'Unanswered' },
+            { c: UI.review, t: 'Review' },
+            { c: UI.unanswered, t: 'Not Visited' },
+          ].map(({ c, t }) => (
+            <Box key={t} sx={{ display: 'flex', alignItems: 'center', gap: .75 }}>
+              <Box sx={{ width: 12, height: 12, borderRadius: 3, background: c, border: `1px solid ${UI.border}` }} />
+              <Typography variant="caption" sx={{ color: UI.muted, fontSize: 10, fontFamily: inter.style.fontFamily }}>{t}</Typography>
+                </Box>
+          ))}
+        </Box>
+      </Box>
+    </Box>
+  );
 
   if (loading) {
     return (
@@ -1192,77 +1537,23 @@ export default function AttemptQuizPage() {
   }
 
   return (
-    <Box sx={{
-      fontFamily: 'Poppins, sans-serif',
-      backgroundColor: currentTheme.background,
-      color: currentTheme.text,
-      minHeight: '100vh',
-      transition: 'background-color 0.3s, color 0.3s',
-      // Disable text selection for exam security
-      userSelect: 'none',
-      WebkitUserSelect: 'none',
-      MozUserSelect: 'none',
-      msUserSelect: 'none',
-      // Watermark background
-      position: 'relative',
-      zIndex: 0,
-    }}>
-      {/* Watermark Layer */}
-      <Box
-        aria-hidden="true"
-        sx={{
-          pointerEvents: 'none',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
+    <>
+      <CssBaseline />
+      <Box sx={{ fontFamily: `${inter.style.fontFamily}, system-ui, -apple-system, Segoe UI, Roboto, Arial` }}>
+        <Box sx={{
+          backgroundColor: '#F8F9FA',
+          color: UI.text,
+          minHeight: '100vh',
+          transition: 'background-color 0.3s, color 0.3s',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          MozUserSelect: 'none',
+          msUserSelect: 'none',
+          position: 'relative',
           zIndex: 0,
-          opacity: 0.13,
-          backgroundImage: `repeating-linear-gradient(135deg, transparent 0 60px, rgba(0,0,0,0.01) 60px 80px, transparent 80px 120px), repeating-linear-gradient(45deg, transparent 0 60px, rgba(0,0,0,0.01) 60px 80px, transparent 80px 120px)`,
-        }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            flexWrap: 'wrap',
-            zIndex: 0,
-            pointerEvents: 'none',
-            opacity: 0.18,
-            userSelect: 'none',
-          }}
-        >
-          {Array.from({ length: 12 }).map((_, row) => (
-            <Box key={row} sx={{ width: '100vw', display: 'flex', justifyContent: 'space-between', mb: 0 }}>
-              {Array.from({ length: 4 }).map((_, col) => (
-                <Typography
-                  key={col}
-                  sx={{
-                    fontSize: { xs: '2.2rem', sm: '2.8rem', md: '3.2rem' },
-                    fontWeight: 700,
-                    color: '#002366',
-                    opacity: 0.13,
-                    transform: `rotate(-25deg)`,
-                    whiteSpace: 'nowrap',
-                    mx: 6,
-                    my: 2,
-                    userSelect: 'none',
-                  }}
-                >
-                  {(user?.fullName || 'Anonymous')}
-                </Typography>
-              ))}
-            </Box>
-          ))}
-        </Box>
-      </Box>
-      {/* Offline Overlay */}
-      {isOffline && (
+        }}>
+          {/* Offline Overlay */}
+          {isOffline && (
         <Box
           sx={{
             position: 'fixed',
@@ -1287,327 +1578,240 @@ export default function AttemptQuizPage() {
           </Typography>
         </Box>
       )}
-      {/* Header */}
-      <Box sx={{
-        backgroundColor: currentTheme.primary,
-        color: '#ffffff',
-        p: 2,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        boxShadow: 2
-      }}>
-        <Typography variant="h5" fontWeight="bold">
-          {quiz?.quiz_title || 'Exam'}
-        </Typography>
-        
-        <Box display="flex" alignItems="center" gap={2}>
+      
+                    {/* Top bar */}
+        <Box sx={{
+          backgroundColor: '#495057',
+          color: '#ffffff',
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          position: 'sticky',
+          top: 0,
+          zIndex: 1000,
+          boxShadow: UI.shadow,
+          gap: 1,
+        }}>
+          {/* Quiz Title */}
+          <Typography sx={{ fontSize: 18, fontWeight: 700, fontFamily: inter.style.fontFamily }}>{quiz?.quiz_title || 'Exam'}</Typography>
+
+          {/* Timer - Centered and Compact */}
           <Box sx={{
-            backgroundColor: timeLeft && timeLeft <= 60 ? '#f44336' : currentTheme.primary,
-            color: '#ffffff',
-            px: 2,
-            py: 1,
-            borderRadius: 2,
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            transition: 'background-color 0.3s'
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 2,
+            px: 3, 
+            py: 1.5, 
+            borderRadius: 3,
+            border: '2px solid rgba(255,255,255,.35)',
+            backgroundColor: 'rgba(255,255,255,.12)',
+            minWidth: 280, 
+            justifyContent: 'center',
           }}>
-            <TimerIcon />
-            <span>{formatTime(timeLeft || 0)}</span>
+                        <Typography sx={{ 
+              fontSize: 14, 
+              fontWeight: 600,
+              color: 'rgba(255,255,255,0.9)',
+              fontFamily: inter.style.fontFamily
+            }}>
+              Time Left
+            </Typography>
+            <Typography sx={{ 
+              fontSize: 20, 
+              fontWeight: 700,
+              color: UI.danger,
+              fontFamily: inter.style.fontFamily
+            }}>
+              {formatTime(timeLeft || 0)}
+                  </Typography>
+            <Box sx={{ 
+              width: 1, 
+              height: 20, 
+              backgroundColor: 'rgba(255,255,255,0.4)',
+              borderRadius: 1
+            }} />
+                        <Typography sx={{ 
+              fontSize: 16, 
+              fontWeight: 600,
+              color: 'rgba(255,255,255,0.8)',
+              fontFamily: inter.style.fontFamily
+            }}>
+              {formatTime(totalTime || 0)}
+                  </Typography>
           </Box>
-          
-          <IconButton onClick={toggleFullscreen} color="inherit">
-            {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-          </IconButton>
-          
-          <Avatar src={user?.imageUrl} alt={user?.fullName || 'User'} />
         </Box>
+
+      {/* Progress: fills left→right */}
+      <Box sx={{ height: 4, bgcolor: UI.timerTrack }}>
+        <Box sx={{
+          height: 4, width: `${timerProgress}%`,
+          background: UI.timerFill,
+          transition: 'width .4s ease',
+          borderTopRightRadius: 4, borderBottomRightRadius: 4
+        }} />
       </Box>
 
-      {/* Main Content */}
-      <Box display="flex" sx={{ height: 'calc(100vh - 64px)' }}>
-        {/* Navigation Sidebar */}
-        <Drawer
-          variant="persistent"
-          open={showNavigationPanel}
-          sx={{
-            width: showNavigationPanel ? 320 : 0,
-            flexShrink: 0,
-            '& .MuiDrawer-paper': {
-              width: 320,
-              boxSizing: 'border-box',
-              backgroundColor: currentTheme.background,
-              borderRight: `1px solid ${currentTheme.secondary}`,
-              overflowY: 'auto'
-            },
+              {/* Main Content - Two Column Layout */}
+                      <Box 
+                        sx={{
+            height: 'calc(100vh - 80px)',
+                          display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: '1fr 400px' },
+            gap: { xs: 0, md: 2 },
+            overflow: 'hidden',
+            backgroundColor: '#F8F9FA'
           }}
         >
-          <Box sx={{ p: 2 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6" fontWeight="bold">
-                Question Navigation
-              </Typography>
-              <IconButton onClick={() => setShowNavigationPanel(false)} size="small">
-                <ChevronRightIcon />
-              </IconButton>
-            </Box>
-
-            <Box display="flex" gap={1} mb={3} flexWrap="wrap">
-              <Chip 
-                label={`Answered: ${answeredCount}`} 
-                size="small" 
-                sx={{ 
-                  backgroundColor: NAV_COLORS.attempted, 
-                  color: '#fff',
-                  fontWeight: 'bold'
-                }} 
-              />
-              <Chip 
-                label={`Unanswered: ${questions.length - answeredCount}`} 
-                size="small" 
-                sx={{ 
-                  backgroundColor: NAV_COLORS.unattempted,
-                  border: `1px solid ${NAV_COLORS.borderUnattempted}`,
-                  fontWeight: 'bold'
-                }} 
-              />
-              <Chip 
-                label={`Flagged: ${Object.values(flagged).filter(Boolean).length}`} 
-                size="small" 
-                sx={{ 
-                  backgroundColor: NAV_COLORS.flagged, 
-                  color: '#fff',
-                  fontWeight: 'bold'
-                }} 
-              />
-            </Box>
-
-            {/* Sections with expandable questions */}
-            <List sx={{ width: '100%' }}>
-              {sections.map((section) => {
-                const sectionQuestionsList = questionsBySection[section.id] || []
-                const sectionAnswered = sectionQuestionsList.filter((q: Question) => answers[q.id]).length
-                const sectionFlagged = sectionQuestionsList.filter((q: Question) => flagged[q.id]).length
-
-                const sectionMarks = typeof section.marks === 'number'
-                  ? section.marks
-                  : sectionQuestionsList.reduce((sum, q) => sum + (typeof q.marks === 'number' ? q.marks : 1), 0);
-
-                return (
-                  <Box key={section.id} sx={{ mb: 1 }}>
-                    <ListItem 
-                      button 
-                      onClick={() => toggleSection(section.id)}
-                      sx={{
-                        backgroundColor: currentSection === section.id ? `${currentTheme.primary}20` : 'transparent',
-                        borderRadius: 1,
-                        '&:hover': {
-                          backgroundColor: `${currentTheme.primary}10`
-                        }
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        {expandedSections[section.id] ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={
-                          <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Typography fontWeight="bold">
-                              {section.name}
-                            </Typography>
-                            <Box display="flex" gap={1}>
-                              <Chip 
-                                label={`${sectionAnswered}/${sectionQuestionsList.length}`}
-                                size="small"
-                                sx={{
-                                  backgroundColor: sectionAnswered === sectionQuestionsList.length 
-                                    ? NAV_COLORS.attempted 
-                                    : sectionAnswered > 0 
-                                      ? `${NAV_COLORS.attempted}80`
-                                      : NAV_COLORS.unattempted,
-                                  color: sectionAnswered === sectionQuestionsList.length || sectionAnswered > 0 
-                                    ? '#fff' 
-                                    : 'inherit',
-                                  fontSize: '0.7rem',
-                                  height: 20
-                                }}
-                              />
-                              {sectionFlagged > 0 && (
-                                <Chip 
-                                  label={sectionFlagged}
-                                  size="small"
-                                  sx={{
-                                    backgroundColor: NAV_COLORS.flagged,
-                                    color: '#fff',
-                                    fontSize: '0.7rem',
-                                    height: 20
-                                  }}
-                                />
-                              )}
-                            </Box>
-                          </Box>
-                        }
-                        secondary={`${sectionQuestionsList.length} Questions | ${sectionMarks} Marks`}
-                      />
-                    </ListItem>
-
-                    <Collapse in={expandedSections[section.id]} timeout="auto" unmountOnExit>
-                      <Box sx={{ 
-                        pl: 6, 
-                        pr: 2, 
-                        pt: 1,
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 0.5
-                      }}>
-                        {sectionQuestionsList.map((q: Question, idx: number) => {
-                          return (
-                            <Box key={q.id} display="flex" alignItems="center" gap={1}>
-                              <QuestionButton
-                                q={q}
-                                idx={idx}
-                                isCurrent={currentQuestionId === q.id}
-                                isAnswered={!!answers[q.id]}
-                                isFlagged={!!flagged[q.id]}
-                                isBookmarked={!!bookmarked[q.id]}
-                                isMarkedForReview={!!markedForReview[q.id]}
-                                onClick={() => goToQuestion(q.id)}
-                                disabled={submitted}
-                              />
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    </Collapse>
-                  </Box>
-                )
-              })}
-            </List>
-
-            <Button
-              variant="contained"
-              color="primary"
-              fullWidth
-              sx={{ mt: 2, fontWeight: 'bold' }}
-              onClick={handleSubmit}
-              disabled={submitted}
-              startIcon={<CheckCircleIcon />}
-            >
-              Submit Exam
-            </Button>
-
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                Navigation Legend:
-              </Typography>
-              <Box display="flex" flexDirection="column" gap={1}>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Box sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '4px',
-                    backgroundColor: NAV_COLORS.attempted,
-                    border: `1px solid ${NAV_COLORS.borderAttempted}`
-                  }} />
-                  <Typography variant="body2">Answered</Typography>
-                </Box>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Box sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '4px',
-                    backgroundColor: NAV_COLORS.unattempted,
-                    border: `1px solid ${NAV_COLORS.borderUnattempted}`
-                  }} />
-                  <Typography variant="body2">Unanswered</Typography>
-                </Box>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Box sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '4px',
-                    backgroundColor: NAV_COLORS.current,
-                    border: `1px solid ${NAV_COLORS.borderCurrent}`
-                  }} />
-                  <Typography variant="body2">Current</Typography>
-                </Box>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Box sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '4px',
-                    backgroundColor: NAV_COLORS.flagged,
-                    border: `1px solid ${NAV_COLORS.borderUnattempted}`,
-                    position: 'relative'
-                  }}>
-                    <FlagIcon sx={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      color: '#f44336',
-                      fontSize: '0.75rem'
-                    }} />
-                  </Box>
-                  <Typography variant="body2">Flagged</Typography>
-                </Box>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Box sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '4px',
-                    backgroundColor: NAV_COLORS.markedForReview,
-                    border: `1px solid ${NAV_COLORS.borderMarkedForReview}`
-                  }} />
-                  <Typography variant="body2">Marked for Review</Typography>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-        </Drawer>
-
-        {/* Question Area */}
-        <Box sx={{
-          flexGrow: 1,
+        {/* Question Area - Left Column */}
+        <Box
+                sx={{
+            gridColumn: '1 / 2',
           overflowY: 'auto',
-          p: 3,
+          p: { xs: 2, sm: 3, md: 4 },
+          backgroundColor: '#F8F9FA',
           ...fontSizeStyles[fontSize]
-        }}>
+          }}
+        >
           {/* Current Section Header */}
           {sections.filter((s) => s.id === currentSection).map((section) => (
-            <Card key={section.id} sx={{ 
+            <Box key={section.id} sx={{ 
               mb: 3,
-              backgroundColor: currentTheme.primary,
-              color: '#fff',
+              backgroundColor: '#E9ECEF',
+              color: UI.text,
+              borderRadius: 8,
+              boxShadow: 'none',
+              border: `1px solid ${UI.border}`,
+              p: 2,
             }}>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography sx={{ fontFamily: inter.style.fontFamily, fontSize: 18, fontWeight: 800, color: UI.text }}>
                   {section.name}
                 </Typography>
-                {section.description && (
-                  <Typography variant="body1" sx={{ mb: 1 }}>
-                    {section.description}
+                <Chip 
+                  label={`${questionsBySection[section.id]?.length || 0} questions`}
+                  size="small"
+                  sx={{ 
+                    backgroundColor: UI.primary, 
+                    color: 'white',
+                    fontSize: '10px',
+                    height: 20
+                  }}
+                />
+              </Box>
+              {section.description && (
+                <Typography sx={{ fontSize: 12, color: UI.muted, mt: .5 }}>
+                  {section.description}
+                </Typography>
+              )}
+              {section.instructions && showSectionInstructions && (
+                <Box sx={{ 
+                  mt: 1.5,
+                  p: 1.5,
+                  backgroundColor: UI.card,
+                  borderRadius: 8,
+                  border: `1px solid ${UI.border}`
+                }}>
+                  <Typography 
+                    sx={{
+                      fontFamily: inter.style.fontFamily,
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: UI.text,
+                      mb: .5
+                    }}
+                  >
+                    Section Instructions:
                   </Typography>
-                )}
-                {section.instructions && showSectionInstructions && (
-                  <Box sx={{ 
-                    mt: 2,
-                    p: 2,
-                    backgroundColor: '#ffffff20',
-                    borderRadius: 1
-                  }}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      Section Instructions:
-                    </Typography>
-                    <Typography variant="body2">
-                      {section.instructions}
-                    </Typography>
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
+                  <Typography 
+                    sx={{
+                      fontFamily: inter.style.fontFamily,
+                      fontSize: '11px',
+                      fontWeight: 400,
+                      color: UI.muted,
+                      lineHeight: 1.4
+                    }}
+                  >
+                    {section.instructions}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           ))}
+
+          {/* Progress Bar */}
+          <Box sx={{ mb: 3, textAlign: 'center' }}>
+            <Typography sx={{ 
+              fontSize: 14, 
+              fontWeight: 600, 
+              color: UI.muted, 
+              mb: 1,
+              fontFamily: inter.style.fontFamily
+            }}>
+              Progress: {Math.round((Object.keys(answers).length / questions.length) * 100)}%
+            </Typography>
+            <Box sx={{ 
+              width: '100%', 
+              maxWidth: 400, 
+              height: 8, 
+              backgroundColor: UI.border, 
+              borderRadius: 4,
+              mx: 'auto',
+              overflow: 'hidden'
+            }}>
+              <Box sx={{
+                height: '100%',
+                width: `${(Object.keys(answers).length / questions.length) * 100}%`,
+                backgroundColor: UI.primary,
+                borderRadius: 4,
+                transition: 'width 0.3s ease'
+              }} />
+            </Box>
+            
+            {/* Auto-save Indicator */}
+            {isAutoSaving && (
+                          <Typography variant="caption" sx={{ 
+              color: UI.primary, 
+              fontStyle: 'italic',
+              mt: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.5,
+              fontFamily: inter.style.fontFamily
+            }}>
+              <CircularProgress size={12} sx={{ color: UI.primary }} />
+              Saving progress...
+            </Typography>
+            )}
+          </Box>
+
+          {/* Question counter */}
+          <Typography sx={{ 
+            fontSize: 16, 
+            fontWeight: 800, 
+            color: UI.primary, 
+            mb: 2,
+            textAlign: 'center',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            fontFamily: inter.style.fontFamily
+          }}>
+            Question {questions.findIndex(q => q.id === currentQuestion.id) + 1} of {questions.length}
+            {currentQuestion.marks && (
+              <Box component="span" sx={{ 
+                ml: 1, 
+                fontSize: '14px', 
+                fontWeight: 600, 
+                color: UI.muted,
+                textTransform: 'none',
+                letterSpacing: 'normal',
+                fontFamily: inter.style.fontFamily
+              }}>
+                • {currentQuestion.marks} mark{currentQuestion.marks > 1 ? 's' : ''}
+              </Box>
+            )}
+          </Typography>
 
           {/* Render only the current question, not all questions in the current section */}
           {currentQuestion && (
@@ -1616,46 +1820,34 @@ export default function AttemptQuizPage() {
               ref={(el: HTMLDivElement | null) => { questionRefs.current[currentQuestion.id] = el; }}
               id={`question-${currentQuestion.id}`}
               sx={{
-                mb: 4,
-                p: 3,
-                borderRadius: 2,
-                backgroundColor: currentTheme.background,
-                border: `2px solid ${currentTheme.primary}`,
-                boxShadow: 3,
-                transition: 'all 0.3s',
+                mb: { xs: 3, sm: 4 },
+                p: { xs: 3, sm: 4 },
+                borderRadius: '12px',
+                backgroundColor: '#FFFFFF',
+                border: `1px solid ${UI.border}`,
+                boxShadow: UI.shadow,
+                transition: 'all 0.3s ease',
                 position: 'relative'
               }}
             >
-              {/* Question number with section prefix */}
-              <Typography variant="subtitle2" sx={{
-                position: 'absolute',
-                top: 8,
-                right: 8,
-                backgroundColor: currentTheme.primary,
-                color: '#fff',
-                px: 1,
-                borderRadius: 1,
-                fontWeight: 'bold'
-              }}>
-                Q-{questions.findIndex(q => q.id === currentQuestion.id) + 1}
-              </Typography>
+
 
               {/* Question Image */}
               {currentQuestion.image && (
-                <Box display="flex" justifyContent="center" mb={2}>
+                <Box display="flex" justifyContent="center" mb={3}>
                   <img
                     src={currentQuestion.image}
                     alt="Question visual"
                     style={{
                       width: '100%',
-                      maxWidth: 300,
+                      maxWidth: 360,
                       height: 'auto',
-                      borderRadius: 20,
-                      boxShadow: '0 6px 32px rgba(0,0,0,0.13)',
+                      borderRadius: 12,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
                       objectFit: 'contain',
-                      background: '#f8fafc',
+                      background: UI.bg,
                       padding: 12,
-                      border: '2.5px solid #e0e0e0',
+                      border: `1px solid ${UI.border}`,
                       display: 'block',
                       margin: '0 auto'
                     }}
@@ -1663,10 +1855,38 @@ export default function AttemptQuizPage() {
                 </Box>
               )}
 
+
+
               {/* Question controls */}
-              <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                <Box>
-                  <Typography variant="h6" fontWeight="bold" sx={{ pr: 4 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
+                <Box sx={{ flex: 1, pr: 4 }}>
+                  {/* Question Type Badge - Left side */}
+                  <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Chip 
+                      label={currentQuestion.question_type === 'single' ? 'Single Choice' : 'Multiple Choice'}
+                      size="small"
+                      sx={{ 
+                        backgroundColor: UI.primary, 
+                        color: 'white',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                        height: 24
+                      }}
+                    />
+                  </Box>
+                  <Typography 
+                    sx={{
+                      fontFamily: inter.style.fontFamily,
+                      fontSize: '28px',
+                      fontWeight: 800,
+                      color: UI.text,
+                      lineHeight: 1.4,
+                      mb: 3,
+                      textAlign: 'center',
+                      maxWidth: '800px',
+                      mx: 'auto'
+                    }}
+                  >
                     {currentQuestion.question_text}
                   </Typography>
                 </Box>
@@ -1677,13 +1897,15 @@ export default function AttemptQuizPage() {
                       onClick={() => toggleFlag(currentQuestion.id)} 
                       size="small"
                       sx={{
-                        backgroundColor: flagged[currentQuestion.id] ? `${NAV_COLORS.flagged}20` : 'transparent',
+                        backgroundColor: flagged[currentQuestion.id] ? '#ffebee' : 'transparent',
+                        color: flagged[currentQuestion.id] ? '#f44336' : '#666',
+                        border: flagged[currentQuestion.id] ? '1px solid #f44336' : '1px solid #e0e0e0',
                         '&:hover': {
-                          backgroundColor: `${NAV_COLORS.flagged}10`
+                          backgroundColor: flagged[currentQuestion.id] ? '#ffcdd2' : '#f5f5f5'
                         }
                       }}
                     >
-                      <FlagIcon color={flagged[currentQuestion.id] ? 'error' : 'inherit'} />
+                      <FlagIcon />
                     </IconButton>
                   </Tooltip>
                   
@@ -1692,32 +1914,19 @@ export default function AttemptQuizPage() {
                       onClick={() => toggleBookmark(currentQuestion.id)} 
                       size="small"
                       sx={{
-                        backgroundColor: bookmarked[currentQuestion.id] ? `${NAV_COLORS.bookmarked}20` : 'transparent',
+                        backgroundColor: bookmarked[currentQuestion.id] ? '#fff8e1' : 'transparent',
+                        color: bookmarked[currentQuestion.id] ? '#ffb300' : '#666',
+                        border: bookmarked[currentQuestion.id] ? '1px solid #ffb300' : '1px solid #e0e0e0',
                         '&:hover': {
-                          backgroundColor: `${NAV_COLORS.bookmarked}10`
+                          backgroundColor: bookmarked[currentQuestion.id] ? '#fff3e0' : '#f5f5f5'
                         }
                       }}
                     >
                       {bookmarked[currentQuestion.id] ? (
-                        <BookmarkIcon color="warning" />
+                        <BookmarkIcon />
                       ) : (
                         <BookmarkBorderIcon />
                       )}
-                    </IconButton>
-                  </Tooltip>
-                  
-                  <Tooltip title="Mark for review">
-                    <IconButton 
-                      onClick={() => toggleMarkForReview(currentQuestion.id)} 
-                      size="small"
-                      sx={{
-                        backgroundColor: markedForReview[currentQuestion.id] ? `${NAV_COLORS.markedForReview}20` : 'transparent',
-                        '&:hover': {
-                          backgroundColor: `${NAV_COLORS.markedForReview}10`
-                        }
-                      }}
-                    >
-                      <VisibilityIcon color={markedForReview[currentQuestion.id] ? 'secondary' : 'inherit'} />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -1726,9 +1935,9 @@ export default function AttemptQuizPage() {
               {/* Question options */}
               {currentQuestion.options.length === 0 ? (
                 <Box sx={{
-                  mt: 2,
-                  mb: 2,
-                  p: 2,
+                  mt: 3,
+                  mb: 3,
+                  p: 3,
                   backgroundColor: '#fff3cd',
                   border: '1px solid #ffeeba',
                   borderRadius: 2,
@@ -1742,107 +1951,136 @@ export default function AttemptQuizPage() {
                   ⚠️ No options available for this question. Please contact your instructor or admin.
                 </Box>
               ) : currentQuestion.question_type === 'single' ? (
-                <RadioGroup
+                                <RadioGroup
                   value={typeof answers[currentQuestion.id]?.[0] === 'number' ? answers[currentQuestion.id]?.[0] : ''}
                   onChange={(e) => handleOptionSelect(currentQuestion.id, Number(e.target.value), currentQuestion.question_type)}
                 >
                   {currentQuestion.options.map((opt: Option, optIdx: number) => (
-                    <Box key={optIdx} display="flex" alignItems="center" mb={2} flexDirection="row" justifyContent="space-between">
+                    <Box key={optIdx} sx={{ mb: 2 }}>
                       <FormControlLabel
                         value={optIdx}
-                        control={<Radio color="primary" />}
-                        label={opt.text}
-                        sx={{
-                          mb: 1,
-                          p: 1,
-                          borderRadius: 1,
-                          backgroundColor: answers[currentQuestion.id]?.includes(optIdx)
-                            ? `${currentTheme.primary}20`
-                            : 'transparent',
-                          '&:hover': {
-                            backgroundColor: `${currentTheme.primary}10`
-                          },
-                          flex: 1,
-                          mr: 2
-                        }}
+                        control={<Radio sx={{ 
+                          color: UI.primary,
+                          '&.Mui-checked': {
+                            color: UI.primary
+                          }
+                        }} />}
+                        label={
+                          <Box sx={{ display:'flex', alignItems:'center', width:'100%' }}>
+                            {/* Letter square */}
+                            <Box sx={{
+                              width: 40, height: 40, borderRadius: '8px',
+                              display:'grid', placeItems:'center', fontWeight: 800,
+                              mr: 2, 
+                              border: answers[currentQuestion.id]?.includes(optIdx) ? `2px solid ${UI.optSelectedBorder}` : `1px solid ${UI.border}`,
+                              bgcolor: answers[currentQuestion.id]?.includes(optIdx) ? UI.optSelectedBg : '#f1f5f9',
+                              color: answers[currentQuestion.id]?.includes(optIdx) ? UI.primary : UI.text,
+                            }}>{String.fromCharCode(65 + optIdx)}</Box>
+
+                            {/* Long bar like your sketch */}
+                            <Box sx={{
+                              flex:1, py: 2, px: 2.5, borderRadius: 0,
+                              border: answers[currentQuestion.id]?.includes(optIdx) ? `2px solid ${UI.optSelectedBorder}` : `1px solid ${UI.border}`,
+                              bgcolor: answers[currentQuestion.id]?.includes(optIdx) ? UI.optSelectedBg : '#f1f5f9',
+                              '&:hover': { bgcolor: UI.optHover },
+                              transition: 'all 0.2s ease',
+                            }}>
+                              <Typography sx={{ fontSize: 16, fontWeight: 500, color: UI.text, fontFamily: inter.style.fontFamily }}>
+                                {opt.text}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        }
+                        sx={{ width:'100%', cursor:'pointer', py:1 }}
                         disabled={submitted}
                       />
                       {opt.image && (
-                        <img
-                          src={opt.image}
-                          alt={`Option ${optIdx + 1}`}
-                          style={{
-                            width: 320,
-                            height: 320,
-                            minWidth: 220,
-                            minHeight: 220,
-                            maxWidth: 400,
-                            maxHeight: 400,
-                            borderRadius: 16,
-                            boxShadow: '0 2px 16px rgba(0,0,0,0.10)',
-                            objectFit: 'contain',
-                            background: '#f8fafc',
-                            padding: 12,
-                            border: '2px solid #e0e0e0',
-                            display: 'block',
-                            flexShrink: 0,
-                            marginLeft: 16
-                          }}
-                        />
+                        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                          <img
+                            src={opt.image}
+                            alt={`Option ${optIdx + 1}`}
+                            style={{
+                              width: '100%',
+                              maxWidth: 400,
+                              height: 'auto',
+                              borderRadius: 0,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                              objectFit: 'contain',
+                              background: '#f8fafc',
+                              padding: 12,
+                              border: '1px solid #e0e0e0'
+                            }}
+                          />
+                        </Box>
                       )}
                     </Box>
                   ))}
                 </RadioGroup>
               ) : (
                 <FormGroup>
-                  {currentQuestion.options.map((opt: Option, optIdx: number) => (
-                    <Box key={optIdx} display="flex" alignItems="center" mb={2} flexDirection="row" justifyContent="space-between">
+                                    {currentQuestion.options.map((opt: Option, optIdx: number) => (
+                    <Box key={optIdx} sx={{ mb: 2 }}>
                       <FormControlLabel
                         control={
                           <Checkbox
                             checked={answers[currentQuestion.id]?.includes(optIdx) || false}
                             onChange={() => handleOptionSelect(currentQuestion.id, optIdx, currentQuestion.question_type)}
                             color="primary"
+                            sx={{ 
+                              color: UI.primary,
+                              '&.Mui-checked': {
+                                color: UI.primary
+                              }
+                            }}
                           />
                         }
-                        label={opt.text}
-                        sx={{
-                          mb: 1,
-                          p: 1,
-                          borderRadius: 1,
-                          backgroundColor: answers[currentQuestion.id]?.includes(optIdx)
-                            ? `${currentTheme.primary}20`
-                            : 'transparent',
-                          '&:hover': {
-                            backgroundColor: `${currentTheme.primary}10`
-                          },
-                          flex: 1,
-                          mr: 2
-                        }}
+                        label={
+                          <Box sx={{ display:'flex', alignItems:'center', width:'100%' }}>
+                            {/* Letter square */}
+                            <Box sx={{
+                              width: 40, height: 40, borderRadius: '8px',
+                              display:'grid', placeItems:'center', fontWeight: 800,
+                              mr: 2, 
+                              border: answers[currentQuestion.id]?.includes(optIdx) ? `2px solid ${UI.optSelectedBorder}` : `1px solid ${UI.border}`,
+                              bgcolor: answers[currentQuestion.id]?.includes(optIdx) ? UI.optSelectedBg : '#f1f5f9',
+                              color: answers[currentQuestion.id]?.includes(optIdx) ? UI.primary : UI.text,
+                            }}>{String.fromCharCode(65 + optIdx)}</Box>
+
+                            {/* Long bar like your sketch */}
+                            <Box sx={{
+                              flex:1, py: 2, px: 2.5, borderRadius: 0,
+                              border: answers[currentQuestion.id]?.includes(optIdx) ? `2px solid ${UI.optSelectedBorder}` : `1px solid ${UI.border}`,
+                              bgcolor: answers[currentQuestion.id]?.includes(optIdx) ? UI.optSelectedBg : '#f1f5f9',
+                              '&:hover': { bgcolor: UI.optHover },
+                              transition: 'all 0.2s ease',
+                            }}>
+                              <Typography sx={{ fontSize: 16, fontWeight: 500, color: UI.text, fontFamily: inter.style.fontFamily }}>
+                                {opt.text}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        }
+                        sx={{ width:'100%', cursor:'pointer', py:1 }}
                         disabled={submitted}
                       />
-                      {opt.image && (
+                                              {opt.image && (
+                        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
                         <img
                           src={opt.image}
                           alt={`Option ${optIdx + 1}`}
                           style={{
-                            width: 320,
-                            height: 320,
-                            minWidth: 220,
-                            minHeight: 220,
+                              width: '100%',
                             maxWidth: 400,
-                            maxHeight: 400,
-                            borderRadius: 16,
-                            boxShadow: '0 2px 16px rgba(0,0,0,0.10)',
+                              height: 'auto',
+                              borderRadius: 0,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                             objectFit: 'contain',
                             background: '#f8fafc',
                             padding: 12,
-                            border: '2px solid #e0e0e0',
-                            display: 'block',
-                            flexShrink: 0,
-                            marginLeft: 16
+                              border: '1px solid #e0e0e0'
                           }}
                         />
+                        </Box>
                       )}
                     </Box>
                   ))}
@@ -1850,13 +2088,18 @@ export default function AttemptQuizPage() {
               )}
               
               {/* Marks indicator */}
-              <Typography variant="caption" sx={{
-                display: 'block',
-                mt: 2,
-                textAlign: 'right',
-                fontStyle: 'italic',
-                fontWeight: 'bold'
-              }}>
+              <Typography 
+                sx={{
+                  display: 'block',
+                  mt: 3,
+                  textAlign: 'right',
+                  fontStyle: 'italic',
+                  fontFamily: inter.style.fontFamily,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: UI.muted
+                }}
+              >
                 Marks: {typeof currentQuestion.marks === 'number' ? currentQuestion.marks : 1}
               </Typography>
 
@@ -1864,15 +2107,15 @@ export default function AttemptQuizPage() {
               {(reviewMode || showAnswerKey) && currentQuestion.explanation && (
                 <Box sx={{ 
                   mt: 3, 
-                  p: 2, 
+                  p: 3, 
                   backgroundColor: '#e8f5e9', 
-                  borderRadius: 1,
+                  borderRadius: 2,
                   borderLeft: '4px solid #4caf50'
                 }}>
                   <Typography variant="subtitle2" fontWeight="bold" color="#2e7d32">
                     Explanation:
                   </Typography>
-                  <Typography variant="body2" color="#2e7d32">
+                  <Typography variant="body2" color="#2e7d32" sx={{ mt: 1 }}>
                     {currentQuestion.explanation}
                   </Typography>
                 </Box>
@@ -1880,39 +2123,171 @@ export default function AttemptQuizPage() {
             </Box>
           )}
 
-          {/* Section navigation buttons */}
-          <Box display="flex" justifyContent="space-between" mt={4}>
+                    {/* Section navigation (sticky at bottom of question card) */}
+          <Box sx={{
+            position:'sticky', bottom: -16, pt: 2, mt: 4,
+            background: `linear-gradient(180deg, rgba(255,255,255,0), ${UI.card} 50%)`
+          }}>
+            <Box display="flex" justifyContent="space-between" sx={{ gap:2, mb:2, flexDirection:{ xs:'column', sm:'row' }}}>
+              <Button
+                variant="outlined"
+                startIcon={<BackIcon />}
+                onClick={goToPrevQuestionFlat}
+                disabled={questions.findIndex(q => q.id === currentQuestionId) === 0}
+                sx={{ 
+                  fontFamily: inter.style.fontFamily,
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  py: { xs: 2, sm: 1.5 },
+                  px: { xs: 2, sm: 3 },
+                  borderRadius: '8px',
+                  borderColor: UI.primary,
+                  color: UI.primary,
+                  '&:hover': {
+                    borderColor: UI.primaryHover,
+                    backgroundColor: UI.optHover
+                  }
+                }}
+              >
+                Prev
+              </Button>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  onClick={goToNextQuestionFlat}
+                  disabled={questions.findIndex(q => q.id === currentQuestionId) === questions.length - 1}
+                  sx={{ 
+                    fontFamily: inter.style.fontFamily,
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    py: { xs: 2, sm: 1.5 },
+                    px: { xs: 2, sm: 3 },
+                    borderRadius: '8px',
+                    borderColor: UI.review,
+                    color: UI.review,
+                    '&:hover': {
+                      borderColor: UI.review,
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)'
+                    }
+                  }}
+                >
+                  Skip
+                </Button>
+                <Button
+                  variant="contained"
+                  endIcon={<NextIcon />}
+                  onClick={goToNextQuestionFlat}
+                  disabled={questions.findIndex(q => q.id === currentQuestionId) === questions.length - 1}
+                  sx={{ 
+                    fontFamily: inter.style.fontFamily,
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    py: { xs: 2, sm: 1.5 },
+                    px: { xs: 2, sm: 3 },
+                    borderRadius: '8px',
+                    backgroundColor: UI.primary,
+                    '&:hover': {
+                      backgroundColor: UI.primaryHover,
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 4px 8px rgba(11, 95, 255, 0.3)'
+                    }
+                  }}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
+            
+            {/* Mark for Review (full width) */}
             <Button
-              variant="contained"
-              startIcon={<BackIcon />}
-              onClick={goToPrevQuestionFlat}
-              disabled={questions.findIndex(q => q.id === currentQuestionId) === 0}
-              sx={{ fontWeight: 'bold' }}
+              variant="outlined"
+              fullWidth
+              onClick={() => toggleMarkForReview(currentQuestion.id)}
+              sx={{ 
+                fontFamily: inter.style.fontFamily,
+                fontSize: '14px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                py: { xs: 2, sm: 1.5 },
+                px: { xs: 2, sm: 3 },
+                borderRadius: '8px',
+                borderColor: markedForReview[currentQuestion.id] ? UI.review : UI.border,
+                color: markedForReview[currentQuestion.id] ? UI.review : UI.text,
+                backgroundColor: markedForReview[currentQuestion.id] ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
+                '&:hover': {
+                  borderColor: UI.review,
+                  backgroundColor: 'rgba(245, 158, 11, 0.15)'
+                }
+              }}
             >
-              Previous Question
+              {markedForReview[currentQuestion.id] ? 'Marked for Review' : 'Mark for Review'}
             </Button>
-            <Button
-              variant="contained"
-              endIcon={<NextIcon />}
-              onClick={goToNextQuestionFlat}
-              disabled={questions.findIndex(q => q.id === currentQuestionId) === questions.length - 1}
-              sx={{ fontWeight: 'bold' }}
-            >
-              Next Question
-            </Button>
+
+            {/* Keyboard Shortcuts Tip */}
+            <Typography variant="caption" sx={{ 
+              textAlign: 'center', 
+              color: UI.muted, 
+              mt: 1,
+              display: 'block',
+              fontStyle: 'italic',
+              fontFamily: inter.style.fontFamily
+            }}>
+              💡 Tip: Use ← → arrow keys to navigate between questions
+            </Typography>
           </Box>
-        </Box>
       </Box>
+
+        {/* Question Palette - Right Column (Desktop Only) */}
+        <Drawer
+          variant="persistent"
+          anchor="right"
+          open={true}
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': {
+              width: 400,
+              boxSizing: 'border-box',
+              backgroundColor: '#F8F9FA',
+              borderLeft: `1px solid ${UI.border}`,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+              padding: '16px',
+            }
+          }}
+        >
+          <PaletteBody />
+        </Drawer>
+      </Box>
+
+      {/* Mobile Bottom Sheet for Question Palette */}
+      <Drawer
+        anchor="bottom"
+        open={showNavigationPanel}
+        onClose={() => setShowNavigationPanel(false)}
+        sx={{ display: { xs: 'block', md: 'none' } }}
+        PaperProps={{ sx: { maxHeight: '75vh', borderTopLeftRadius: 12, borderTopRightRadius: 12 } }}
+      >
+        <PaletteBody />
+      </Drawer>
 
       {/* Floating Action Buttons */}
       {!showNavigationPanel && (
         <Fab
-          color="primary"
           sx={{
             position: 'fixed',
-            bottom: 16,
-            left: 16,
-            zIndex: 1000
+            bottom: 24,
+            left: 24,
+            zIndex: 1000,
+            backgroundColor: UI.deepBlue,
+            color: '#ffffff',
+            boxShadow: '0 4px 12px rgba(0, 35, 102, 0.3)',
+            '&:hover': {
+              backgroundColor: '#1565c0',
+              transform: 'translateY(-2px)',
+              boxShadow: '0 6px 16px rgba(0, 35, 102, 0.4)'
+            }
           }}
           onClick={() => setShowNavigationPanel(true)}
         >
@@ -1921,12 +2296,19 @@ export default function AttemptQuizPage() {
       )}
       
       <Fab
-        color="secondary"
         sx={{
           position: 'fixed',
-          bottom: 16,
-          right: 16,
-          zIndex: 1000
+          bottom: 24,
+          right: 24,
+          zIndex: 1000,
+          backgroundColor: UI.navy,
+          color: '#ffffff',
+          boxShadow: '0 4px 12px rgba(10, 37, 64, 0.3)',
+          '&:hover': {
+            backgroundColor: '#0a2540',
+            transform: 'translateY(-2px)',
+            boxShadow: '0 6px 16px rgba(10, 37, 64, 0.4)'
+          }
         }}
         onClick={() => setSidebarOpen(true)}
       >
@@ -1940,13 +2322,13 @@ export default function AttemptQuizPage() {
         onClose={() => setSidebarOpen(false)}
       >
         <Box sx={{ width: 300, p: 3 }}>
-          <Typography variant="h6" gutterBottom>
+          <Typography variant="h6" gutterBottom sx={{ fontFamily: inter.style.fontFamily }}>
             Exam Settings
           </Typography>
           
           <Divider sx={{ my: 2 }} />
           
-          <Typography variant="subtitle1" gutterBottom>
+          <Typography variant="subtitle1" gutterBottom sx={{ fontFamily: inter.style.fontFamily }}>
             Theme
           </Typography>
           <RadioGroup
@@ -2002,7 +2384,7 @@ export default function AttemptQuizPage() {
           
           <Divider sx={{ my: 2 }} />
           
-          <Typography variant="subtitle1" gutterBottom>
+          <Typography variant="subtitle1" gutterBottom sx={{ fontFamily: inter.style.fontFamily }}>
             Font Size
           </Typography>
           <RadioGroup
@@ -2042,13 +2424,13 @@ export default function AttemptQuizPage() {
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)}>
-        <DialogTitle>Submit Exam?</DialogTitle>
+        <DialogTitle sx={{ fontFamily: inter.style.fontFamily }}>Submit Exam?</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ fontFamily: inter.style.fontFamily }}>
             Are you sure you want to submit your exam? You won't be able to make changes after submission.
           </DialogContentText>
           <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2">Summary:</Typography>
+            <Typography variant="subtitle2" sx={{ fontFamily: inter.style.fontFamily }}>Summary:</Typography>
             <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
               <Chip label={`Answered: ${answeredCount}`} color="success" variant="outlined" />
               <Chip label={`Unanswered: ${questions.length - answeredCount}`} color="warning" variant="outlined" />
@@ -2083,10 +2465,10 @@ export default function AttemptQuizPage() {
       </Dialog>
 
       {/* Time Up Dialog */}
-      <Dialog open={timeUpDialogOpen} onClose={() => {}}>
-        <DialogTitle>Time's Up!</DialogTitle>
+              <Dialog open={timeUpDialogOpen} onClose={() => {}}>
+        <DialogTitle sx={{ fontFamily: inter.style.fontFamily }}>Time's Up!</DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ fontFamily: inter.style.fontFamily }}>
             Your time for this exam has ended. Your answers are being submitted automatically.
           </DialogContentText>
           {autoSubmitting && (
@@ -2104,7 +2486,7 @@ export default function AttemptQuizPage() {
       <Dialog open={submittingModalOpen} PaperProps={{ sx: { textAlign: 'center', p: 4 } }}>
         <DialogContent>
           <CircularProgress sx={{ mb: 2 }} />
-          <Typography variant="h6" sx={{ mt: 2 }}>
+          <Typography variant="h6" sx={{ mt: 2, fontFamily: inter.style.fontFamily }}>
             Submitting your quiz, please wait...
           </Typography>
         </DialogContent>
@@ -2142,6 +2524,29 @@ export default function AttemptQuizPage() {
         </Alert>
       </Snackbar>
 
+      {/* Toast Notifications */}
+      {toastMessage && (
+        <Snackbar
+          open={!!toastMessage}
+          autoHideDuration={3000}
+          onClose={() => setToastMessage(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          sx={{ zIndex: 2000 }}
+        >
+          <Alert 
+            severity={toastMessage.includes('Only') ? 'warning' : toastMessage.includes('Breathe') ? 'info' : 'success'} 
+            sx={{ 
+              width: '100%',
+              fontFamily: inter.style.fontFamily,
+              fontWeight: 600,
+              fontSize: '1rem'
+            }}
+          >
+            {toastMessage}
+          </Alert>
+        </Snackbar>
+      )}
+
       {/* Thank You Card after submission */}
       {showSubmitThankYou && (
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh" position="fixed" top={0} left={0} width="100vw" height="100vh" zIndex={3000} bgcolor="rgba(255,255,255,0.85)">
@@ -2156,13 +2561,13 @@ export default function AttemptQuizPage() {
             }}
           >
             <CheckCircleOutlineIcon sx={{ fontSize: 64, color: '#43a047', mb: 2 }} />
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
+            <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ fontFamily: inter.style.fontFamily }}>
               Thank You!
             </Typography>
-            <Typography variant="h6" color="text.secondary" gutterBottom>
+            <Typography variant="h6" color="text.secondary" gutterBottom sx={{ fontFamily: inter.style.fontFamily }}>
               Your quiz has been submitted successfully.
             </Typography>
-            <Typography variant="body1" sx={{ mt: 2, mb: 3 }}>
+            <Typography variant="body1" sx={{ mt: 2, mb: 3, fontFamily: inter.style.fontFamily }}>
               You can view your results in the dashboard once they are available.
             </Typography>
             <Button
@@ -2177,6 +2582,8 @@ export default function AttemptQuizPage() {
           </Paper>
         </Box>
       )}
-    </Box>
+        </Box>
+      </Box>
+    </>
   )
 }

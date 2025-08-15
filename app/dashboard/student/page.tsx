@@ -285,7 +285,7 @@ function StudentDashboardPageContent() {
   useEffect(() => {
     if (typeof window === 'undefined' || !liveQuizzes.length) return;
     liveQuizzes.forEach((q) => {
-      if (router.prefetch) router.prefetch(`/attempt-quiz/${q.id}`);
+      if (router.prefetch) router.prefetch(`/pre-exam/${q.id}`);
     });
   }, [liveQuizzes, router]);
 
@@ -495,7 +495,7 @@ function StudentDashboardPageContent() {
       } else if (now > new Date(data.end_time)) {
         setCodeError('Quiz ended.');
         setShowCodeErrorSnackbar(true);
-      } else router.push(`/attempt-quiz/${data.id}`);
+      } else router.push(`/pre-exam/${data.id}`);
     } finally {
       setCodeLoading(false);
     }
@@ -1815,7 +1815,7 @@ export function ExamsPage() {
                           variant="contained"
                           color="primary"
                           size="small"
-                          onClick={() => router.push(`/attempt-quiz/${exam.id}`)}
+                          onClick={() => router.push(`/pre-exam/${exam.id}`)}
                           sx={{ borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif', background: '#002366', color: '#fff', '&:hover': { background: '#001b4e' } }}
                         >
                           Start
