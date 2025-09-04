@@ -98,7 +98,8 @@ export async function POST(req: Request) {
     };
     const optionalFields = [
       'completed_at', 'created_at', 'start_time', 'end_time', 'marked_questions', 'sections',
-      'total_questions', 'correct_count', 'percentage', 'status', 'marked_for_review'
+      'total_questions', 'correct_count', 'percentage', 'status', 'marked_for_review', 'question_time_spent',
+      'tab_switch_count', 'last_tab_switch_time', 'tab_switch_history'
     ];
     for (const field of optionalFields) {
       if (field in body && body[field] !== null && body[field] !== undefined) {

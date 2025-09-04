@@ -4,8 +4,8 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { ThemeModeProvider } from '@/providers/ThemeModeProvider';
 
 export const metadata = {
-  title: 'OctaMind',
-  description: 'Create and manage assessments easily',
+  title: 'OctoMind By F13 Technologies',
+  description: 'OctoMind By F13 Technologies - Create and manage assessments easily',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

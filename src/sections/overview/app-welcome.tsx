@@ -100,7 +100,7 @@ export default function AppWelcome({
 
         <Typography variant="body2" sx={{ maxWidth: 600 }}>
           {description ||
-            'Create, manage, and analyze assessments seamlessly with your personal dashboard.'}
+                         'Create, manage, and analyze OctoMind assessments seamlessly with your personal dashboard.'}
         </Typography>
 
         {shouldShowCreateButton && (

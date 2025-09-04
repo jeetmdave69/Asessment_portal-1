@@ -11,20 +11,6 @@ const isProtectedRoute = createRouteMatcher([
   '/preview-quiz(.*)',
 ]);
 
-const studentOnlyRoutes = createRouteMatcher([
-  '/dashboard/student(.*)',
-  '/attempt-quiz(.*)',
-  '/result(.*)',
-]);
-
-const teacherOnlyRoutes = createRouteMatcher([
-  '/dashboard/teacher(.*)',
-  '/dashboard/admin(.*)',
-  '/create-quiz(.*)',
-  '/edit-quiz(.*)',
-  '/preview-quiz(.*)',
-]);
-
 export default clerkMiddleware(async (auth, req) => {
   // Never redirect to access-denied for sign-in page
   if (req.nextUrl.pathname.startsWith('/sign-in')) {
@@ -34,25 +20,12 @@ export default clerkMiddleware(async (auth, req) => {
   // Only protect certain routes
   if (!isProtectedRoute(req)) return NextResponse.next();
 
-  const { userId, sessionClaims, redirectToSignIn } = await auth();
+  const { userId } = await auth();
   if (!userId) {
-    return redirectToSignIn();
+    // Redirect to your custom sign-in page instead of Clerk's hosted page
+    const signInUrl = new URL('/sign-in', req.url);
+    return NextResponse.redirect(signInUrl);
   }
-
-  const role = (sessionClaims as any)?.publicMetadata?.role;
-
-  // Student cannot access teacher/admin pages
-  if (role === 'student' && teacherOnlyRoutes(req)) {
-    return NextResponse.redirect(new URL('/sign-in', req.url));
-  }
-
-  // Teacher cannot access student pages
-  if (role === 'teacher' && studentOnlyRoutes(req)) {
-    return NextResponse.redirect(new URL('/sign-in', req.url));
-  }
-
-  // Admin can access everything
-  // If you want to restrict admin, add logic here
 
   return NextResponse.next();
 });

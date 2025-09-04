@@ -18,6 +18,7 @@ import { supabase } from '@/utils/supabaseClient';
 import TablePagination from '@mui/material/TablePagination';
 import { SettingsDrawer } from '../../../components/settings/SettingsDrawer';
 import { useSettingsContext } from '@/context/settings-context';
+import LogoutSplash from '../../../components/LogoutSplash';
 import IconButton from '@mui/material/IconButton';
 import Iconify from '../../../src/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
@@ -57,6 +58,7 @@ export default function AdminDashboardPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [showLogoutSplash, setShowLogoutSplash] = useState(false);
   const [userTableLoading, setUserTableLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
@@ -324,7 +326,28 @@ export default function AdminDashboardPage() {
         }}
       >
         <Box display="flex" alignItems="center" p={2} mb={1}>
-          <DashboardIcon sx={{ mr: 1, color: '#fff', fontSize: 32 }} />
+          <Box sx={{
+            width: 52,
+            height: 52,
+            borderRadius: '12px',
+            background: '#FFFFFF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
+            border: '3px solid #3B82F6',
+            mr: 1
+          }}>
+            <img 
+              src="/Logo.svg" 
+              alt="OctoMind Logo" 
+              style={{ 
+                width: '40px', 
+                height: '40px',
+                filter: 'brightness(0) saturate(100%) invert(0%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(0%) contrast(100%)'
+              }} 
+            />
+          </Box>
           <Typography variant="h6" sx={{ color: '#fff', fontWeight: 600, fontSize: 22, letterSpacing: 1 }}>Admin</Typography>
         </Box>
         <List sx={{ mt: 2 }}>
@@ -754,7 +777,7 @@ export default function AdminDashboardPage() {
               <Button onClick={() => setLogoutDialogOpen(false)} variant="outlined" color="primary" sx={{ color: theme.palette.text.primary, borderColor: theme.palette.text.primary }}>
                 Cancel
               </Button>
-              <Button onClick={() => { setLogoutDialogOpen(false); signOut({ redirectUrl: "/sign-in" }); }} variant="contained" color="error" sx={{ ml: 2, color: theme.palette.text.primary, background: theme.palette.error.main, '&:hover': { background: theme.palette.error.dark } }}>
+              <Button onClick={() => { setLogoutDialogOpen(false); setShowLogoutSplash(true); }} variant="contained" color="error" sx={{ ml: 2, color: theme.palette.text.primary, background: theme.palette.error.main, '&:hover': { background: theme.palette.error.dark } }}>
                 Log Out
               </Button>
             </DialogActions>
@@ -799,6 +822,13 @@ export default function AdminDashboardPage() {
             </Button>
           </DialogActions>
         </Dialog>
+        
+        {showLogoutSplash && (
+          <LogoutSplash
+            name={user?.firstName || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress || 'User'}
+            onComplete={() => signOut({ redirectUrl: "/sign-in" })}
+          />
+        )}
       </Box>
     </Box>
   );

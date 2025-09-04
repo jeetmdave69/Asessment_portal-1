@@ -12,7 +12,8 @@ export function withRole(Component: any, allowedRoles: string[]) {
       if (!isLoaded) return;
       const role = user?.publicMetadata?.role;
       if (!allowedRoles.includes(role as string)) {
-        router.push("/unauthorized");
+        // Redirect to sign-in instead of unauthorized page
+        router.push("/sign-in");
       }
     }, [isLoaded, user, router]);
 

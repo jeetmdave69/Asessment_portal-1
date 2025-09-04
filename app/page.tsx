@@ -1,61 +1,21 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import {
-  Box,
-  Typography,
-  Button,
-  Container,
-  Grid,
-  Card,
-  CardContent,
-  TextField,
-  IconButton,
-  useTheme,
-  useMediaQuery,
-  Fade,
-  Slide,
-  Grow,
-  Pagination,
-  Chip,
-} from '@mui/material';
-import {
-  KeyboardArrowDown,
-  KeyboardArrowRight,
-  KeyboardArrowLeft,
-  School,
-  Psychology,
-  Analytics,
-  Star,
-  Email,
-  ArrowForward,
-  Rocket,
-  TrendingUp,
-  Security,
-  Speed,
-  Lightbulb,
-  Group,
-  Assessment,
-  Timeline,
-  AutoAwesome,
-} from '@mui/icons-material';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
-import Particles from 'react-tsparticles';
-import { loadSlim } from 'tsparticles-slim';
-import type { Engine, Container as ParticlesContainer } from 'tsparticles-engine';
+import Image from 'next/image';
 
 export default function LandingPage() {
   const { isLoaded, isSignedIn } = useUser();
   const router = useRouter();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [email, setEmail] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number>();
+  const [mounted, setMounted] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
-  const { scrollYProgress } = useScroll();
-  const y = useTransform(scrollYProgress, [0, 1], [0, -300]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
@@ -63,1009 +23,895 @@ export default function LandingPage() {
     }
   }, [isLoaded, isSignedIn, router]);
 
-  const handleSignUp = () => {
-    router.push('/sign-up');
-  };
+  useEffect(() => {
+    // Aurora Background Animation
+    const shapesEl = document.querySelectorAll('.aurora-shape');
+    const shapes = Array.from(shapesEl).map(el => {
+      return {
+        el: el as HTMLElement,
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        vx: (Math.random() - 0.5) * 0.7,
+        vy: (Math.random() - 0.5) * 0.7,
+        size: parseInt(window.getComputedStyle(el).width, 10)
+      };
+    });
+
+    let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const handleMouseMove = (e: MouseEvent) => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+    };
+
+    function animate() {
+      animationRef.current = requestAnimationFrame(animate);
+
+      shapes.forEach(shape => {
+        shape.x += shape.vx;
+        shape.y += shape.vy;
+
+        if ((shape.x - shape.size / 2 < 0 && shape.vx < 0) || (shape.x + shape.size / 2 > window.innerWidth && shape.vx > 0)) {
+          shape.vx *= -1;
+        }
+        if ((shape.y - shape.size / 2 < 0 && shape.vy < 0) || (shape.y + shape.size / 2 > window.innerHeight && shape.vy > 0)) {
+          shape.vy *= -1;
+        }
+        
+        const dx = mouse.x - shape.x;
+        const dy = mouse.y - shape.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 350) { 
+          const angle = Math.atan2(dy, dx);
+          shape.vx += Math.cos(angle) * 0.02;
+          shape.vy += Math.sin(angle) * 0.02;
+        }
+        
+        shape.vx *= 0.995;
+        shape.vy *= 0.995;
+        
+        shape.el.style.top = '0';
+        shape.el.style.left = '0';
+        shape.el.style.bottom = 'auto';
+        shape.el.style.right = 'auto';
+        
+        shape.el.style.transform = `translate(${shape.x - shape.size / 2}px, ${shape.y - shape.size / 2}px)`;
+      });
+    }
+
+    // Header scroll effect
+    const handleScroll = () => {
+      const header = document.getElementById('header');
+      if (header) {
+        if (window.scrollY > 10) {
+          header.classList.add('header-scrolled');
+        } else {
+          header.classList.remove('header-scrolled');
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('scroll', handleScroll);
+    
+    // Start animation with a small delay
+    setTimeout(animate, 0);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const handleLogin = () => {
     router.push('/sign-in');
   };
 
+  const handleGetStarted = () => {
+    router.push('/sign-in');
+  };
+
   const handleNewsletterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Newsletter subscription:', email);
-    setEmail('');
+    const form = e.target as HTMLFormElement;
+    const emailInput = form.querySelector('input[type="email"]') as HTMLInputElement;
+    const email = emailInput.value;
+    
+    if (email) {
+      // Here you would typically send the email to your backend
+      // For now, we'll show a success message
+      setToastMessage('Thank you for subscribing! We\'ll send updates to your email address.');
+      setShowToast(true);
+      emailInput.value = ''; // Clear the form
+      
+      // Auto-hide toast after 4 seconds
+      setTimeout(() => {
+        setShowToast(false);
+      }, 4000);
+    }
   };
 
-  // Initialize tsparticles
-  const particlesInit = async (main: Engine): Promise<void> => {
-    await loadSlim(main);
-  };
-
-  const particlesLoaded = async (container?: ParticlesContainer): Promise<void> => {};
-
-  const features = [
-    {
-      icon: <Psychology sx={{ fontSize: 40, color: '#00d4ff' }} />,
-      title: "AI-Powered Learning",
-      description: "Advanced artificial intelligence that adapts to your learning style and pace."
-    },
-    {
-      icon: <Analytics sx={{ fontSize: 40, color: '#00d4ff' }} />,
-      title: "Real-time Analytics",
-      description: "Comprehensive insights into your performance and progress tracking."
-    },
-    {
-      icon: <School sx={{ fontSize: 40, color: '#00d4ff' }} />,
-      title: "Interactive Assessments",
-      description: "Engaging quizzes and tests that make learning enjoyable and effective."
-    },
-    {
-      icon: <Assessment sx={{ fontSize: 40, color: '#00d4ff' }} />,
-      title: "Smart Evaluation",
-      description: "Intelligent evaluation system that provides detailed feedback and recommendations."
-    },
-    {
-      icon: <Timeline sx={{ fontSize: 40, color: '#00d4ff' }} />,
-      title: "Progress Tracking",
-      description: "Track your learning journey with detailed progress reports and milestones."
-    },
-    {
-      icon: <AutoAwesome sx={{ fontSize: 40, color: '#00d4ff' }} />,
-      title: "Personalized Experience",
-      description: "Tailored learning experience that adapts to your individual needs and preferences."
+  // Prevent flash of unstyled content
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.body.style.backgroundColor = '#060818';
+      document.body.style.color = '#e0e0e0';
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
     }
-  ];
+  }, []);
 
-  const testimonials = [
-    {
-      name: "Sarah Johnson",
-      role: "Student",
-      content: "The AI-powered assessment system has completely transformed how I study and prepare for exams. The personalized feedback is incredible!",
-      rating: 5,
-      avatar: "SJ"
-    },
-    {
-      name: "Dr. Michael Chen",
-      role: "Professor",
-      content: "As an educator, I love how this platform adapts to each student's learning pace and style. It's revolutionized my teaching approach.",
-      rating: 5,
-      avatar: "MC"
-    },
-    {
-      name: "Emily Rodriguez",
-      role: "Student",
-      content: "The personalized feedback and analytics help me understand exactly where I need to improve. It's like having a personal tutor!",
-      rating: 5,
-      avatar: "ER"
-    }
-  ];
+  if (!mounted) {
+  return (
+      <div style={{
+        backgroundColor: '#060818',
+        color: '#e0e0e0',
+        minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div style={{ 
+          width: '40px', 
+          height: '40px', 
+          border: '4px solid rgba(255, 255, 255, 0.3)',
+          borderTop: '4px solid white',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <style jsx>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#000', overflow: 'hidden' }}>
-      {/* Particles Background */}
-      {!isMobile && (
-        <Particles
-          id="tsparticles"
-          init={particlesInit}
-          loaded={particlesLoaded}
-          options={{
-            background: {
-              color: { value: 'transparent' },
-            },
-            fpsLimit: 120,
-            interactivity: {
-              events: {
-                onClick: { enable: false, mode: 'push' },
-                onHover: { 
-                  enable: true, 
-                  mode: 'repulse',
-                  parallax: {
-                    enable: true,
-                    force: 60,
-                    smooth: 10
-                  }
-                },
-                resize: true,
-              },
-              modes: {
-                push: { quantity: 4 },
-                repulse: { 
-                  distance: 200, 
-                  duration: 0.4,
-                  factor: 100
-                },
-              },
-            },
-            particles: {
-              color: { value: '#00d4ff' },
-              links: {
-                color: '#00d4ff',
-                distance: 150,
-                enable: true,
-                opacity: 0.3,
-                width: 1,
-              },
-              collisions: { enable: false },
-              move: {
-                direction: 'none',
-                enable: true,
-                outModes: { default: 'bounce' },
-                random: false,
-                speed: 2,
-                straight: false,
-              },
-              number: {
-                density: { enable: true, area: 800 },
-                value: 100,
-              },
-              opacity: { value: 0.5 },
-              shape: { type: 'circle' },
-              size: { value: { min: 1, max: 3 } },
-            },
-            detectRetina: true,
-          }}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 0,
-          }}
-        />
-      )}
+    <>
+      <style jsx global>{`
+        /* --- CSS Variables and Reset --- */
+        :root {
+          --color-bg: #060818;
+          --color-text-primary: #e0e0e0;
+          --color-text-secondary: #a5b4fc;
+          --color-text-muted: #d1d5db;
+          --color-indigo-light: #a5b4fc;
+          --color-purple-light: #d8b4fe;
+          --color-indigo-400: #818cf8;
+          --color-indigo-500: #6366f1;
+          --color-purple-500: #8b5cf6;
+          --color-pink-500: #ec4899;
+          --card-bg: rgba(255, 255, 255, 0.05);
+          --card-border: rgba(255, 255, 255, 0.1);
+        }
 
-      {/* Header */}
-      <Box
-        component="header"
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1000,
-          background: 'rgba(0, 0, 0, 0.8)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(0, 212, 255, 0.2)',
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              py: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <School sx={{ fontSize: 32, color: '#00d4ff' }} />
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 700,
-                  background: 'linear-gradient(45deg, #00d4ff, #0099cc)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
-              >
-                OctaMind
-              </Typography>
-            </Box>
-            <Button
-              variant="contained"
-              onClick={handleLogin}
-              sx={{
-                borderRadius: '25px',
-                px: 3,
-                py: 1,
-                textTransform: 'none',
-                fontWeight: 600,
-                background: 'linear-gradient(45deg, #00d4ff, #0099cc)',
-                boxShadow: '0 4px 20px rgba(0, 212, 255, 0.3)',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 30px rgba(0, 212, 255, 0.4)',
-                  background: 'linear-gradient(45deg, #0099cc, #00d4ff)',
-                },
-                transition: 'all 0.3s ease',
-              }}
-            >
-              Login
-            </Button>
-          </Box>
-        </Container>
-      </Box>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
 
-      {/* Main Content */}
-      <Box ref={containerRef} sx={{ position: 'relative', zIndex: 1, background: 'transparent' }}>
-        {/* Hero Section */}
-    <Box
-      sx={{
-        minHeight: '100vh',
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            overflow: 'hidden',
-            background: 'transparent',
-          }}
-        >
-          <Container maxWidth="lg" sx={{ height: '100vh', display: 'flex', alignItems: 'center' }}>
-            <Grid container spacing={4} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <Fade in timeout={1000}>
-                  <Box>
-                    <motion.div
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 0.2 }}
-                    >
-                      <Typography
-                        variant="h2"
-                        sx={{
-                          fontWeight: 800,
-                          color: 'white',
-                          mb: 2,
-                          fontSize: { xs: '2.5rem', md: '3.5rem' },
-                          lineHeight: 1.2,
-                          textShadow: '0 4px 20px rgba(0, 212, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.8)',
-                        }}
-                      >
-                        India's AI-Based Assessment Platform
-                      </Typography>
-                    </motion.div>
-                    <motion.div
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 0.4 }}
-                    >
-                      <Typography
-                        variant="h5"
-                        sx={{
-                          color: 'rgba(255, 255, 255, 0.9)',
-                          mb: 2,
-                          fontWeight: 300,
-                          textShadow: '0 2px 8px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.8)',
-                        }}
-                      >
-                        Transform your learning experience with intelligent, personalized assessments
-                      </Typography>
-                    </motion.div>
-                    <motion.div
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 0.6 }}
-                    >
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          color: 'rgba(255, 255, 255, 0.7)',
-                          mb: 4,
-                          fontSize: '1.1rem',
-                          lineHeight: 1.6,
-                          textShadow: '0 2px 8px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.8)',
-                        }}
-                      >
-                        Experience the future of education with our cutting-edge AI-powered assessment system that adapts to every student's unique learning style.
-                      </Typography>
-                    </motion.div>
-                    <motion.div
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 0.8 }}
-                    >
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={handleSignUp}
-                        sx={{
-                          borderRadius: '30px',
-                          px: 4,
-                          py: 1.5,
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          fontSize: '1.1rem',
-                          background: 'linear-gradient(45deg, #00d4ff, #0099cc)',
-                          color: 'white',
-                          boxShadow: '0 8px 32px rgba(0, 212, 255, 0.3)',
-                          '&:hover': {
-                            background: 'linear-gradient(45deg, #0099cc, #00d4ff)',
-                            transform: 'translateY(-2px)',
-                            boxShadow: '0 12px 40px rgba(0, 212, 255, 0.4)',
-                          },
-                          transition: 'all 0.3s ease',
-                        }}
-                      >
-                        Get Started
-                        <ArrowForward sx={{ ml: 1 }} />
-                      </Button>
-                    </motion.div>
-                  </Box>
-                </Fade>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Slide direction="left" in timeout={1000}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      height: '100%',
-                    }}
-                  >
-                    <motion.div
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ duration: 1, delay: 0.5 }}
-                    >
-                      <Box
-                        sx={{
-                          width: { xs: 300, md: 400 },
-                          height: { xs: 300, md: 400 },
-                          background: 'rgba(0, 212, 255, 0.1)',
-                          borderRadius: '30px',
-                          backdropFilter: 'blur(20px)',
-                          border: '2px solid rgba(0, 212, 255, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 20px 60px rgba(0, 212, 255, 0.2)',
-                        }}
-                      >
-                        <Rocket sx={{ fontSize: 80, color: '#00d4ff' }} />
-                      </Box>
-                    </motion.div>
-                  </Box>
-                </Slide>
-              </Grid>
-            </Grid>
-          </Container>
-        </Box>
+        html {
+          scroll-behavior: smooth;
+        }
 
-        {/* Features Section */}
-        <Box
-          component="section"
-          sx={{
-            py: 8,
-            background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
-          }}
-        >
-          <Container maxWidth="lg">
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-            >
-              <Typography
-                variant="h3"
-                sx={{
-                  textAlign: 'center',
-                  fontWeight: 700,
-                  mb: 6,
-                  color: 'white',
-                  textShadow: '0 4px 20px rgba(0, 212, 255, 0.3)',
-                }}
-              >
-                Why Choose Our Platform?
-              </Typography>
-            </motion.div>
-            <Grid container spacing={4}>
-              {features.map((feature, index) => (
-                <Grid item xs={12} md={4} key={index}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 50 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: index * 0.1 }}
-                    viewport={{ once: true }}
-                  >
-                    <Card
-                      sx={{
-                        height: '100%',
-                        borderRadius: '20px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(0, 212, 255, 0.2)',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'translateY(-8px)',
-                          boxShadow: '0 16px 48px rgba(0, 212, 255, 0.2)',
-                          border: '1px solid rgba(0, 212, 255, 0.4)',
-                        },
-                      }}
-                    >
-                      <CardContent sx={{ textAlign: 'center', p: 4 }}>
-                        <Box sx={{ mb: 2 }}>{feature.icon}</Box>
-                        <Typography
-                          variant="h5"
-                          sx={{ fontWeight: 600, mb: 2, color: 'white' }}
-                        >
-                          {feature.title}
-                        </Typography>
-                        <Typography
-                          variant="body1"
-                          sx={{ color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.6 }}
-                        >
-                          {feature.description}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </Grid>
-              ))}
-            </Grid>
-          </Container>
-        </Box>
+        body {
+          font-family: 'Inter', sans-serif;
+          background-color: var(--color-bg);
+          color: var(--color-text-primary);
+          overflow-x: hidden;
+          position: relative;
+        }
 
-        {/* Unique Features Section */}
-        <Box
-          component="section"
-          sx={{
-            py: 8,
-            background: 'linear-gradient(135deg, #000000 0%, #0a0a0a 100%)',
-            position: 'relative',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'radial-gradient(circle at 30% 20%, rgba(0, 212, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(0, 212, 255, 0.1) 0%, transparent 50%)',
-              zIndex: 0,
-            },
-          }}
-        >
-          <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-            >
-              <Typography
-                variant="h3"
-                sx={{
-                  textAlign: 'center',
-                  fontWeight: 700,
-                  mb: 2,
-                  color: 'white',
-                  textShadow: '0 4px 20px rgba(0, 212, 255, 0.3)',
-                }}
-              >
-                Unique Features
-              </Typography>
-              <Typography
-                variant="h6"
-                sx={{
-                  textAlign: 'center',
-                  mb: 6,
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: 300,
-                }}
-              >
-                Cutting-edge technology that sets us apart
-              </Typography>
-            </motion.div>
+        .container {
+          width: 100%;
+          margin-left: auto;
+          margin-right: auto;
+          padding-left: 1rem;
+          padding-right: 1rem;
+        }
 
-            {/* AI Powered Insights Feature */}
-            <Box sx={{ mb: 8 }}>
-              <Grid container spacing={6} alignItems="center">
-                <Grid item xs={12} md={6}>
-                  <motion.div
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8 }}
-                    viewport={{ once: true }}
-                  >
-                    <Box
-                      sx={{
-                        background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 153, 204, 0.1) 100%)',
-                        borderRadius: '30px',
-                        p: 4,
-                        border: '2px solid rgba(0, 212, 255, 0.3)',
-                        backdropFilter: 'blur(20px)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          top: -50,
-                          right: -50,
-                          width: 100,
-                          height: 100,
-                          background: 'radial-gradient(circle, rgba(0, 212, 255, 0.2) 0%, transparent 70%)',
-                          borderRadius: '50%',
-                          animation: 'pulse 3s ease-in-out infinite',
-                        },
-                      }}
-                    >
-                      <Typography
-                        variant="h4"
-                        sx={{
-                          fontWeight: 700,
-                          mb: 3,
-                          color: 'white',
-                          textShadow: '0 2px 8px rgba(0, 212, 255, 0.3)',
-                        }}
-                      >
-                        AI-Powered Insights
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          color: 'rgba(255, 255, 255, 0.8)',
-                          mb: 3,
-                          lineHeight: 1.8,
-                          fontSize: '1.1rem',
-                        }}
-                      >
-                        Our advanced AI system analyzes student performance patterns in real-time, providing personalized insights and recommendations for improvement.
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {['Performance Analytics', 'Learning Patterns', 'Predictive Insights', 'Personalized Recommendations'].map((item, index) => (
-                          <Chip
-                            key={index}
-                            label={item}
-                            sx={{
-                              background: 'rgba(0, 212, 255, 0.2)',
-                              color: 'white',
-                              border: '1px solid rgba(0, 212, 255, 0.4)',
-                              '&:hover': {
-                                background: 'rgba(0, 212, 255, 0.3)',
-                              },
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  </motion.div>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <motion.div
-                    initial={{ opacity: 0, x: 50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                    viewport={{ once: true }}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        height: '100%',
-                        minHeight: 400,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 300,
-                          height: 300,
-                          background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 153, 204, 0.1) 100%)',
-                          borderRadius: '50%',
-                          border: '3px solid rgba(0, 212, 255, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: '80%',
-                            height: '80%',
-                            background: 'radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 70%)',
-                            borderRadius: '50%',
-                            animation: 'rotate 10s linear infinite',
-                          },
-                        }}
-                      >
-                        <Psychology sx={{ fontSize: 80, color: '#00d4ff', zIndex: 1, position: 'relative' }} />
-                      </Box>
-                    </Box>
-                  </motion.div>
-                </Grid>
-              </Grid>
-            </Box>
+        /* --- Background Animation --- */
+        #aurora-background {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: -1;
+          overflow: hidden;
+        }
 
-            {/* Anti-Cheating Interface Feature */}
-            <Box>
-              <Grid container spacing={6} alignItems="center" direction="row-reverse">
-                <Grid item xs={12} md={6}>
-                  <motion.div
-                    initial={{ opacity: 0, x: 50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8 }}
-                    viewport={{ once: true }}
-                  >
-                    <Box
-                      sx={{
-                        background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 153, 204, 0.1) 100%)',
-                        borderRadius: '30px',
-                        p: 4,
-                        border: '2px solid rgba(0, 212, 255, 0.3)',
-                        backdropFilter: 'blur(20px)',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          bottom: -50,
-                          left: -50,
-                          width: 100,
-                          height: 100,
-                          background: 'radial-gradient(circle, rgba(0, 212, 255, 0.2) 0%, transparent 70%)',
-                          borderRadius: '50%',
-                          animation: 'pulse 3s ease-in-out infinite 1.5s',
-                        },
-                      }}
-                    >
-                      <Typography
-                        variant="h4"
-                        sx={{
-                          fontWeight: 700,
-                          mb: 3,
-                          color: 'white',
-                          textShadow: '0 2px 8px rgba(0, 212, 255, 0.3)',
-                        }}
-                      >
-                        Highly Secure Anti-Cheating Interface
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        sx={{
-                          color: 'rgba(255, 255, 255, 0.8)',
-                          mb: 3,
-                          lineHeight: 1.8,
-                          fontSize: '1.1rem',
-                        }}
-                      >
-                        Advanced security measures including facial recognition, screen monitoring, and AI-powered behavior analysis to ensure exam integrity.
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {['Facial Recognition', 'Screen Monitoring', 'Behavior Analysis', 'Real-time Alerts'].map((item, index) => (
-                          <Chip
-                            key={index}
-                            label={item}
-                            sx={{
-                              background: 'rgba(0, 212, 255, 0.2)',
-                              color: 'white',
-                              border: '1px solid rgba(0, 212, 255, 0.4)',
-                              '&:hover': {
-                                background: 'rgba(0, 212, 255, 0.3)',
-                              },
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  </motion.div>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <motion.div
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                    viewport={{ once: true }}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        height: '100%',
-                        minHeight: 400,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 300,
-                          height: 300,
-                          background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 153, 204, 0.1) 100%)',
-                          borderRadius: '20px',
-                          border: '3px solid rgba(0, 212, 255, 0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: '80%',
-                            height: '80%',
-                            background: 'radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 70%)',
-                            borderRadius: '20px',
-                            animation: 'pulse 2s ease-in-out infinite',
-                          },
-                        }}
-                      >
-                        <Security sx={{ fontSize: 80, color: '#00d4ff', zIndex: 1, position: 'relative' }} />
-                      </Box>
-                    </Box>
-                  </motion.div>
-                </Grid>
-              </Grid>
-            </Box>
-          </Container>
-        </Box>
+        .aurora-shape {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(120px);
+          opacity: 0.2;
+        }
 
-        {/* Testimonials Section */}
-        <Box
-          component="section"
-          sx={{
-            py: 8,
-            background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)',
-          }}
-        >
-          <Container maxWidth="lg">
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-            >
-              <Typography
-                variant="h3"
-                sx={{
-                  textAlign: 'center',
-                  fontWeight: 700,
-                  mb: 6,
-                  color: 'white',
-                  textShadow: '0 4px 20px rgba(0, 212, 255, 0.3)',
-                }}
-              >
-                What Our Users Say
-              </Typography>
-            </motion.div>
-            <Grid container spacing={4}>
-              {testimonials.map((testimonial, index) => (
-                <Grid item xs={12} md={4} key={index}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 50 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: index * 0.2 }}
-                    viewport={{ once: true }}
-                  >
-                    <Card
-                      sx={{
-                        height: '100%',
-                        borderRadius: '20px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(0, 212, 255, 0.2)',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                      }}
-                    >
-                      <CardContent sx={{ p: 4 }}>
-                        <Box sx={{ display: 'flex', mb: 2 }}>
-                          {[...Array(testimonial.rating)].map((_, i) => (
-                            <Star key={i} sx={{ color: '#00d4ff', fontSize: 20 }} />
-                          ))}
-                        </Box>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            mb: 3,
-                            fontStyle: 'italic',
-                            color: 'rgba(255, 255, 255, 0.8)',
-                            lineHeight: 1.6,
-                          }}
-                        >
-                          "{testimonial.content}"
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Box
-                            sx={{
-                              width: 50,
-                              height: 50,
-                              borderRadius: '50%',
-                              background: 'linear-gradient(45deg, #00d4ff, #0099cc)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-                              color: 'white',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {testimonial.avatar}
-                          </Box>
-                          <Box>
-                            <Typography
-                              variant="h6"
-                              sx={{ fontWeight: 600, color: 'white' }}
-                            >
-                              {testimonial.name}
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{ color: 'rgba(255, 255, 255, 0.6)' }}
-                            >
-                              {testimonial.role}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </Grid>
-              ))}
-            </Grid>
-          </Container>
-        </Box>
+        .shape1 {
+          width: 600px;
+          height: 600px;
+          background: #4f46e5;
+        }
 
-        {/* Newsletter Section */}
-        <Box
-          component="section"
-          sx={{
-            py: 8,
-            background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)',
-          }}
-        >
-          <Container maxWidth="md">
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-            >
-              <Box
-                sx={{
-                  textAlign: 'center',
-                  background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 153, 204, 0.1) 100%)',
-                  borderRadius: '30px',
-                  p: 6,
-                  border: '2px solid rgba(0, 212, 255, 0.3)',
-                  backdropFilter: 'blur(20px)',
-                }}
-              >
-                <Typography
-                  variant="h4"
-                  sx={{
-                    fontWeight: 700,
-                    mb: 2,
-                    color: 'white',
-                    textShadow: '0 4px 20px rgba(0, 212, 255, 0.3)',
-                  }}
-                >
-                  Stay Updated
-                </Typography>
-                <Typography
-                  variant="body1"
-                  sx={{
-                    mb: 4,
-                    color: 'rgba(255, 255, 255, 0.8)',
-                  }}
-                >
-                  Subscribe to our newsletter for the latest updates and educational insights
-                </Typography>
-                <Box
-                  component="form"
-                  onSubmit={handleNewsletterSubmit}
-                  sx={{
-                    display: 'flex',
-                    gap: 2,
-                    maxWidth: 400,
-                    mx: 'auto',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                  }}
-                >
-                  <TextField
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    sx={{
-                      flex: 1,
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '25px',
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        color: 'white',
-                        '& fieldset': {
-                          border: '1px solid rgba(0, 212, 255, 0.3)',
-                        },
-                        '&:hover fieldset': {
-                          border: '1px solid rgba(0, 212, 255, 0.5)',
-                        },
-                        '&.Mui-focused fieldset': {
-                          border: '1px solid rgba(0, 212, 255, 0.7)',
-                        },
-                        '& input': {
-                          color: 'white',
-                          '&::placeholder': {
-                            color: 'rgba(255, 255, 255, 0.5)',
-                          },
-                        },
-                      },
-                    }}
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    sx={{
-                      borderRadius: '25px',
-                      px: 3,
-                      py: 1.5,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      background: 'linear-gradient(45deg, #00d4ff, #0099cc)',
-                      color: 'white',
-                      '&:hover': {
-                        background: 'linear-gradient(45deg, #0099cc, #00d4ff)',
-                      },
-                    }}
-                  >
-                    Subscribe
-                    <Email sx={{ ml: 1 }} />
-                  </Button>
-                </Box>
-              </Box>
-            </motion.div>
-          </Container>
-        </Box>
-
-        {/* Footer */}
-        <Box
-          component="footer"
-          sx={{
-            py: 4,
-            background: 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)',
-            borderTop: '1px solid rgba(0, 212, 255, 0.2)',
-          }}
-        >
-          <Container maxWidth="lg">
-      <Box
-        sx={{
-          display: 'flex',
-                justifyContent: 'space-between',
-          alignItems: 'center',
-                flexDirection: { xs: 'column', md: 'row' },
-          gap: 2,
-        }}
-      >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <School sx={{ fontSize: 24, color: '#00d4ff' }} />
-                <Typography variant="h6" sx={{ fontWeight: 600, color: 'white' }}>
-                  OctaMind
-                </Typography>
-              </Box>
-              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                © 2024 OctaMind. All rights reserved.
-        </Typography>
-            </Box>
-          </Container>
-        </Box>
-      </Box>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 0.3;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.6;
-            transform: scale(1.1);
-          }
+        .shape2 {
+          width: 500px;
+          height: 500px;
+          background: #7c3aed;
         }
         
-        @keyframes rotate {
-          from {
-            transform: translate(-50%, -50%) rotate(0deg);
+        .shape3 {
+          width: 400px;
+          height: 400px;
+          background: #db2777;
+        }
+        
+        .content-wrapper {
+          position: relative;
+          z-index: 10;
+        }
+
+        /* --- Header --- */
+        .header {
+          position: fixed;
+          width: 100%;
+          top: 0;
+          z-index: 50;
+          padding: 0.125rem 1rem;
+          transition: all 0.3s ease-in-out;
+        }
+        
+        .header-scrolled {
+          background: rgba(6, 8, 24, 0.7);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border-bottom: 1px solid var(--card-border);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .header nav {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .logo {
+          display: flex;
+          align-items: center;
+        }
+
+        .logo img {
+           width: 7rem;
+           height: 7rem;
+        }
+
+        .logo h1 {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: white;
+        }
+        
+        .login-btn {
+          border: 1px solid var(--color-indigo-500);
+          color: var(--color-text-secondary);
+          font-weight: 600;
+          padding: 0.5rem 1.5rem;
+          border-radius: 0.5rem;
+          transition: all 0.3s;
+          text-decoration: none;
+          font-size: 0.875rem;
+          background: none;
+          cursor: pointer;
+        }
+        
+        .login-btn:hover {
+          background-color: var(--color-indigo-500);
+          color: white;
+        }
+
+        /* --- Hero Section --- */
+        .hero-section {
+          padding-top: 10rem;
+          padding-bottom: 7rem;
+          text-align: center;
+        }
+
+        .hero-section .main-heading {
+          font-size: 3rem;
+          font-weight: 800;
+          color: white;
+          line-height: 1.2;
+          margin-bottom: 1rem;
+        }
+        
+        .brand-gradient {
+          background: linear-gradient(90deg, var(--color-indigo-light), var(--color-purple-light));
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          text-fill-color: transparent;
+        }
+        
+        .hero-section .sub-heading {
+          font-size: 1.25rem;
+          color: var(--color-text-secondary);
+          margin-bottom: 2rem;
+          font-weight: 300;
+        }
+
+        .hero-section .hero-paragraph {
+          max-width: 48rem;
+          margin-left: auto;
+          margin-right: auto;
+          color: var(--color-text-muted);
+          font-size: 1.125rem;
+          margin-bottom: 2.5rem;
+          line-height: 1.6;
+        }
+
+        .btn-primary {
+          background: linear-gradient(90deg, #6366F1, #8B5CF6);
+          color: white;
+          font-weight: 700;
+          padding: 1rem 3rem;
+          border-radius: 9999px;
+          font-size: 1.125rem;
+          text-decoration: none;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+          border: 1px solid transparent;
+          display: inline-block;
+          cursor: pointer;
+        }
+        
+        .btn-primary:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(139, 92, 246, 0.4);
+        }
+
+        /* --- General Section Styling --- */
+        .section {
+          padding-top: 6rem;
+          padding-bottom: 6rem;
+        }
+
+        .section-header {
+          text-align: center;
+          margin-bottom: 4rem;
+        }
+
+        .section-title {
+          font-size: 2.5rem;
+          font-weight: 700;
+          color: white;
+        }
+
+        .section-subtitle {
+          color: var(--color-text-secondary);
+          margin-top: 1rem;
+          max-width: 42rem;
+          margin-left: auto;
+          margin-right: auto;
+          font-size: 1.125rem;
+          line-height: 1.6;
+        }
+
+        /* --- Glass Cards --- */
+        .glass-card {
+          background: var(--card-bg);
+          backdrop-filter: blur(25px);
+          -webkit-backdrop-filter: blur(25px);
+          border: 1px solid var(--card-border);
+          border-radius: 1.25rem;
+          transition: all 0.4s ease;
+          padding: 2rem;
+        }
+
+        .glass-card:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          transform: translateY(-8px);
+          box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        /* --- Features Grid --- */
+        .features-grid {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 2rem;
+        }
+
+        .feature-card {
+          text-align: center;
+        }
+
+        .feature-card .icon-wrapper {
+          margin-bottom: 1.25rem;
+          display: inline-block;
+          padding: 1rem;
+          background-color: rgba(99, 102, 241, 0.1);
+          border-radius: 9999px;
+        }
+        
+        .feature-card .icon-wrapper svg {
+          width: 2rem;
+          height: 2rem;
+          color: var(--color-indigo-400);
+        }
+        
+        .feature-card h3 {
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: white;
+          margin-bottom: 0.75rem;
+        }
+
+        .feature-card p {
+          color: var(--color-text-muted);
+          line-height: 1.6;
+        }
+
+        /* --- Unique Features Section --- */
+        .unique-features-grid {
+             display: grid;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .unique-features-grid .glass-card {
+          padding: 2.5rem;
+        }
+
+        .unique-features-grid h3 {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: white;
+          margin-bottom: 1rem;
+        }
+        
+        .unique-features-grid p {
+          color: var(--color-text-muted);
+          margin-bottom: 1.5rem;
+          line-height: 1.6;
+        }
+        
+        .feature-list {
+          list-style: none;
+        }
+
+        .feature-list li {
+          display: flex;
+          align-items: center;
+          margin-bottom: 1rem;
+          color: var(--color-text-primary);
+        }
+        
+        .feature-list li:last-child {
+          margin-bottom: 0;
+        }
+
+        .feature-list svg {
+          width: 1.25rem;
+          height: 1.25rem;
+          color: var(--color-indigo-400);
+          margin-right: 0.75rem;
+        }
+
+        /* --- Testimonials --- */
+        .testimonials-grid {
+          display: grid;
+          grid-template-columns: repeat(1, 1fr);
+          gap: 2rem;
+        }
+
+        .testimonial-card p:first-child {
+          color: var(--color-text-muted);
+          margin-bottom: 1.5rem;
+          font-style: italic;
+          line-height: 1.6;
+        }
+
+        .testimonial-card .user-info {
+          display: flex;
+          align-items: center;
+        }
+
+        .testimonial-card .avatar {
+          width: 3rem;
+          height: 3rem;
+          border-radius: 9999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          color: white;
+          margin-right: 1rem;
+          font-size: 1.125rem;
+        }
+
+        .avatar.bg-indigo { background-color: var(--color-indigo-500); }
+        .avatar.bg-purple { background-color: var(--color-purple-500); }
+        .avatar.bg-pink { background-color: var(--color-pink-500); }
+
+        .testimonial-card .user-details h4 {
+          font-weight: 700;
+          color: white;
+        }
+
+        .testimonial-card .user-details p {
+          font-size: 0.875rem;
+          color: var(--color-text-secondary);
+        }
+        
+        /* --- Newsletter --- */
+        #newsletter .glass-card {
+          max-width: 48rem;
+          margin-left: auto;
+          margin-right: auto;
+          text-align: center;
+          padding: 2rem;
+        }
+
+        #newsletter h2 {
+          font-size: 1.875rem;
+          font-weight: 700;
+          color: white;
+          margin-bottom: 0.75rem;
+        }
+        
+        #newsletter p {
+          color: var(--color-text-secondary);
+          margin-bottom: 1.5rem;
+          line-height: 1.6;
+        }
+
+        .newsletter-form {
+          display: flex;
+          flex-direction: column;
+          max-width: 28rem;
+          margin: auto;
+        }
+        
+        .newsletter-form input {
+          width: 100%;
+          background-color: rgba(17, 24, 39, 0.5);
+          border: 1px solid #4b5563;
+          border-radius: 0.5rem;
+          padding: 0.75rem 1rem;
+          color: white;
+          transition: all 0.3s;
+          margin-bottom: 0.75rem;
+        }
+        
+        .newsletter-form input:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px var(--color-indigo-400);
+        }
+        
+        .newsletter-form button {
+          width: 100%;
+        }
+
+        /* --- Footer --- */
+        .footer {
+          padding-top: 2.5rem;
+          padding-bottom: 2.5rem;
+          border-top: 1px solid var(--card-border);
+          text-align: center;
+          color: #9ca3af;
+        }
+        
+        .footer h3 {
+          font-size: 1.125rem;
+          font-weight: 600;
+          color: white;
+          margin-bottom: 0.5rem;
+        }
+
+        .footer p {
+          font-size: 0.875rem;
+        }
+
+        /* --- Toast Notification --- */
+        .toast {
+          position: fixed;
+          top: 2rem;
+          right: 2rem;
+          background: linear-gradient(135deg, #10b981, #059669);
+          color: white;
+          padding: 1rem 1.5rem;
+          border-radius: 0.75rem;
+          box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+          z-index: 1000;
+          transform: translateX(100%);
+          transition: transform 0.3s ease-in-out;
+          max-width: 400px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .toast.show {
+          transform: translateX(0);
+        }
+
+        .toast-content {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .toast-icon {
+          width: 1.5rem;
+          height: 1.5rem;
+          flex-shrink: 0;
+        }
+
+        .toast-message {
+          font-weight: 500;
+          line-height: 1.4;
+        }
+
+        /* --- Media Queries for Responsiveness --- */
+        @media (min-width: 640px) {
+          .container {
+            max-width: 640px;
           }
-          to {
-            transform: translate(-50%, -50%) rotate(360deg);
+          .features-grid { grid-template-columns: repeat(2, 1fr); }
+          .testimonials-grid { grid-template-columns: repeat(2, 1fr); }
+          #newsletter .glass-card { padding: 3rem; }
+          .newsletter-form {
+            flex-direction: row;
+          }
+          .newsletter-form input {
+            width: 66.66%;
+            margin-bottom: 0;
+            margin-right: 0.75rem;
+          }
+          .newsletter-form button { width: auto; }
+        }
+
+        @media (min-width: 768px) {
+          .container {
+            max-width: 768px;
+          }
+          .hero-section .main-heading { font-size: 4.5rem; }
+          .hero-section .sub-heading { font-size: 1.5rem; }
+          .section-title { font-size: 3rem; }
+        }
+
+        @media (min-width: 1024px) {
+          .container {
+            max-width: 1024px;
+          }
+          .features-grid { grid-template-columns: repeat(3, 1fr); }
+          .unique-features-grid { grid-template-columns: repeat(2, 1fr); }
+          .testimonials-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        @media (min-width: 1280px) {
+          .container {
+            max-width: 1280px;
           }
         }
       `}</style>
-    </Box>
+
+      <div id="aurora-background">
+        <div className="aurora-shape shape1"></div>
+        <div className="aurora-shape shape2"></div>
+        <div className="aurora-shape shape3"></div>
+      </div>
+      
+      <div className="content-wrapper">
+      {/* Header */}
+        <header id="header" className="header">
+          <nav className="container">
+            <div className="logo">
+                <img 
+                  src="/Logo.svg" 
+                  alt="OctoMind Logo" 
+                  style={{ 
+                    height: '7rem', 
+                    filter: 'brightness(0) invert(1)' // Make it white for dark background
+                  }} 
+                />
+            </div>
+            <button onClick={handleLogin} className="login-btn">Login</button>
+          </nav>
+        </header>
+
+        {/* Hero Section */}
+        <main>
+          <section className="hero-section container">
+            <h1 className="main-heading">
+              <span className="brand-gradient">OctoMind</span> By F13 Technologies
+            </h1>
+            <h2 className="sub-heading">India's AI-Based Assessment Platform</h2>
+            <p className="hero-paragraph">
+              Transform your learning experience with intelligent, personalized assessments. Experience the future of education with our cutting-edge AI that adapts to every student's unique learning style.
+            </p>
+            <button onClick={handleGetStarted} className="btn-primary">
+                        Get Started
+            </button>
+          </section>
+        </main>
+
+        {/* Why Choose Us Section */}
+        <section id="why-choose-us" className="section">
+          <div className="container">
+            <div className="section-header">
+              <h2 className="section-title">Why Choose Our Platform?</h2>
+              <p className="section-subtitle">Discover the features that make OctoMind the pinnacle of modern learning and assessment technology.</p>
+            </div>
+            <div className="features-grid">
+              {/* Feature 1 */}
+              <div className="glass-card feature-card">
+                <div className="icon-wrapper">
+                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.98 0l2.01 2.01"/></svg>
+                </div>
+                <h3>AI-Powered Learning</h3>
+                <p>Advanced artificial intelligence that adapts to your learning style and pace.</p>
+              </div>
+              {/* Feature 2 */}
+              <div className="glass-card feature-card">
+                   <div className="icon-wrapper">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>
+                  </div>
+                  <h3>Real-time Analytics</h3>
+                  <p>Comprehensive insights into your performance and progress tracking.</p>
+              </div>
+              {/* Feature 3 */}
+              <div className="glass-card feature-card">
+                   <div className="icon-wrapper">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>
+                  </div>
+                  <h3>Interactive Assessments</h3>
+                  <p>Engaging quizzes and tests that make learning enjoyable and effective.</p>
+              </div>
+              {/* Feature 4 */}
+              <div className="glass-card feature-card">
+                   <div className="icon-wrapper">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  </div>
+                  <h3>Smart Evaluation</h3>
+                  <p>Intelligent evaluation system that provides detailed feedback and recommendations.</p>
+              </div>
+               {/* Feature 5 */}
+              <div className="glass-card feature-card">
+                   <div className="icon-wrapper">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                  </div>
+                  <h3>Progress Tracking</h3>
+                  <p>Track your learning journey with detailed progress reports and milestones.</p>
+              </div>
+               {/* Feature 6 */}
+              <div className="glass-card feature-card">
+                   <div className="icon-wrapper">
+                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+                  </div>
+                  <h3>Personalized Experience</h3>
+                  <p>Tailored learning experience that adapts to your individual needs and preferences.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Unique Features Section */}
+        <section id="unique-features" className="section">
+          <div className="container">
+                 <div className="section-header">
+                    <h2 className="section-title">Unique Features</h2>
+                    <p className="section-subtitle">Cutting-edge technology that sets us apart from the competition.</p>
+                </div>
+                <div className="unique-features-grid">
+                    <div className="glass-card">
+                        <h3>AI-Powered Insights</h3>
+                        <p>Our advanced AI system analyzes student performance patterns in real-time, providing personalized insights and recommendations for improvement.</p>
+                        <ul className="feature-list">
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Performance Analytics</li>
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Learning Patterns</li>
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Predictive Insights</li>
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Personalized Recommendations</li>
+                        </ul>
+                    </div>
+                     <div className="glass-card">
+                        <h3>Highly Secure Anti-Cheating Interface</h3>
+                        <p>Advanced security measures including facial recognition, screen monitoring, and AI-powered behavior analysis to ensure exam integrity.</p>
+                        <ul className="feature-list">
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Facial Recognition</li>
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Screen Monitoring</li>
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Behavior Analysis</li>
+                            <li><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Real-time Alerts</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {/* Testimonials Section */}
+        <section id="testimonials" className="section">
+            <div className="container">
+                <h2 className="section-title section-header">What Our Users Say</h2>
+                <div className="testimonials-grid">
+                    {/* Testimonial 1 */}
+                    <div className="glass-card testimonial-card">
+                        <p>"The OctoMind AI-powered assessment system has completely transformed how I study and prepare for exams. The personalized feedback is incredible!"</p>
+                        <div className="user-info">
+                            <div className="avatar bg-indigo">SJ</div>
+                            <div className="user-details">
+                                <h4>Sarah Johnson</h4>
+                                <p>Student</p>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Testimonial 2 */}
+                    <div className="glass-card testimonial-card">
+                        <p>"As an educator, I love how this platform adapts to each student's learning pace and style. It's revolutionized my teaching approach."</p>
+                        <div className="user-info">
+                            <div className="avatar bg-purple">MC</div>
+                            <div className="user-details">
+                                <h4>Dr. Michael Chen</h4>
+                                <p>Professor</p>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Testimonial 3 */}
+                    <div className="glass-card testimonial-card">
+                        <p>"The personalized feedback and analytics help me understand exactly where I need to improve. It's like having a personal tutor!"</p>
+                        <div className="user-info">
+                            <div className="avatar bg-pink">ER</div>
+                            <div className="user-details">
+                                <h4>Emily Rodriguez</h4>
+                                <p>Student</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        {/* Newsletter Section */}
+        <section id="newsletter" className="section">
+            <div className="container">
+                <div className="glass-card">
+                    <h2>Stay Updated</h2>
+                    <p>Subscribe to our newsletter for the latest updates and educational insights.</p>
+                    <form onSubmit={handleNewsletterSubmit} className="newsletter-form">
+                        <input type="email" placeholder="Enter your email" required />
+                        <button type="submit" className="btn-primary">Subscribe</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="footer">
+            <div className="container">
+                <h3>OctoMind By F13 Technologies</h3>
+                <p>&copy; 2024 OctoMind. All rights reserved.</p>
+            </div>
+        </footer>
+
+        {/* Toast Notification */}
+        {showToast && (
+          <div className={`toast ${showToast ? 'show' : ''}`}>
+            <div className="toast-content">
+              <svg className="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <div className="toast-message">{toastMessage}</div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
   );
 }

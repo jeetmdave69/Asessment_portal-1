@@ -49,7 +49,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   }, [mode]);
 
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      afterSignInUrl="/dashboard"
+      afterSignUpUrl="/dashboard"
+    >
       <html lang="en">
         <body style={{ margin: 0, padding: 0 }}>
           <ThemeProvider theme={theme}>

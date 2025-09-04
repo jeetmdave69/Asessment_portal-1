@@ -1,168 +1,144 @@
 'use client';
 
 import { SignIn } from '@clerk/nextjs';
-import { motion } from 'framer-motion';
-import { Box, Typography, useTheme, useMediaQuery } from '@mui/material'; // Add useMediaQuery
-import { alpha } from '@mui/material/styles';
-import Particles from 'react-tsparticles';
-import { loadSlim } from 'tsparticles-slim';
-import type { Engine, Container } from 'tsparticles-engine';
+import { Box } from '@mui/material';
 
 export default function SignInPage() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
-  // Initialize tsparticles
-  const particlesInit = async (main: Engine): Promise<void> => {
-    await loadSlim(main);
-  };
-
-  // Optional: Callback when particles are loaded
-  const particlesLoaded = async (container?: Container): Promise<void> => {};
-
   return (
     <Box
       sx={{
-        position: 'fixed',
-        inset: 0,
-        minHeight: '100vh',
         width: '100%',
-        overflow: 'hidden',
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
-        background: '#000',
-        flexDirection: 'column',
+        alignItems: 'center',
       }}
     >
-      {/* Particle Background - only on non-mobile */}
-      {!isMobile && (
-        <Particles
-          id="tsparticles"
-          init={particlesInit}
-          loaded={particlesLoaded}
-          options={{
-            background: {
-              color: { value: 'transparent' },
+      <SignIn 
+        appearance={{ 
+          baseTheme: undefined, // Remove any default theme
+          variables: {
+            colorPrimary: '#0f172a',
+            colorText: '#1e293b',
+            colorTextSecondary: '#64748b',
+            colorBackground: '#ffffff',
+            colorInputBackground: '#ffffff',
+            colorInputText: '#1e293b',
+            borderRadius: '8px', // Sharper corners
+            fontFamily: 'Inter, sans-serif',
+          },
+          elements: { 
+            rootBox: {
+              width: '100%',
+              maxWidth: '100%',
             },
-            fpsLimit: 120,
-            interactivity: {
-              events: {
-                onClick: { enable: false, mode: 'push' },
-                onHover: { enable: true, mode: 'repulse' },
-                resize: true,
-              },
-              modes: {
-                push: { quantity: 4 },
-                repulse: { distance: 100, duration: 0.4 },
+            card: { 
+              borderRadius: '8px !important', // Sharper, more angular
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15) !important', // Bolder shadow
+              border: '2px solid rgba(0, 0, 0, 0.1) !important', // Bolder border
+              backgroundColor: '#ffffff !important',
+              padding: '32px !important', // More generous padding
+            },
+            headerTitle: {
+              fontSize: '1.75rem !important', // Larger, bolder title
+              fontWeight: '700 !important', // Bolder weight
+              color: '#0f172a !important', // Darker, bolder color
+              fontFamily: 'Poppins, sans-serif !important',
+              letterSpacing: '-0.025em !important', // Tighter letter spacing
+            },
+            headerSubtitle: {
+              fontSize: '1rem !important', // Larger subtitle
+              color: '#374151 !important', // Darker color for better contrast
+              fontFamily: 'Inter, sans-serif !important',
+              fontWeight: '500 !important', // Medium weight for better readability
+            },
+            formButtonPrimary: {
+              backgroundColor: '#0f172a !important',
+              borderRadius: '6px !important', // Sharper button corners
+              fontSize: '1rem !important', // Larger text
+              fontWeight: '600 !important', // Bolder weight
+              padding: '16px 32px !important', // Larger padding for bolder appearance
+              border: 'none !important',
+              color: '#ffffff !important',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.3) !important', // Bolder button shadow
+              '&:hover': {
+                backgroundColor: '#1e293b !important',
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.4) !important', // Enhanced hover shadow
+                transform: 'translateY(-1px) !important', // Subtle lift effect
               },
             },
-            particles: {
-              color: { value: '#ffffff' },
-              links: {
-                color: '#ffffff',
-                distance: 150,
-                enable: true,
-                opacity: 0.2,
-                width: 1,
+            formFieldInput: {
+              borderRadius: '6px !important', // Sharper input corners
+              border: '2px solid #e2e8f0 !important', // Bolder border
+              fontSize: '1rem !important', // Larger text
+              padding: '16px 20px !important', // Larger padding
+              backgroundColor: '#ffffff !important',
+              color: '#1e293b !important',
+              fontWeight: '500 !important', // Medium weight for better readability
+              '&:focus': {
+                borderColor: '#0f172a !important',
+                borderWidth: '2px !important', // Maintain bold border on focus
+                boxShadow: '0 0 0 4px rgba(15, 23, 42, 0.15) !important', // Bolder focus ring
+                outline: 'none !important',
               },
-              collisions: { enable: false },
-              move: {
-                direction: 'none',
-                enable: true,
-                outModes: { default: 'bounce' },
-                random: false,
-                speed: 1,
-                straight: false,
-              },
-              number: {
-                density: { enable: true, area: 800 },
-                value: 80,
-              },
-              opacity: { value: 0.3 },
-              shape: { type: 'circle' },
-              size: { value: { min: 1, max: 3 } },
             },
-            detectRetina: true,
-          }}
-          style={{
-            position: 'absolute',
-            zIndex: 0,
-            width: '100%',
-            height: '100%',
-          }}
-        />
-      )}
-
-      {/* Soft radial vignette overlay - less pronounced on mobile */}
-      <Box
-        sx={{
-          position: 'absolute',
-          inset: 0,
-          background: isMobile
-            ? 'radial-gradient(ellipse at center, rgba(0,0,0,0.15) 60%, rgba(0,0,0,0.7) 100%)'
-            : 'radial-gradient(ellipse at center, rgba(0,0,0,0.01) 60%, rgba(0,0,0,0.5) 100%)',
-          boxShadow: isMobile ? undefined : '0 8px 32px 0 rgba(31, 38, 135, 0.18)',
-          zIndex: 1,
-        }}
-      />
-
-      {/* Main content container with animation */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, ease: 'easeOut' }}
-        style={{
-          position: 'relative',
-          zIndex: 2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: isMobile ? '1rem' : '2rem',
-          flexDirection: 'column',
-          textAlign: 'center',
-        }}
-      >
-        {/* Modernized Heading */}
-        <Typography
-          variant="h3"
-          component="h1"
-          sx={{
-            fontWeight: 800,
-            marginBottom: 1,
-            fontSize: { xs: '2rem', sm: '2.8rem', md: '3.2rem' },
-            color: theme.palette.common?.white || '#fff',
-            textShadow: '0 4px 20px rgba(0,0,0,0.7)',
-            letterSpacing: '0.05em',
-          }}
-        >
-          OctaMind
-        </Typography>
-
-        {/* Modernized Subtitle */}
-        <Typography
-          variant="body1"
-          sx={{
-            color: alpha(theme.palette.common?.white || '#fff', 0.8),
-            fontWeight: 400,
-            fontSize: { xs: '1rem', sm: '1.1rem', md: '1.2rem' },
-            marginBottom: isMobile ? '2rem' : '3rem',
-            maxWidth: '550px',
-            lineHeight: 1.6,
-          }}
-        >
-          Your seamless gateway to smarter testing and learning experiences. Empowering education with intuitive tools.
-        </Typography>
-
-        {/* Clerk Sign-in Component */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        >
-          <SignIn path="/sign-in" routing="path" />
-        </motion.div>
-      </motion.div>
+            dividerLine: {
+              backgroundColor: '#d1d5db !important', // Darker divider
+              height: '2px !important', // Bolder divider line
+            },
+            dividerText: {
+              color: '#6b7280 !important', // Darker text
+              fontSize: '1rem !important', // Larger text
+              fontFamily: 'Inter, sans-serif !important',
+              fontWeight: '600 !important', // Bolder weight
+            },
+            socialButtonsBlockButton: {
+              borderRadius: '6px !important', // Sharper corners
+              border: '2px solid #d1d5db !important', // Bolder border
+              backgroundColor: '#ffffff !important',
+              color: '#374151 !important',
+              fontSize: '1rem !important', // Larger text
+              fontWeight: '600 !important', // Bolder weight
+              padding: '16px 32px !important', // Larger padding
+              '&:hover': {
+                backgroundColor: '#f9fafb !important',
+                borderColor: '#9ca3af !important',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1) !important', // Hover shadow
+              },
+            },
+            footerActionLink: {
+              color: '#0f172a !important', // Darker color
+              fontSize: '1rem !important', // Larger text
+              fontWeight: '600 !important', // Bolder weight
+              textDecoration: 'none !important',
+              '&:hover': {
+                color: '#1e293b !important',
+                textDecoration: 'underline !important',
+              },
+            },
+            formFieldLabel: {
+              color: '#1f2937 !important', // Darker color
+              fontSize: '1rem !important', // Larger text
+              fontWeight: '600 !important', // Bolder weight
+              fontFamily: 'Inter, sans-serif !important',
+              marginBottom: '8px !important', // Better spacing
+            },
+            formFieldInputShowPasswordButton: {
+              color: '#6b7280 !important', // Darker color
+              fontSize: '1.125rem !important', // Larger icon
+              '&:hover': {
+                color: '#374151 !important',
+              },
+            },
+            formFieldRow: {
+              marginBottom: '24px !important', // Better spacing between fields
+            },
+            formButtonReset: {
+              fontSize: '1rem !important', // Larger text
+              fontWeight: '500 !important', // Medium weight
+            },
+              }
+            }}
+          />
     </Box>
   );
 }

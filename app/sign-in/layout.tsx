@@ -1,167 +1,374 @@
-// app/sign-in/layout.tsx
-
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
-import { Box, CssBaseline, useTheme, alpha } from '@mui/material'; // Import useTheme and alpha
-import { ThemeModeProvider } from '@/theme/theme-provider'; // Assuming this path is correct for your theme provider
+import { 
+  Box, 
+  CssBaseline, 
+  Typography,
+  Avatar,
+  IconButton,
+  Tooltip
+} from '@mui/material';
+import Image from 'next/image';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useRouter } from 'next/navigation';
+import { ThemeModeProvider } from '@/theme/theme-provider';
+import { keyframes } from '@mui/system';
 
-// ----------------------------------------------------------------------
-// Thematic "Live" Background Component (CSS-only, integrated into layout)
-// Creates a subtle, animated network/data flow effect for an OctaMind theme.
-// ----------------------------------------------------------------------
-const AssessmentPortalThematicBackground = () => {
-  const theme = useTheme();
+// Entrance animations
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+`;
+
+const slideInLeft = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const slideInRight = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
+
+const scaleIn = keyframes`
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+`;
+
+export default function SignInLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  const handleGoBack = () => {
+    // Use window.location to navigate directly to the landing page
+    // This bypasses any Clerk redirect logic
+    window.location.href = '/';
+  };
 
   return (
-    <Box
-      sx={{
-        position: 'absolute',
-        inset: 0,
-        overflow: 'hidden',
-        // Deeper, richer gradient for a more premium modern look
-        // Uses primary colors for a consistent brand feel
-        background: `linear-gradient(155deg, #000 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.main} 100%)`,
-
-        // Layer 1: Animated "nodes" (data points) - even more subtle, softer glow
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          inset: 0,
-          backgroundImage: `
-            radial-gradient(circle at 10% 20%, ${alpha(theme.palette.info.light, 0.05)} 1.5px, transparent 1.5px),
-            radial-gradient(circle at 90% 80%, ${alpha(theme.palette.success.light, 0.05)} 1.5px, transparent 1.5px),
-            radial-gradient(circle at 30% 70%, ${alpha(theme.palette.warning.light, 0.05)} 1.5px, transparent 1.5px),
-            radial-gradient(circle at 60% 40%, ${alpha(theme.palette.primary.light, 0.03)} 1.5px, transparent 1.5px)
-          `,
-          backgroundSize: '40px 40px', // Larger grid for sparser, cleaner feel
-          animation: 'movePoints 80s linear infinite', // Slower animation for extreme calmness
-          opacity: 0.7, // Reduced opacity
-          zIndex: -1, // Behind the main background box
+    <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      afterSignInUrl="/dashboard"
+      afterSignUpUrl="/dashboard"
+      appearance={{
+        variables: {
+          colorPrimary: '#6200EA',
+          borderRadius: '12px',
         },
-
-        // Layer 2: Animated "lines" (information flow) - extremely subtle, delicate lines
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          inset: 0,
-          background: `
-            linear-gradient(0deg, transparent 49%, ${alpha(theme.palette.info.main, 0.03)} 50%, transparent 51%),
-            linear-gradient(90deg, transparent 49%, ${alpha(theme.palette.success.main, 0.03)} 50%, transparent 51%),
-            linear-gradient(45deg, transparent 49%, ${alpha(theme.palette.primary.light, 0.02)} 50%, transparent 51%)
-          `,
-          backgroundSize: '150px 150px', // Even wider spacing for minimalist lines
-          animation: 'moveLines 60s linear infinite', // Slower for subtle motion
-          opacity: 0.5, // Reduced opacity
-          zIndex: -2, // Even further behind
-        },
-
-        // Layer 3: Subtle color shifting overlay for depth - refined blend mode
-        '& .color-shift': {
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          background: `linear-gradient(120deg, ${alpha(theme.palette.secondary.light, 0.02)} 0%, ${alpha(theme.palette.info.light, 0.02)} 100%)`,
-          mixBlendMode: 'overlay', // Most subtle blend mode
-          animation: 'colorShift 25s ease-in-out infinite alternate', // Slower animation
-          zIndex: -3, // Furthest back
-        },
-
-        // Keyframes for subtle movement of points - adjusted speed
-        '@keyframes movePoints': {
-          '0%': { backgroundPosition: '0 0' },
-          '100%': { backgroundPosition: '4000px 4000px' },
-        },
-
-        // Keyframes for subtle movement of lines - adjusted speed
-        '@keyframes moveLines': {
-          '0%': { backgroundPosition: '0 0' },
-          '100%': { backgroundPosition: '1500px 1500px' },
-        },
-
-        // Keyframes for color shifting overlay - adjusted speed and opacity range
-        '@keyframes colorShift': {
-          '0%': { opacity: 0.5 },
-          '50%': { opacity: 0.8 },
-          '100%': { opacity: 0.5 },
+        elements: {
+          formButtonPrimary: {
+            background: 'linear-gradient(135deg, #6200EA 0%, #7C3AED 100%)',
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '1rem',
+            padding: '12px 24px',
+            '&:hover': {
+              transform: 'translateY(-1px)',
+            },
+          },
+          formFieldInput: {
+            borderRadius: '10px',
+          },
+          footer: {
+            display: 'none',
+          },
+          // Hide all Clerk card elements
+          card: {
+            display: 'none',
+          },
+          rootBox: {
+            background: 'transparent',
+            boxShadow: 'none',
+            border: 'none',
+            padding: 0,
+            margin: 0,
+          },
+          header: {
+            display: 'none',
+          },
+          headerTitle: {
+            display: 'none',
+          },
+          headerSubtitle: {
+            display: 'none',
+          },
+          form: {
+            background: 'transparent',
+            boxShadow: 'none',
+            border: 'none',
+            padding: 0,
+            margin: 0,
+          },
+          formSection: {
+            background: 'transparent',
+            boxShadow: 'none',
+            border: 'none',
+            padding: 0,
+            margin: 0,
+          },
         },
       }}
     >
-      {/* Layer 3: Color shift overlay (for extra depth) */}
-      <Box className="color-shift" />
-    </Box>
-  );
-};
-
-// ----------------------------------------------------------------------
-
-export default function SignInLayout({ children }: { children: React.ReactNode }) {
-  const theme = useTheme(); // Use useTheme hook here as well
-
-  return (
-    <ClerkProvider>
       <ThemeModeProvider>
         <CssBaseline />
-
-        {/* Main container for the entire login page, covering the full viewport */}
+        
+        {/* Full page container with entrance animation */}
         <Box
           sx={{
-            position: 'fixed',
-            inset: 0,
-            minHeight: '100vh',
-            width: '100%',
-            overflow: 'hidden',
+            width: '100vw',
+            height: '100vh',
+            bgcolor: '#F5F7FB',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            flexDirection: 'column',
-            // Base background for the entire layout. This is the deepest visual layer.
-            background: `linear-gradient(120deg, #000 0%, ${theme.palette.primary.dark} 50%, ${theme.palette.primary.main} 100%)`,
+            overflow: 'hidden',
+            animation: `${fadeIn} 0.3s ease-out`,
+            '@media (prefers-reduced-motion: reduce)': {
+              animation: 'none',
+            },
+            position: 'relative',
           }}
         >
-          {/* 1. The main Thematic "Live" background component */}
-          <AssessmentPortalThematicBackground />
-
-          {/* 2. Deep Gradient Overlay - crucial for readability and professional look */}
+          {/* Logo in top left corner */}
           <Box
             sx={{
               position: 'absolute',
-              inset: 0,
-              // Increased opacity for a deeper, more refined look over the thematic background
-              background: `linear-gradient(135deg, ${alpha('#000', 0.96)} 0%, ${alpha(theme.palette.primary.main, 0.96)} 100%)`, // Even higher alpha
-              backdropFilter: 'blur(12px) saturate(1.2)', // Glassmorphism effect
-              zIndex: 1, // Above the thematic background
-            }}
-          />
-
-          {/* 3. Subtle Vignette Overlay - adds cinematic depth */}
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.01) 60%, rgba(0,0,0,0.5) 100%)', // More pronounced vignette for focus
-              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.18)', // Soft shadow for depth
-              zIndex: 2, // Above the gradient overlay
-            }}
-          />
-
-          {/* Content area for children (your SignInPage component) */}
-          <Box
-            sx={{
-              position: 'relative', // Important for zIndex to work against fixed background
-              zIndex: 3, // Ensures content is on top of all background layers
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'column',
-              // No background color here, let the thematic background show through
-              // bgcolor: 'transparent', // Explicitly transparent
-              minHeight: '100vh', // Ensure children container also takes full height for centering
-              width: '100%', // Ensure children container takes full width
-              px: 2, // Padding for content
+              top: '24px',
+              left: '24px',
+              zIndex: 1000,
+              animation: `${fadeIn} 0.6s ease-out 0.2s both`,
+              '@media (prefers-reduced-motion: reduce)': {
+                animation: 'none',
+              },
             }}
           >
-            {children}
+            <Image
+              src="/Logo.svg"
+              alt="OctoMind Logo"
+              width={180}
+              height={60}
+              priority
+              style={{
+                filter: 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1))',
+              }}
+            />
+          </Box>
+
+          {/* Back button in top right corner */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '24px',
+              right: '24px',
+              zIndex: 1000,
+              animation: `${fadeIn} 0.6s ease-out 0.2s both`,
+              '@media (prefers-reduced-motion: reduce)': {
+                animation: 'none',
+              },
+            }}
+          >
+            <Tooltip title="Back to Home">
+              <IconButton
+                onClick={handleGoBack}
+                sx={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 1)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.15)',
+                  },
+                  transition: 'all 0.2s ease-in-out',
+                }}
+                aria-label="Go back to home page"
+              >
+                <ArrowBackIcon sx={{ color: '#6200EA' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          {/* Login container with scale entrance */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              width: '100%',
+              height: '100%',
+              bgcolor: '#FFFFFF',
+              overflow: 'hidden',
+              animation: `${scaleIn} 0.4s ease-out 0.1s both`,
+              '@media (prefers-reduced-motion: reduce)': {
+                animation: 'none',
+              },
+            }}
+          >
+            
+            {/* Left Brand Panel with slide-in animation */}
+            <Box
+              sx={{
+                position: 'relative',
+                background: 'linear-gradient(135deg, #6200EA 0%, #7C3AED 100%)',
+                color: '#FFFFFF',
+                display: { xs: 'none', md: 'flex' },
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '40px',
+                textAlign: 'center',
+                clipPath: 'polygon(0 0, 100% 0, 80% 100%, 0% 100%)',
+                animation: `${slideInLeft} 0.5s ease-out 0.2s both`,
+                '@media (prefers-reduced-motion: reduce)': {
+                  animation: 'none',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  maxWidth: '380px',
+                  zIndex: 2,
+                }}
+              >
+                <Typography
+                  variant="h1"
+                  sx={{
+                    fontSize: '3rem',
+                    fontWeight: 700,
+                    mb: 2,
+                    animation: `${fadeIn} 0.6s ease-out 0.4s both`,
+                    '@media (prefers-reduced-motion: reduce)': {
+                      animation: 'none',
+                    },
+                  }}
+                >
+                  Welcome Back!
+                </Typography>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontSize: '1.3rem',
+                    lineHeight: 1.6,
+                    opacity: 0.9,
+                    animation: `${fadeIn} 0.6s ease-out 0.5s both`,
+                    '@media (prefers-reduced-motion: reduce)': {
+                      animation: 'none',
+                    },
+                  }}
+                >
+                  Your seamless gateway to smarter testing and learning experiences. Sign in to continue your journey.
+                </Typography>
+              </Box>
+              
+              <Typography
+                variant="body2"
+                sx={{
+                  position: 'absolute',
+                  bottom: '30px',
+                  fontSize: '0.9rem',
+                  opacity: 0.7,
+                  animation: `${fadeIn} 0.6s ease-out 0.6s both`,
+                  '@media (prefers-reduced-motion: reduce)': {
+                    animation: 'none',
+                  },
+                }}
+              >
+                © 2025 OctoMind Inc. All rights reserved.
+              </Typography>
+            </Box>
+
+            {/* Right Form Panel with slide-in animation */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: { xs: 'flex-start', md: 'center' },
+                padding: '40px',
+                pt: { xs: '15vh', md: '40px' },
+                animation: `${slideInRight} 0.5s ease-out 0.3s both`,
+                '@media (prefers-reduced-motion: reduce)': {
+                  animation: 'none',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  textAlign: 'center',
+                  animation: `${fadeIn} 0.6s ease-out 0.7s both`,
+                  '@media (prefers-reduced-motion: reduce)': {
+                    animation: 'none',
+                  },
+                }}
+              >
+                <Typography
+                  variant="h2"
+                  sx={{
+                    fontSize: '2.5rem',
+                    fontWeight: 600,
+                    color: '#121212',
+                    mb: 1,
+                    animation: `${fadeIn} 0.6s ease-out 0.8s both`,
+                    '@media (prefers-reduced-motion: reduce)': {
+                      animation: 'none',
+                    },
+                  }}
+                >
+                  Sign In to OctoMind
+                </Typography>
+                <Typography
+                  variant="body1"
+                  sx={{
+                    color: '#757575',
+                    mb: 4,
+                    fontSize: '1.1rem',
+                    animation: `${fadeIn} 0.6s ease-out 0.9s both`,
+                    '@media (prefers-reduced-motion: reduce)': {
+                      animation: 'none',
+                    },
+                  }}
+                >
+                  Enter your details below to access your account.
+                </Typography>
+                
+                {/* Clerk SignIn Widget with fade-in animation */}
+                <Box 
+                  sx={{ 
+                    width: '100%',
+                    animation: `${fadeIn} 0.6s ease-out 1s both`,
+                    '@media (prefers-reduced-motion: reduce)': {
+                      animation: 'none',
+                    },
+                  }}
+                >
+                  {children}
+                </Box>
+              </Box>
+            </Box>
           </Box>
         </Box>
       </ThemeModeProvider>

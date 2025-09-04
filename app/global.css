@@ -1,4 +1,3 @@
-/* Remove Tailwind directives and keep only the custom CSS */
 @import url('https://fonts.googleapis.com/css?family=Montserrat:400,800');
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700;800;900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
@@ -23,18 +22,19 @@
   }
 }
 
+/* Inter font is now loaded via Next.js font optimization */
+
 /* Base styles */
-html,
-body {
+html, body {
+  height: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  height: 100%;
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
-  background-color: #f8fafc;
+  background-color: #f7f8fb;
   color: #0f172a;
 }
 
@@ -143,8 +143,8 @@ input, textarea, select {
 
 .btn-neutral {
   background-color: white;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: #334155;
+  border: 1px solid #cbd5e1;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   font-weight: 500;
@@ -153,12 +153,12 @@ input, textarea, select {
 }
 
 .btn-neutral:hover {
-  background-color: #f9fafb;
+  background-color: #f8fafc;
 }
 
 .btn-neutral:focus {
   outline: none;
-  box-shadow: 0 0 0 2px #d1d5db;
+  box-shadow: 0 0 0 2px #cbd5e1;
 }
 
 /* Dashboard specific font */
@@ -245,4 +245,84 @@ input, textarea, select {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* Print/PDF readiness for executive reports */
+@media print {
+  body { 
+    -webkit-print-color-adjust: exact; 
+    print-color-adjust: exact; 
+  }
+  .no-print { 
+    display: none !important; 
+  }
+  .page-break { 
+    break-after: page; 
+  }
+  .MuiPaper-root { 
+    box-shadow: none !important; 
+  }
+  .container { 
+    max-width: 980px !important; 
+  }
+}
+
+/* Large screen optimization */
+@media (min-width: 1600px) {
+  .MuiContainer-root, .container-xl {
+    max-width: 1440px !important;
+  }
+}
+
+/* Ensure Inter font is used consistently */
+* {
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Add subtle texture overlay to reduce "too white" feeling */
+.page-texture {
+  position: relative;
+}
+
+.page-texture::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(15,23,42,0.02) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(15,23,42,0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Enhanced card shadows for better depth */
+.enhanced-shadow {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(15,23,42,0.05);
+}
+
+/* Typography enhancements with Inter */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+p, span, div, button, input, textarea {
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Ensure charts and SVG elements use Inter font */
+.recharts-text, .recharts-label, .recharts-legend-item-text {
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+/* MUI component font consistency */
+.MuiTypography-root, .MuiButton-root, .MuiChip-root, .MuiPaper-root {
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
 }

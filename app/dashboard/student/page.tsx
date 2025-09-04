@@ -69,7 +69,16 @@ import {
   TrendingUp as TrendingUpIcon,
   Announcement as AnnouncementIcon,
   Notifications as NotificationsIcon,
+  Group as GroupIcon,
 } from '@mui/icons-material';
+
+// Modern thin icons from Lucide/Heroicons style
+import {
+  Bell as BellIcon,
+  LogOut as LogOutIcon,
+  CalendarDays as CalendarIcon,
+  Menu as MenuIcon
+} from 'lucide-react';
 import SummaryCards from '../../../components/dashboard/SummaryCards';
 import { useSettingsContext } from '@/context/settings-context';
 import Iconify from '@/components/iconify/Iconify';
@@ -80,6 +89,25 @@ import Tooltip from '@mui/material/Tooltip';
 import LogoutSplash from '../../../components/LogoutSplash';
 import { styled } from '@mui/material/styles';
 import { format } from 'date-fns';
+
+// Styled Components for Enhanced UI
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: 16,
+  boxShadow: theme.palette.mode === 'dark' 
+    ? '0 4px 20px rgba(0,0,0,0.3)' 
+    : '0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.04)',
+  border: `1px solid ${theme.palette.mode === 'dark' ? theme.palette.divider : '#E6E8EC'}`,
+  backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  overflow: 'hidden',
+  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  '&:hover': {
+    transform: 'translateY(-2px)',
+    boxShadow: theme.palette.mode === 'dark' 
+      ? '0 8px 30px rgba(0,0,0,0.4)' 
+      : '0 4px 12px rgba(16,24,40,.1), 0 2px 4px rgba(16,24,40,.06)',
+  },
+}));
 
 const formatDateTime = (d: Date) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -100,7 +128,7 @@ const instructions = [
   "Once the test is started the timer would run irrespective of your logged in or logged out status. So it is recommended not to logout before test completion.",
   "To mark an answer you need to select the option. Upon locking the selected options button will \"blue\".",
   "To reset the form click on the reset button at the bottom.",
-  "The assigned tests should be completed within the submission time. Failing to complete the assessment will award you zero marks.",
+                     "The assigned OctoMind tests should be completed within the submission time. Failing to complete the assessment will award you zero marks.",
   "The marks will be calculated and displayed instantly in the result section along with your percentage."
 ];
 
@@ -110,24 +138,7 @@ const boxStyles = [
   { bg: '#fff', color: '#37474f', border: '1px solid #e3e6ef' },
 ];
 
-const StyledCard = styled(Card)(({ theme }) => ({
-  borderRadius: 16,
-  boxShadow: theme.palette.mode === 'dark' 
-    ? '0 4px 20px rgba(0,0,0,0.3)' 
-    : '0 4px 20px rgba(0,0,0,0.08)',
-  border: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.background.paper,
-  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  overflow: 'hidden',
-  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  '&:hover': {
-    transform: 'translateY(-4px)',
-    boxShadow: theme.palette.mode === 'dark' 
-      ? '0 8px 32px rgba(0,0,0,0.4)' 
-      : '0 8px 32px rgba(0,0,0,0.12)',
-    borderColor: theme.palette.primary.main,
-  },
-}));
+
 
 const professionalBoxSx = (theme: any) => ({
   background: theme.palette.mode === 'dark'
@@ -170,9 +181,17 @@ function StudentDashboardPageContent() {
   const [accessCode, setAccessCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [codeLoading, setCodeLoading] = useState(false);
+  const [codeMessageType, setCodeMessageType] = useState<'error' | 'success' | 'warning'>('error');
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [examsCount, setExamsCount] = useState(0);
   const [attemptsCount, setAttemptsCount] = useState(0);
   const [announcementsCount, setAnnouncementsCount] = useState(0);
+  
+  // Additional KPI variables
+  const [completedQuizzes, setCompletedQuizzes] = useState<any[]>([]);
+  const [upcomingQuizzes, setUpcomingQuizzes] = useState<any[]>([]);
+  const [averageScore, setAverageScore] = useState(0);
+  const [totalAttempts, setTotalAttempts] = useState(0);
 
   // Settings/Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -190,6 +209,12 @@ function StudentDashboardPageContent() {
   // Messages/Announcements state
   const [messages, setMessages] = useState<any[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+
+  // Notification state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   // Results state
   const [results, setResults] = useState<any[]>([]);
@@ -217,9 +242,9 @@ function StudentDashboardPageContent() {
     return 'live';
   };
   const liveQuizzes = allQuizzes.filter((q) => classify(q) === 'live');
-  const upcomingQuizzes = allQuizzes.filter((q) => classify(q) === 'upcoming');
-  const completedQuizzes = allQuizzes.filter((q) => ['completed', 'expired'].includes(classify(q)));
-  const currentCompleted = completedQuizzes.slice(
+  const upcomingQuizzesFiltered = allQuizzes.filter((q) => classify(q) === 'upcoming');
+  const completedQuizzesFiltered = allQuizzes.filter((q) => ['completed', 'expired'].includes(classify(q)));
+  const currentCompleted = completedQuizzesFiltered.slice(
     (completedPage - 1) * COMPLETED_PAGE_SIZE,
     completedPage * COMPLETED_PAGE_SIZE
   );
@@ -251,10 +276,10 @@ function StudentDashboardPageContent() {
     { quote: "Learning never exhausts the mind.", author: "Leonardo da Vinci" },
     { quote: "Education is the most powerful weapon which you can use to change the world.", author: "Nelson Mandela" },
     { quote: "The beautiful thing about learning is that no one can take it away from you.", author: "B.B. King" },
-    { quote: "It always seems impossible until it’s done.", author: "Nelson Mandela" },
-    { quote: "Don’t let what you cannot do interfere with what you can do.", author: "John Wooden" },
+    { quote: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+    { quote: "Don't let what you cannot do interfere with what you can do.", author: "John Wooden" },
     { quote: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
-    { quote: "You don’t have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
+    { quote: "You don't have to be great to start, but you have to start to be great.", author: "Zig Ziglar" },
     { quote: "Opportunities don't happen, you create them.", author: "Chris Grosser" },
     { quote: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
     { quote: "Strive for progress, not perfection.", author: "David Perlmutter" },
@@ -272,6 +297,13 @@ function StudentDashboardPageContent() {
     setMounted(true);
     fetchQuizzes();
   }, [user]);
+
+  // Cleanup redirecting state on unmount
+  useEffect(() => {
+    return () => {
+      setIsRedirecting(false);
+    };
+  }, []);
 
   useEffect(() => {
     const now = new Date();
@@ -336,6 +368,31 @@ function StudentDashboardPageContent() {
         setMessagesLoading(false);
       });
   }, [selectedSection]);
+
+  // Fetch notifications
+  useEffect(() => {
+    if (!user) return;
+    const fetchNotifications = async () => {
+      setNotificationsLoading(true);
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .in('target_audience', ['all', 'students'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (error) {
+        console.error('Error fetching notifications:', error);
+      } else {
+        setNotifications(data || []);
+        // Count unread notifications (for demo, we'll consider all as unread)
+        setUnreadNotifications(data?.length || 0);
+      }
+      setNotificationsLoading(false);
+    };
+    fetchNotifications();
+  }, [user]);
 
   useEffect(() => {
     if (selectedSection !== 'results' || !user) return;
@@ -457,11 +514,82 @@ function StudentDashboardPageContent() {
     fetchAllQuestions();
   }, [results]);
 
+  // Update KPI values when results or userAttempts change
+  useEffect(() => {
+    if (!allQuizzes.length) return;
+    
+    const now = new Date();
+    const completed: any[] = [];
+    const upcoming: any[] = [];
+    let totalScore = 0;
+    let scoreCount = 0;
+    let totalAttemptsCount = 0;
+    
+    allQuizzes.forEach((quiz) => {
+      const startTime = new Date(quiz.start_time);
+      const attempts = userAttempts[quiz.id] || 0;
+      totalAttemptsCount += attempts;
+      
+      if (attempts > 0) {
+        completed.push(quiz);
+        // Calculate average score from results
+        const quizResults = results.filter(r => r.quiz_id === quiz.id);
+        if (quizResults.length > 0) {
+          const avgScore = quizResults.reduce((sum, r) => sum + (r.score || 0), 0) / quizResults.length;
+          totalScore += avgScore;
+          scoreCount++;
+        }
+      } else if (startTime > now) {
+        upcoming.push(quiz);
+      }
+    });
+    
+    setCompletedQuizzes(completed);
+    setUpcomingQuizzes(upcoming);
+    setAverageScore(scoreCount > 0 ? Math.round(totalScore / scoreCount) : 0);
+    setTotalAttempts(totalAttemptsCount);
+  }, [allQuizzes, userAttempts, results]);
+
   const fetchQuizzes = async () => {
     if (!user) return;
     setLoading(true);
     const { data } = await supabase.from('quizzes').select('*').eq('is_draft', false);
     setAllQuizzes(data ?? []);
+    
+    // Classify quizzes
+    const now = new Date();
+    const completed: any[] = [];
+    const upcoming: any[] = [];
+    let totalScore = 0;
+    let scoreCount = 0;
+    let totalAttemptsCount = 0;
+    
+    data?.forEach((quiz) => {
+      const startTime = new Date(quiz.start_time);
+      const endTime = new Date(quiz.end_time);
+      const attempts = userAttempts[quiz.id] || 0;
+      totalAttemptsCount += attempts;
+      
+      if (attempts > 0) {
+        completed.push(quiz);
+        // Calculate average score from results
+        const quizResults = results.filter(r => r.quiz_id === quiz.id);
+        if (quizResults.length > 0) {
+          const avgScore = quizResults.reduce((sum, r) => sum + (r.score || 0), 0) / quizResults.length;
+          totalScore += avgScore;
+          scoreCount++;
+        }
+      } else if (startTime > now) {
+        upcoming.push(quiz);
+      }
+    });
+    
+    setCompletedQuizzes(completed);
+    setUpcomingQuizzes(upcoming);
+    setAverageScore(scoreCount > 0 ? Math.round(totalScore / scoreCount) : 0);
+    setTotalAttempts(totalAttemptsCount);
+    setExamsCount(data?.length || 0);
+    
     if (data?.length) fetchAttempts(data.map((q) => q.id));
     setLoading(false);
   };
@@ -475,8 +603,10 @@ function StudentDashboardPageContent() {
 
   const handleAccessCodeSubmit = async () => {
     setCodeError('');
+    setCodeMessageType('error');
     if (!accessCode.trim()) {
-      setCodeError('Enter a code.');
+      setCodeError('⚠️ Please enter an access code to continue.');
+      setCodeMessageType('warning');
       setShowCodeErrorSnackbar(true);
       return;
     }
@@ -484,18 +614,56 @@ function StudentDashboardPageContent() {
     try {
       const { data } = await supabase.from('quizzes').select('*').eq('access_code', accessCode).single();
       if (!data) {
-        setCodeError('Invalid code.');
+        setCodeError('❌ Invalid access code. Please check the code and try again.');
+        setCodeMessageType('error');
         setShowCodeErrorSnackbar(true);
         return;
       }
+      
+      // Check if user has reached maximum attempts
+      const { data: attemptsData } = await supabase
+        .from('attempts')
+        .select('id')
+        .eq('quiz_id', data.id)
+        .eq('user_id', user!.id);
+      
+      const currentAttempts = attemptsData?.length || 0;
+      if (currentAttempts >= (data.max_attempts || 1)) {
+        setCodeError(`⚠️ Maximum attempts reached for "${data.quiz_title}". You have already completed this quiz.`);
+        setCodeMessageType('warning');
+        setShowCodeErrorSnackbar(true);
+        return;
+      }
+      
       const now = new Date();
       if (now < new Date(data.start_time)) {
-        setCodeError('Quiz not started.');
+        setCodeError(`⏰ Quiz "${data.quiz_title}" has not started yet. Please wait for the scheduled start time.`);
+        setCodeMessageType('warning');
         setShowCodeErrorSnackbar(true);
       } else if (now > new Date(data.end_time)) {
-        setCodeError('Quiz ended.');
+        setCodeError(`⏰ Quiz "${data.quiz_title}" has ended. The submission deadline has passed.`);
+        setCodeMessageType('warning');
         setShowCodeErrorSnackbar(true);
-      } else router.push(`/pre-exam/${data.id}`);
+      } else {
+        // Quiz found and accessible
+        setCodeError(`✅ Quiz "${data.quiz_title}" found successfully! Redirecting to exam instructions...`);
+        setCodeMessageType('success');
+        setShowCodeErrorSnackbar(true);
+        // Clear the access code input
+        setAccessCode('');
+        // Set redirecting state to show skeleton loader
+        setIsRedirecting(true);
+        // Redirect after a short delay to show the success message
+        setTimeout(() => {
+          router.push(`/pre-exam/${data.id}`);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error checking access code:', error);
+      setCodeError('❌ Unable to verify access code. Please check your connection and try again.');
+      setCodeMessageType('error');
+      setShowCodeErrorSnackbar(true);
+      setIsRedirecting(false); // Reset redirecting state on error
     } finally {
       setCodeLoading(false);
     }
@@ -627,12 +795,49 @@ function StudentDashboardPageContent() {
     }
   }, [profileSuccess]);
 
+  // Handle profile button click
+  const handleProfileClick = () => {
+    setSelectedSection('settings');
+  };
+
+  // Handle notification button click
+  const handleNotificationClick = () => {
+    setNotificationDropdownOpen(!notificationDropdownOpen);
+  };
+
+  // Handle notification item click
+  const handleNotificationItemClick = (notification: any) => {
+    // Mark as read (you can implement this logic)
+    console.log('Notification clicked:', notification);
+    // Close dropdown after a short delay
+    setTimeout(() => {
+      setNotificationDropdownOpen(false);
+    }, 200);
+  };
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationDropdownOpen) {
+        const target = event.target as Element;
+        if (!target.closest('[data-notification-dropdown]')) {
+          setNotificationDropdownOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notificationDropdownOpen]);
+
   if (!mounted || !user) return null;
 
   // Remove splash/skeleton loader: show minimal spinner on white bg if loading
   if (loading) {
     return (
-      <Box height="100vh" display="flex" alignItems="center" justifyContent="center" sx={{ background: '#fff' }}>
+      <Box height="100vh" display="flex" alignItems="center" justifyContent="center" sx={{ background: theme.palette.mode === 'dark' ? '#0A0A0A' : '#F8FAFC' }}>
         <CircularProgress />
       </Box>
     );
@@ -842,10 +1047,12 @@ function StudentDashboardPageContent() {
       borderRadius={4}
       boxShadow={4}
       sx={{
-        background: `linear-gradient(135deg, #e3eafc 0%, #f7fafd 100%)`,
+        background: theme.palette.mode === 'dark' 
+          ? `linear-gradient(135deg, #1e293b 0%, #0f172a 100%)`
+          : `linear-gradient(135deg, #e3eafc 0%, #f7fafd 100%)`,
         width: '100%',
         mx: 0,
-        border: 'none',
+        border: theme.palette.mode === 'dark' ? `1px solid ${theme.palette.divider}` : 'none',
         fontFamily: 'Poppins, sans-serif',
         minHeight: 320,
       }}
@@ -866,10 +1073,12 @@ function StudentDashboardPageContent() {
       <TableContainer
         component={Paper}
         sx={{
-          boxShadow: '0 8px 32px 0 rgba(30,64,175,0.10)',
-          background: 'transparent',
+          boxShadow: theme.palette.mode === 'dark' 
+            ? '0 8px 32px 0 rgba(0,0,0,0.3)' 
+            : '0 8px 32px 0 rgba(30,64,175,0.10)',
+          background: theme.palette.mode === 'dark' ? theme.palette.background.paper : 'transparent',
           borderRadius: 4,
-          border: 'none',
+          border: theme.palette.mode === 'dark' ? `1px solid ${theme.palette.divider}` : 'none',
           p: 0,
           width: '100%',
           minWidth: 0,
@@ -881,7 +1090,9 @@ function StudentDashboardPageContent() {
           <TableHead>
             <TableRow
               sx={{
-                background: 'linear-gradient(90deg, #e3eafc 60%, #dbeafe 100%)',
+                background: theme.palette.mode === 'dark' 
+                  ? 'linear-gradient(90deg, #1e293b 60%, #334155 100%)'
+                  : 'linear-gradient(90deg, #e3eafc 60%, #dbeafe 100%)',
                 height: 68,
               }}
             >
@@ -904,7 +1115,12 @@ function StudentDashboardPageContent() {
                 const priorityColor = row.priority === 3 ? '#d32f2f' : row.priority === 2 ? '#f57c00' : '#1976d2';
                 const priorityText = row.priority === 3 ? 'URGENT' : row.priority === 2 ? 'IMPORTANT' : 'NORMAL';
                 // Use a soft background color for the whole row based on priority
-                const rowBg = row.priority === 3 ? '#ffebee' : row.priority === 2 ? '#fffde7' : '#e3f2fd';
+                const rowBg = theme.palette.mode === 'dark' 
+                  ? (row.priority === 3 ? '#2d1b1b' : row.priority === 2 ? '#2d2a1b' : '#1a2332')
+                  : (row.priority === 3 ? '#ffebee' : row.priority === 2 ? '#fffde7' : '#e3f2fd');
+                const hoverBg = theme.palette.mode === 'dark'
+                  ? (row.priority === 3 ? '#3d2a2a' : row.priority === 2 ? '#3d3a2a' : '#2a3342')
+                  : (row.priority === 3 ? '#ffcdd2' : row.priority === 2 ? '#ffe0b2' : '#bbdefb');
                 return (
                   <TableRow
                     key={idx}
@@ -915,7 +1131,7 @@ function StudentDashboardPageContent() {
                       height: 72,
                       border: 'none',
                       '&:hover': {
-                        background: row.priority === 3 ? '#ffcdd2' : row.priority === 2 ? '#ffe0b2' : '#bbdefb',
+                        background: hoverBg,
                       },
                     }}
                   >
@@ -1001,10 +1217,10 @@ function StudentDashboardPageContent() {
       borderRadius={3}
       boxShadow={2}
       sx={{
-        background: '#fff',
+        background: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF',
         width: '100%',
         mx: 0,
-        border: 'none',
+        border: theme.palette.mode === 'dark' ? `1px solid ${theme.palette.divider}` : 'none',
         fontFamily: 'Poppins, sans-serif',
         minHeight: 320,
       }}
@@ -1026,7 +1242,7 @@ function StudentDashboardPageContent() {
         component={Paper}
         sx={{
           boxShadow: 'none',
-          background: '#fff',
+          background: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF',
           borderRadius: 3,
           border: 'none',
           p: 0,
@@ -1039,24 +1255,27 @@ function StudentDashboardPageContent() {
       >
         <Table>
           <TableHead>
-            <TableRow sx={{ background: '#f5f5f5', height: 60 }}>
-              <TableCell align="left" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Student Name</TableCell>
-              <TableCell align="left" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Exam Name</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Total Qs</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Correct</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Marks</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Total</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>%</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Time Taken</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Completed</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Review</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: '#111', py: 1.5, px: 3, border: 'none' }}>Marked</TableCell>
+            <TableRow sx={{ 
+              background: theme.palette.mode === 'dark' ? theme.palette.background.default : '#f5f5f5', 
+              height: 60 
+            }}>
+              <TableCell align="left" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Student Name</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Exam Name</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Total Qs</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Correct</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Marks</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Total</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>%</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Time Taken</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Completed</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Review</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7, fontSize: '1.01rem', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111', py: 1.5, px: 3, border: 'none' }}>Marked</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {resultsLoading ? (
               <TableRow>
-                <TableCell colSpan={11} align="center" sx={{ py: 5, border: 'none', color: '#111' }}>
+                <TableCell colSpan={11} align="center" sx={{ py: 5, border: 'none', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111' }}>
                   <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
@@ -1100,23 +1319,23 @@ function StudentDashboardPageContent() {
                     key={idx}
                     hover
                     sx={{
-                      background: '#fff',
+                      background: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF',
                       transition: 'background 0.2s',
-                      borderBottom: '1px solid #eee',
+                      borderBottom: `1px solid ${theme.palette.divider}`,
                       '&:hover': {
-                        background: '#f5f5f5',
+                        background: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f5f5f5',
                       },
                     }}
                   >
-                    <TableCell sx={{ fontWeight: 700, color: '#111', border: 'none', px: 3 }}>{studentName}</TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: '#111', border: 'none', px: 3 }}>{examName}</TableCell>
-                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{totalQuestions}</TableCell>
-                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{correctAnswers}</TableCell>
-                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{safeMarksObtained.toFixed(2)}</TableCell>
-                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{safeTotalMarks.toFixed(2)}</TableCell>
-                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#111' }}>{percentage}%</TableCell>
-                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{timeTaken}</TableCell>
-                    <TableCell align="center" sx={{ border: 'none', px: 3, color: '#222' }}>{row.submitted_at ? dayjs(row.submitted_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, border: 'none', px: 3 }}>{studentName}</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: theme.palette.text.primary, border: 'none', px: 3 }}>{examName}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: theme.palette.text.secondary }}>{totalQuestions}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: theme.palette.text.secondary }}>{correctAnswers}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: theme.palette.text.secondary }}>{safeMarksObtained.toFixed(2)}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: theme.palette.text.secondary }}>{safeTotalMarks.toFixed(2)}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: theme.palette.text.primary }}>{percentage}%</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: theme.palette.text.secondary }}>{timeTaken}</TableCell>
+                    <TableCell align="center" sx={{ border: 'none', px: 3, color: theme.palette.text.secondary }}>{row.submitted_at ? dayjs(row.submitted_at).format('YYYY-MM-DD HH:mm') : '-'}</TableCell>
                     <TableCell align="center" sx={{ border: 'none', px: 3 }}>
                       <Button
                         variant="outlined"
@@ -1151,7 +1370,7 @@ function StudentDashboardPageContent() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={11} align="center" sx={{ py: 5, border: 'none', color: '#111' }}>
+                <TableCell colSpan={11} align="center" sx={{ py: 5, border: 'none', color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111' }}>
                   No results found.
                 </TableCell>
               </TableRow>
@@ -1165,35 +1384,73 @@ function StudentDashboardPageContent() {
   return (
     <Box sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
       {/* Main Content */}
-      <Box component="main" sx={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
-        {/* Top Navigation Bar */}
-        <AppBar position="static" elevation={0} sx={{ background: '#FFFFFF', borderBottom: '1px solid #E5E7EB' }}>
-          <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, md: 4 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box component="main" sx={{ minHeight: '100vh', background: theme.palette.mode === 'dark' ? '#0A0A0A' : '#F8FAFC', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+        {/* Top Navigation Bar - Matching Teacher Design */}
+        <Box
+          sx={{
+            background: theme.palette.mode === 'dark' ? '#0B1220' : '#FFFFFF',
+            borderBottom: theme.palette.mode === 'dark' ? '1px solid #1E293B' : '1px solid #E5E7EB',
+            px: { xs: 4, sm: 6, md: 8 },
+            py: 3,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 3,
+            width: '100%'
+          }}
+        >
+          {/* Left: Logo and Branding */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                  width: 48,
+                  height: 48,
+                borderRadius: '12px',
+                background: theme.palette.mode === 'dark' ? '#1E293B' : '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                boxShadow: theme.palette.mode === 'dark' ? '0 4px 12px rgba(0, 0, 0, 0.3)' : '0 4px 12px rgba(0, 0, 0, 0.1)',
+                border: theme.palette.mode === 'dark' ? '2px solid #334155' : '2px solid #E5E7EB'
                 }}>
-                  <SchoolIcon sx={{ color: 'white', fontSize: 18 }} />
+                  <img 
+                  src="/favicon.svg" 
+                    alt="OctoMind Logo" 
+                    style={{ 
+                    width: '28px', 
+                    height: '28px'
+                    }} 
+                  />
                 </Box>
                 <Box>
-                  <Typography variant="h6" fontWeight={700} sx={{ color: '#1a1a1a', fontSize: '1.125rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', lineHeight: 1.2 }}>
-                    OctaMind
+                <Typography variant="h6" fontWeight={700} sx={{ 
+                  color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#1A1A1A', 
+                  fontSize: '1.25rem',
+                  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                }}>
+                    OctoMind
                   </Typography>
-                  <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
-                    Powered by OctaMind
+                <Typography variant="body2" sx={{ 
+                  color: theme.palette.mode === 'dark' ? '#94A3B8' : '#6B7280', 
+                  fontSize: '0.75rem',
+                  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                }}>
+                  Student Portal
                   </Typography>
                 </Box>
               </Box>
+            
+            {/* Greeting */}
               <Box>
-                <Typography variant="h6" fontWeight={600} sx={{ color: '#1a1a1a', fontSize: '1rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+              <Typography 
+                variant="h6" 
+                fontWeight={600} 
+                sx={{ 
+                  color: 'text.primary',
+                  fontSize: '1rem',
+                  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                }}
+              >
                   {(() => {
                     const hour = new Date().getHours();
                     if (hour < 12) return 'Good Morning';
@@ -1201,252 +1458,561 @@ function StudentDashboardPageContent() {
                     return 'Good Evening';
                   })()}, {user?.firstName || user?.fullName || 'Student'}!
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: 'text.secondary',
+                  fontSize: '0.875rem',
+                  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                }}
+              >
                   Welcome back to your dashboard.
                 </Typography>
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
-                {format(new Date(), 'MMM dd, yyyy • h:mm a')}
-              </Typography>
-              <IconButton sx={{ color: '#6b7280' }}>
-                <Badge badgeContent={announcementsCount} color="primary">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
-              <Avatar src={profileForm.profile_picture || user.imageUrl} alt="Profile" sx={{ width: 40, height: 40, border: '2px solid #E5E7EB' }} />
-            </Box>
-          </Toolbar>
-        </AppBar>
 
-        {/* Dark Navigation Menu */}
-        <Box sx={{ background: '#1E293B', px: { xs: 2, md: 4 }, py: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, overflowX: 'auto' }}>
-            <Button
-              onClick={() => setSelectedSection('dashboard')}
+          {/* Right: Date/Time and Controls */}
+          <Box 
         sx={{
-                color: selectedSection === 'dashboard' ? '#3B82F6' : '#94A3B8',
-                background: 'transparent',
-                textTransform: 'none',
-                fontSize: '0.875rem',
-                fontWeight: selectedSection === 'dashboard' ? 600 : 500,
-                px: 2,
-                py: 1,
-                borderRadius: 1,
-                borderBottom: selectedSection === 'dashboard' ? '2px solid #3B82F6' : '2px solid transparent',
-                '&:hover': {
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3B82F6',
-                },
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Dashboard
-            </Button>
-            <Button
-              onClick={() => setSelectedSection('exams')}
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: { xs: 1.5, sm: 2 },
+              flexWrap: 'nowrap'
+            }}
+          >
+            {/* Date and Time */}
+            <Box
               sx={{
-                color: selectedSection === 'exams' ? '#3B82F6' : '#94A3B8',
-                background: 'transparent',
-                textTransform: 'none',
-                fontSize: '0.875rem',
-                fontWeight: selectedSection === 'exams' ? 600 : 500,
+                display: { xs: 'none', sm: 'flex' },
+                alignItems: 'center',
+                gap: 1,
                 px: 2,
                 py: 1,
-                borderRadius: 1,
-                borderBottom: selectedSection === 'exams' ? '2px solid #3B82F6' : '2px solid transparent',
-                '&:hover': {
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3B82F6',
-                },
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
+                background: theme.palette.mode === 'dark' ? '#1E1E1E' : '#f9fafb',
+                borderRadius: '8px',
+                border: `1px solid ${theme.palette.divider}`,
+                minWidth: 'fit-content'
               }}
             >
-              Exams
-            </Button>
-            <Button
-              onClick={() => setSelectedSection('results')}
-          sx={{
-                color: selectedSection === 'results' ? '#3B82F6' : '#94A3B8',
-                background: 'transparent',
-                textTransform: 'none',
-                fontSize: '0.875rem',
-                fontWeight: selectedSection === 'results' ? 600 : 500,
-                px: 2,
-                py: 1,
-                borderRadius: 1,
-                borderBottom: selectedSection === 'results' ? '2px solid #3B82F6' : '2px solid transparent',
-                '&:hover': {
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3B82F6',
-                },
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Results
-            </Button>
-            <Button
-              onClick={() => setSelectedSection('messages')}
+              <CalendarIcon size={16} color={theme.palette.text.secondary} />
+              <Typography 
+                variant="body2" 
               sx={{
-                color: selectedSection === 'messages' ? '#3B82F6' : '#94A3B8',
-                background: 'transparent',
-                textTransform: 'none',
+                  color: 'text.primary',
                 fontSize: '0.875rem',
-                fontWeight: selectedSection === 'messages' ? 600 : 500,
-                px: 2,
-                py: 1,
-                borderRadius: 1,
-                borderBottom: selectedSection === 'messages' ? '2px solid #3B82F6' : '2px solid transparent',
-                '&:hover': {
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3B82F6',
-                },
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Messages
-            </Button>
-            <Button
-              onClick={() => setSelectedSection('settings')}
+                  fontWeight: 500,
+                  fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                }}
+              >
+                {new Date().toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric',
+                  year: 'numeric'
+                })} • {new Date().toLocaleTimeString('en-US', { 
+                  hour: 'numeric', 
+                  minute: '2-digit',
+                  hour12: true 
+                })}
+              </Typography>
+            </Box>
+
+            {/* Theme Toggle */}
+            <Box
               sx={{
-                color: selectedSection === 'settings' ? '#3B82F6' : '#94A3B8',
-                background: 'transparent',
-                textTransform: 'none',
-                fontSize: '0.875rem',
-                fontWeight: selectedSection === 'settings' ? 600 : 500,
-                px: 2,
-                py: 1,
-                borderRadius: 1,
-                borderBottom: selectedSection === 'settings' ? '2px solid #3B82F6' : '2px solid transparent',
+                color: 'text.secondary',
                 '&:hover': {
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3B82F6',
-                },
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
+                  color: 'text.primary'
+                }
               }}
             >
-              Settings
-            </Button>
-            <Button
-              onClick={() => setSelectedSection('help')}
-              sx={{
-                color: selectedSection === 'help' ? '#3B82F6' : '#94A3B8',
-                background: 'transparent',
-                textTransform: 'none',
-                fontSize: '0.875rem',
-                fontWeight: selectedSection === 'help' ? 600 : 500,
-                px: 2,
-                py: 1,
-                borderRadius: 1,
-                borderBottom: selectedSection === 'help' ? '2px solid #3B82F6' : '2px solid transparent',
-                '&:hover': {
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3B82F6',
-                },
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Help
-            </Button>
-            <Box sx={{ ml: 'auto' }}>
-              <Button
-                onClick={() => setLogoutDialogOpen(true)}
+              <ThemeToggleButton />
+            </Box>
+
+            {/* Notification Bell */}
+            <Box sx={{ position: 'relative' }} data-notification-dropdown>
+              <IconButton
+                size="small"
+                onClick={handleNotificationClick}
                 sx={{
-                  color: '#EF4444',
-                  background: 'transparent',
-                  textTransform: 'none',
+                  color: 'text.secondary',
+                  '&:hover': {
+                    background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#f3f4f6',
+                    color: 'text.primary'
+                  }
+                }}
+              >
+                <BellIcon size={20} />
+              </IconButton>
+              {unreadNotifications > 0 && (
+                <Badge
+                  badgeContent={unreadNotifications}
+                  color="error"
+                  sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    '& .MuiBadge-badge': {
+                      fontSize: '0.75rem',
+                      minWidth: '18px',
+                      height: '18px',
+                      borderRadius: '9px'
+                    }
+                  }}
+                />
+              )}
+            </Box>
+
+            {/* User Avatar */}
+            <Avatar 
+              src={user?.imageUrl} 
+              alt="Profile" 
+              onClick={handleProfileClick}
+              sx={{
+                width: 36, 
+                height: 36, 
+                border: '2px solid #e5e7eb',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                '&:hover': {
+                  borderColor: '#3b82f6',
+                  transform: 'scale(1.05)'
+                }
+              }} 
+            >
+              {user?.firstName?.charAt(0) || user?.fullName?.charAt(0) || 'S'}
+            </Avatar>
+          </Box>
+        </Box>
+
+        {/* Notification Dropdown */}
+        {notificationDropdownOpen && (
+          <Box
+            data-notification-dropdown
+            sx={{
+              position: 'absolute',
+              top: '100%',
+              right: { xs: 16, sm: 24, md: 32 },
+              zIndex: 1000,
+              width: 320,
+              maxHeight: 400,
+              background: theme.palette.mode === 'dark' ? '#1A1A1A' : '#FFFFFF',
+              border: `1px solid ${theme.palette.divider}`,
+              borderRadius: 2,
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 10px 25px rgba(0, 0, 0, 0.5)' 
+                : '0 10px 25px rgba(0, 0, 0, 0.1)',
+              overflow: 'hidden',
+              mt: 1
+            }}
+          >
+            {/* Header */}
+            <Box
+              sx={{
+                p: 2,
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#F8FAFC'
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                Notifications
+              </Typography>
+            </Box>
+
+            {/* Notifications List */}
+            <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+              {notificationsLoading ? (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : notifications.length > 0 ? (
+                notifications.map((notification, index) => (
+                  <Box
+                    key={notification.id || index}
+                    onClick={() => handleNotificationItemClick(notification)}
+                    sx={{
+                      p: 2,
+                      borderBottom: index < notifications.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                      '&:hover': {
+                        background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#F8FAFC'
+                      }
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 0.5 }}>
+                      {notification.title || 'Announcement'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.875rem', mb: 1 }}>
+                      {notification.content?.substring(0, 100)}
+                      {notification.content?.length > 100 ? '...' : ''}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {new Date(notification.created_at).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    No notifications
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Footer */}
+            {notifications.length > 0 && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderTop: `1px solid ${theme.palette.divider}`,
+                  background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#F8FAFC',
+                  textAlign: 'center'
+                }}
+              >
+                <Button
+                  size="small"
+                  onClick={() => {
+                    setSelectedSection('messages');
+                    setNotificationDropdownOpen(false);
+                  }}
+                  sx={{ fontSize: '0.875rem' }}
+                >
+                  View All Messages
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Menu Strip - Navigation Items - Matching Teacher Design */}
+        <Box
+              sx={{
+            background: theme.palette.mode === 'dark' ? '#1A1A1A' : '#0B1220',
+            borderBottom: theme.palette.mode === 'dark' ? 'none' : '1px solid #0E1A30',
+            px: { xs: 4, sm: 6, md: 8 },
+            py: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 3,
+            width: '100%'
+          }}
+        >
+          {/* Left: Menu Items */}
+          <Box 
+            sx={{ 
+              display: { xs: 'none', md: 'flex' },
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            {[
+              { text: 'Dashboard', tab: 'dashboard', icon: <DashboardIcon sx={{ fontSize: 18 }} /> },
+              { text: 'Exams', tab: 'exams', icon: <BookIcon sx={{ fontSize: 18 }} /> },
+              { text: 'Results', tab: 'results', icon: <BarChartIcon sx={{ fontSize: 18 }} /> },
+              { text: 'Messages', tab: 'messages', icon: <BellIcon size={18} /> },
+              { text: 'Settings', tab: 'settings', icon: <SettingsIcon sx={{ fontSize: 18 }} /> },
+              { text: 'Help', tab: 'help', icon: <HelpIcon sx={{ fontSize: 18 }} /> }
+            ].map((item) => (
+              <Box
+                key={item.text}
+                onClick={() => setSelectedSection(item.tab)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Navigate to ${item.text} section`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedSection(item.tab);
+                  }
+                }}
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: 'center',
+                  gap: 0.5,
+                  cursor: 'pointer',
+                  color: selectedSection === item.tab ? '#FFFFFF' : '#E5E7EB',
+                  borderBottom: selectedSection === item.tab ? '2px solid #2563EB' : '2px solid transparent',
+                  backgroundColor: selectedSection === item.tab ? 'rgba(37, 99, 235, 0.15)' : 'transparent',
+                  borderRadius: '8px',
+                px: 2,
+                py: 1,
+                  minHeight: 40,
+                  transition: 'all 0.2s ease',
+                  border: selectedSection === item.tab ? `1px solid ${theme.palette.primary.main}` : '1px solid transparent',
+                '&:hover': {
+                    color: '#FFFFFF',
+                    backgroundColor: selectedSection === item.tab ? 'rgba(37, 99, 235, 0.2)' : '#2A2A2A',
+                    borderBottomColor: selectedSection === item.tab ? theme.palette.primary.main : theme.palette.primary.light,
+                    border: selectedSection === item.tab ? `1px solid ${theme.palette.primary.main}` : '1px solid #2A2A2A',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                  },
+                  '&:focus-visible': {
+                    outline: `2px solid ${theme.palette.primary.main}`,
+                    outlineOffset: '2px',
+                    backgroundColor: 'rgba(37, 99, 235, 0.12)'
+                  }
+                }}
+              >
+                {item.icon}
+                <Typography 
+                  variant="body2" 
+              sx={{
+                fontSize: '0.875rem',
+                    fontWeight: selectedSection === item.tab ? 600 : 500,
+                    letterSpacing: '0.025em',
+                    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                  }}
+                >
+                  {item.text}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Mobile Menu Button */}
+          <Box 
+            sx={{ 
+              display: { xs: 'flex', md: 'none' },
+              alignItems: 'center'
+            }}
+          >
+            <IconButton
+              size="small"
+              sx={{
+                color: theme.palette.mode === 'dark' ? '#E5E7EB' : '#FFFFFF',
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? '#2A2A2A' : 'rgba(255,255,255,0.1)'
+                },
+                '&:focus-visible': {
+                  outline: `2px solid ${theme.palette.primary.main}`,
+                  outlineOffset: '2px'
+                }
+              }}
+            >
+              <MenuIcon size={20} />
+            </IconButton>
+          </Box>
+
+          {/* Right: Log Out Button */}
+              <Button
+            variant="contained"
+            size="small"
+                onClick={() => setLogoutDialogOpen(true)}
+            startIcon={<LogOutIcon size={16} />}
+                sx={{
+              color: '#FFFFFF',
+              backgroundColor: '#EF4444',
+              border: '1px solid #EF4444',
+              borderRadius: '8px',
+              px: 2,
+              py: 0.75,
                   fontSize: '0.875rem',
                   fontWeight: 500,
-                  px: 2,
-                  py: 1,
-                  borderRadius: 1,
+              fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+              transition: 'all 0.2s ease',
                   '&:hover': {
-                    background: 'rgba(239, 68, 68, 0.1)',
+                backgroundColor: '#DC2626',
+                borderColor: '#DC2626',
+                color: '#FFFFFF'
                   },
-                  minWidth: 'auto',
+              '&:focus-visible': {
+                outline: `2px solid #EF4444`,
+                outlineOffset: '2px'
+              }
                 }}
-                endIcon={<LogoutIcon sx={{ fontSize: 16 }} />}
               >
-                LOG OUT
+            Log Out
               </Button>
-            </Box>
-          </Box>
         </Box>
 
         {/* Main Content Container */}
         <div className="mx-auto max-w-[1280px] px-6 md:px-8 py-6 space-y-6">
 
-        {/* Main Content Section Switcher */}
         {selectedSection === 'dashboard' && (
           <>
-            {/* Greeting Section */}
-            <Box display="flex" alignItems="center" gap={2} mb={1.5}>
-              {/* Simple icon based on time of day */}
+            {/* KPI Cards - Row 1 */}
+            <Grid container spacing={3} mb={3}>
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Box>
-                {(() => {
-                  const hour = new Date().getHours();
-                  if (hour < 12) return <span role="img" aria-label="sun" style={{fontSize: 40}}>🌞</span>;
-                  if (hour < 17) return <span role="img" aria-label="afternoon" style={{fontSize: 40}}>🌤️</span>;
-                  return <span role="img" aria-label="moon" style={{fontSize: 40}}>🌙</span>;
-                })()}
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Available Exams
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {examsCount}
+                        </Typography>
               </Box>
-              <Typography variant="h5" fontWeight={700} color={theme.palette.text.primary}>
-                {(() => {
-                  const hour = new Date().getHours();
-                  if (hour < 12) return 'Good Morning';
-                  if (hour < 17) return 'Good Afternoon';
-                  return 'Good Evening';
-                })()}, {user?.firstName || user?.fullName || 'Student'}!
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <BookIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Upcoming Exams
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {upcomingQuizzes.length}
               </Typography>
             </Box>
-            <Box sx={{ mt: 1, mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontStyle: 'italic', textAlign: 'center', color: '#222', fontWeight: 500 }}>
-                "{quoteOfTheDay.quote}"
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <CalendarIcon size={24} color="white" />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Announcements
               </Typography>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, textAlign: 'center', mt: 0.5, color: '#333' }}>
-                — {quoteOfTheDay.author}
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {announcementsCount}
               </Typography>
             </Box>
-            {/* Overview Boxes */}
-            <Grid container spacing={3} mb={4} alignItems="stretch">
-              <Grid item xs={12} sm={4}>
-                <SummaryCards
-                  title="Exams"
-                  total={examsCount}
-                  color={theme.palette.primary.main}
-                  countColor={theme.palette.primary.main}
-                />
-                <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15, textAlign: 'center', mt: 1 }}>Active exams</Typography>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <BellIcon size={24} color="white" />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
               </Grid>
-              <Grid item xs={12} sm={4}>
-                <SummaryCards
-                  title="Upcoming Exams"
-                  total={upcomingQuizzes.length}
-                  color={theme.palette.text.secondary}
-                  countColor={theme.palette.text.secondary}
-                />
-                <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15, textAlign: 'center', mt: 1 }}>Exams scheduled for the future</Typography>
               </Grid>
-              <Grid item xs={12} sm={4}>
-                <SummaryCards
-                  title="Announcements"
-                  total={announcementsCount}
-                  color={theme.palette.text.secondary}
-                  countColor={theme.palette.text.secondary}
-                />
-                <Typography sx={{ opacity: 0.8, color: theme.palette.text.secondary, fontSize: 15, textAlign: 'center', mt: 1 }}>Total number of messages received</Typography>
+
+            {/* KPI Cards - Row 2 */}
+            <Grid container spacing={3} mb={6}>
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Completed Exams
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {completedQuizzes.length}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <CheckCircleIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Average Score
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {averageScore}%
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <TrendingUpIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={4}>
+                <StyledCard>
+                  <CardContent sx={{ p: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', mb: 1, color: 'text.secondary' }}>
+                          Total Attempts
+                        </Typography>
+                        <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
+                          {totalAttempts}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <AssignmentIcon sx={{ color: 'white', fontSize: 24 }} />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
               </Grid>
             </Grid>
 
             {/* General Instructions */}
-            <Box sx={{ background: '#fff', borderRadius: 2, boxShadow: 1, p: 3, mb: 4, fontFamily: 'Poppins, sans-serif' }}>
+            <StyledCard sx={{ mb: 4, fontFamily: 'Poppins, sans-serif' }}>
+              <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" align="center" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 700, fontFamily: 'Poppins, sans-serif' }}>
                 :: General Instructions ::
               </Typography>
@@ -1455,58 +2021,306 @@ function StudentDashboardPageContent() {
                   <li key={idx} style={{ marginBottom: 14, color: theme.palette.text.secondary, fontSize: 16, lineHeight: 1.7, fontFamily: 'Poppins, sans-serif' }}>{ins}</li>
                 ))}
               </ul>
-            </Box>
+              </CardContent>
+            </StyledCard>
           </>
         )}
 
         {selectedSection === 'exams' && (
           <>
-            {/* Access Quiz by Code - moved to top */}
-            <StyledCard sx={{ mb: 6 }}>
-              <CardHeader
-                title="Access Quiz by Code"
-                titleTypographyProps={{ variant: 'h6', fontWeight: 700, color: 'text.primary' }}
-                sx={{ pb: 2 }}
-              />
-              <CardContent>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField
-                  label="Access Code"
-                  fullWidth
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  error={!!codeError}
-                  helperText={codeError}
-                    sx={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
-                  />
-                  <Button 
-                    variant="contained" 
-                    disabled={codeLoading} 
-                    onClick={handleAccessCodeSubmit} 
-                    sx={{ 
-                      minWidth: 160, 
-                      background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', 
-                      color: '#fff', 
-                      borderRadius: 2, 
-                      fontWeight: 600, 
-                      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', 
-                      '&:hover': { 
-                        background: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)' 
-                      } 
+            {/* Access Quiz by Code - Redesigned */}
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                minHeight: '60vh',
+                mb: 6,
+                px: 2
+              }}
+            >
+              <Box
+                sx={{
+                  width: '100%',
+                  maxWidth: 480,
+                  background: '#ffffff',
+                  borderRadius: 4,
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                  border: '1px solid #e5e7eb',
+                  overflow: 'hidden',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+              >
+                {/* Header Section */}
+                <Box
+                  sx={{
+                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                    color: '#ffffff',
+                    p: 4,
+                    textAlign: 'center'
+                  }}
+                >
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: { xs: '1.75rem', sm: '2rem' },
+                      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      letterSpacing: '-0.025em',
+                      mb: 1
                     }}
                   >
-                  {codeLoading ? 'Checking…' : 'Begin'}
-                </Button>
-              </Stack>
-              </CardContent>
-            </StyledCard>
+                    Enter Your Exam Code
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      color: '#cbd5e1',
+                      fontSize: '1rem',
+                      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      lineHeight: 1.6,
+                      maxWidth: '400px',
+                      mx: 'auto'
+                    }}
+                  >
+                    Please enter the code provided by your instructor to begin your exam.
+                  </Typography>
+                </Box>
+
+                {/* Form Section */}
+                <Box sx={{ p: 4 }}>
+                  {isRedirecting ? (
+                    // Skeleton Loader for Redirect
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      gap: 3,
+                      py: 4
+                    }}>
+                      {/* Success Icon Animation */}
+                      <Box sx={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        animation: 'pulse 2s infinite',
+                        '@keyframes pulse': {
+                          '0%': { transform: 'scale(1)', opacity: 1 },
+                          '50%': { transform: 'scale(1.05)', opacity: 0.8 },
+                          '100%': { transform: 'scale(1)', opacity: 1 }
+                        }
+                      }}>
+                        <Box sx={{ 
+                          color: 'white', 
+                          fontSize: '2rem',
+                          animation: 'bounce 1s infinite',
+                          '@keyframes bounce': {
+                            '0%, 20%, 50%, 80%, 100%': { transform: 'translateY(0)' },
+                            '40%': { transform: 'translateY(-10px)' },
+                            '60%': { transform: 'translateY(-5px)' }
+                          }
+                        }}>
+                          ✓
+                        </Box>
+                      </Box>
+                      
+                      {/* Loading Text */}
+                      <Typography variant="h6" sx={{ 
+                        color: '#10b981', 
+                        fontWeight: 600,
+                        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                        textAlign: 'center'
+                      }}>
+                        Quiz Found Successfully!
+                      </Typography>
+                      
+                      <Typography variant="body2" sx={{ 
+                        color: '#6b7280', 
+                        textAlign: 'center',
+                        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                      }}>
+                        Redirecting to exam instructions...
+                      </Typography>
+                      
+                      {/* Progress Bar */}
+                      <Box sx={{ 
+                        width: '100%', 
+                        height: 4, 
+                        backgroundColor: '#e5e7eb', 
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        mt: 2
+                      }}>
+                        <Box sx={{
+                          width: '100%',
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                          borderRadius: 2,
+                          animation: 'progress 2s ease-in-out',
+                          '@keyframes progress': {
+                            '0%': { transform: 'translateX(-100%)' },
+                            '100%': { transform: 'translateX(0%)' }
+                          }
+                        }} />
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Stack spacing={3}>
+                    <TextField
+                      fullWidth
+                      variant="outlined"
+                      placeholder="Enter Access Code..."
+                      value={accessCode}
+                      onChange={(e) => setAccessCode(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAccessCodeSubmit();
+                        }
+                      }}
+                      error={codeMessageType === 'error'}
+                      helperText={codeError}
+                      disabled={codeLoading}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 3,
+                          fontSize: '1.1rem',
+                          fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#3b82f6',
+                              borderWidth: '2px'
+                            }
+                          },
+                          '&.Mui-focused': {
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#3b82f6',
+                              borderWidth: '2px',
+                              boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                            }
+                          }
+                        },
+                        '& .MuiInputLabel-root': {
+                          fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                          fontWeight: 500
+                        },
+                        '& .MuiFormHelperText-root': {
+                          fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          color: codeMessageType === 'success' ? '#16a34a' : 
+                                 codeMessageType === 'warning' ? '#f59e0b' : 
+                                 codeMessageType === 'error' ? '#ef4444' : '#6b7280'
+                        }
+                      }}
+                    />
+
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      size="large"
+                      disabled={codeLoading || !accessCode.trim()}
+                      onClick={handleAccessCodeSubmit}
+                      sx={{
+                        height: 56,
+                        borderRadius: 3,
+                        fontSize: '1.1rem',
+                        fontWeight: 600,
+                        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        color: '#ffffff',
+                        textTransform: 'none',
+                        letterSpacing: '0.025em',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.39)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                          boxShadow: '0 6px 20px 0 rgba(59, 130, 246, 0.5)',
+                          transform: 'translateY(-1px)'
+                        },
+                        '&:active': {
+                          transform: 'translateY(0)',
+                          boxShadow: '0 2px 8px 0 rgba(59, 130, 246, 0.3)'
+                        },
+                        '&:disabled': {
+                          background: '#9ca3af',
+                          color: '#ffffff',
+                          boxShadow: 'none',
+                          transform: 'none'
+                        }
+                      }}
+                    >
+                      {codeLoading ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CircularProgress size={20} color="inherit" />
+                          <span>Checking Code...</span>
+                        </Box>
+                      ) : (
+                        'Begin Exam'
+                      )}
+                    </Button>
+                  </Stack>
+                  )}
+                </Box>
+              </Box>
+            </Box>
             <Snackbar
               open={showCodeErrorSnackbar}
-              autoHideDuration={3500}
+              autoHideDuration={codeMessageType === 'success' ? 2000 : 3500}
               onClose={() => setShowCodeErrorSnackbar(false)}
               anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
-              <Alert severity="error" onClose={() => setShowCodeErrorSnackbar(false)} sx={{ width: '100%' }}>
+              <Alert 
+                severity={codeMessageType} 
+                onClose={() => setShowCodeErrorSnackbar(false)} 
+                sx={{ 
+                  width: '100%',
+                  ...(codeMessageType === 'success' && {
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #0ea5e9',
+                    color: '#0c4a6e',
+                    '& .MuiAlert-icon': {
+                      color: '#0ea5e9'
+                    },
+                    '& .MuiAlert-message': {
+                      fontWeight: 600,
+                      fontSize: '0.95rem'
+                    }
+                  }),
+                  ...(codeMessageType === 'error' && {
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #ef4444',
+                    color: '#991b1b',
+                    '& .MuiAlert-icon': {
+                      color: '#ef4444'
+                    },
+                    '& .MuiAlert-message': {
+                      fontWeight: 600,
+                      fontSize: '0.95rem'
+                    }
+                  }),
+                  ...(codeMessageType === 'warning' && {
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #f59e0b',
+                    color: '#92400e',
+                    '& .MuiAlert-icon': {
+                      color: '#f59e0b'
+                    },
+                    '& .MuiAlert-message': {
+                      fontWeight: 600,
+                      fontSize: '0.95rem'
+                    }
+                  })
+                }}
+              >
                 {codeError || 'Invalid code.'}
               </Alert>
             </Snackbar>
@@ -1531,15 +2345,23 @@ function StudentDashboardPageContent() {
         <Box sx={{ mt: 8, pt: 6, borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{ width: 24, height: 24, borderRadius: '6px', background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <SchoolIcon sx={{ color: 'white', fontSize: 14 }} />
+              <Box sx={{ width: 32, height: 32, borderRadius: '8px', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #3B82F6' }}>
+                <img 
+                  src="/Logo.svg" 
+                  alt="OctoMind Logo" 
+                  style={{ 
+                    width: '24px', 
+                    height: '24px',
+                    filter: 'brightness(0) saturate(100%) invert(0%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(0%) contrast(100%)'
+                  }} 
+                />
               </Box>
               <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
-                OctaMind
+                OctoMind
               </Typography>
             </Box>
             <Typography variant="body2" sx={{ color: '#9ca3af', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
-              © {new Date().getFullYear()} OctaMind. All rights reserved.
+              © {new Date().getFullYear()} OctoMind. All rights reserved.
             </Typography>
             <Typography variant="body2" sx={{ color: '#9ca3af', fontSize: '0.875rem', fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
               v1.0.0
@@ -1578,25 +2400,10 @@ function StudentDashboardPageContent() {
         </DialogActions>
       </Dialog>
       {showLogoutSplash && (
-        <Box
-          sx={{
-            position: 'fixed',
-            zIndex: 2000,
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(245,247,250,0.96)',
-          }}
-        >
-          <LogoutSplash
-            name={user?.firstName || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress || 'User'}
-            onComplete={() => signOut({ redirectUrl: "/sign-in" })}
-          />
-        </Box>
+        <LogoutSplash
+          name={user?.firstName || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress || 'User'}
+          onComplete={() => signOut({ redirectUrl: "/sign-in" })}
+        />
       )}
     </Box>
   );
@@ -1666,7 +2473,7 @@ function QuizCard({
           color={map.btn as any}
           disabled={map.disabled}
           onClick={onStart}
-          sx={{ mt: 3, textTransform: 'none', fontWeight: 600, borderRadius: 2, background: theme.palette.primary.main, color: '#fff', fontFamily: 'Poppins, sans-serif', '&:hover': { background: theme.palette.primary.dark } }}
+          sx={{ mt: 3, textTransform: 'none', fontWeight: 600, borderRadius: 2, background: theme.palette.primary.main, color: '#FFFFFF', fontFamily: 'Poppins, sans-serif', '&:hover': { background: theme.palette.primary.dark } }}
           startIcon={status === 'live' && hasProgress ? <ReplayIcon /> : <PlayArrowIcon />}
         >
           {status === 'live' ? (hasProgress ? 'Resume Quiz' : 'Start Quiz') : map.badge}
@@ -1678,6 +2485,7 @@ function QuizCard({
 
 export function ExamsPage() {
   const { user } = useUser();
+  const theme = useTheme();
   const { signOut } = useClerk();
   const router = useRouter();
 
@@ -1765,22 +2573,23 @@ export function ExamsPage() {
           p={2}
           borderRadius={2}
           sx={{
-            background: '#fff',
-            color: '#002366',
+            background: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF',
+            color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#002366',
             boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             border: 'none',
             fontFamily: 'Poppins, sans-serif',
           }}
         >
-          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: '#002366', fontFamily: 'Poppins, sans-serif' }}>Exams</Typography>
+          <Typography variant="h5" fontWeight={700} letterSpacing={0.5} sx={{ color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#002366', fontFamily: 'Poppins, sans-serif' }}>Exams</Typography>
           <Box display="flex" alignItems="center">
             <Avatar src={user?.imageUrl} alt="pro" sx={{ mr: 2, border: '2px solid #e3e6ef', width: 44, height: 44 }} />
-            <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#002366', fontFamily: 'Poppins, sans-serif' }}>{user?.firstName}</Typography>
+            <Typography variant="subtitle1" fontWeight={600} sx={{ color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#002366', fontFamily: 'Poppins, sans-serif' }}>{user?.firstName}</Typography>
           </Box>
         </Box>
 
         {/* Exams Table */}
-        <Box p={3} borderRadius={3} boxShadow={2} sx={{ background: '#fff', fontFamily: 'Poppins, sans-serif', maxWidth: 1200, mx: 'auto' }}>
+        <StyledCard sx={{ fontFamily: 'Poppins, sans-serif', maxWidth: 1200, mx: 'auto' }}>
+          <CardContent sx={{ p: 3 }}>
           {loading ? (
             <Box py={6} display="flex" justifyContent="center">
               <CircularProgress />
@@ -1816,7 +2625,7 @@ export function ExamsPage() {
                           color="primary"
                           size="small"
                           onClick={() => router.push(`/pre-exam/${exam.id}`)}
-                          sx={{ borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif', background: '#002366', color: '#fff', '&:hover': { background: '#001b4e' } }}
+                          sx={{ borderRadius: 2, fontWeight: 600, fontFamily: 'Poppins, sans-serif', background: theme.palette.primary.main, color: '#FFFFFF', '&:hover': { background: theme.palette.primary.dark } }}
                         >
                           Start
                         </Button>
@@ -1827,7 +2636,8 @@ export function ExamsPage() {
               </Table>
             </TableContainer>
           )}
-        </Box>
+          </CardContent>
+        </StyledCard>
       </Box>
     </Box>
   );

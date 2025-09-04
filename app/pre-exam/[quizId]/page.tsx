@@ -35,6 +35,8 @@ export default function PreExamPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasReadInstructions, setHasReadInstructions] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isGoingBack, setIsGoingBack] = useState(false);
 
   // Function to fetch teacher info from Clerk
   const fetchTeacherFromClerk = async (userId: string) => {
@@ -372,25 +374,64 @@ export default function PreExamPage() {
     }
   };
 
-  const handleStartExam = () => {
-    if (!hasReadInstructions) return;
-    router.push(`/attempt-quiz/${quizId}`);
+  const handleStartExam = async () => {
+    if (!hasReadInstructions || isStarting) return;
+    
+    setIsStarting(true);
+    
+    // Navigate after a brief loading state
+    setTimeout(() => {
+      router.push(`/attempt-quiz/${quizId}`);
+    }, 1000); // Simple 1 second loading
   };
 
   const handleGoBack = () => {
+    // Prevent multiple clicks
+    if (isGoingBack) return;
+    
+    // Set loading state for visual feedback
+    setIsGoingBack(true);
+    
+    // Add a smooth transition delay before navigation
+    setTimeout(() => {
     router.push('/dashboard/student');
+    }, 500); // 500ms for smooth transition with animation
   };
 
   // Early return if no quizId
   if (!quizId) {
     return (
-      <div className={inter.className} style={styles.container}>
+      <div 
+        className={inter.className} 
+        style={{
+          ...styles.container,
+          ...(isGoingBack && {
+            opacity: 0.7,
+            transform: 'scale(0.98)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          })
+        }}
+      >
         <div style={styles.card}>
           <div style={styles.errorContainer}>
             <h2 style={styles.errorTitle}>Invalid Quiz</h2>
             <p style={styles.errorMessage}>Quiz ID not found.</p>
-            <button style={styles.primaryButton} onClick={handleGoBack}>
-              Go Back
+            <button 
+              style={{
+                ...styles.primaryButton,
+                ...(isGoingBack ? styles.goingBackButton : {})
+              }} 
+              onClick={handleGoBack}
+              disabled={isGoingBack}
+            >
+              {isGoingBack ? (
+                <div style={styles.loadingContainer}>
+                  <div style={styles.spinner}></div>
+                  <span style={styles.loadingText}>Going Back...</span>
+                </div>
+              ) : (
+                'GO BACK'
+              )}
             </button>
           </div>
         </div>
@@ -413,13 +454,37 @@ export default function PreExamPage() {
 
   if (error || !quizDetails) {
     return (
-      <div className={inter.className} style={styles.container}>
+      <div 
+        className={inter.className} 
+        style={{
+          ...styles.container,
+          ...(isGoingBack && {
+            opacity: 0.7,
+            transform: 'scale(0.98)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          })
+        }}
+      >
         <div style={styles.card}>
           <div style={styles.errorContainer}>
             <h2 style={styles.errorTitle}>Error</h2>
             <p style={styles.errorMessage}>{error || 'Quiz not found'}</p>
-            <button style={styles.primaryButton} onClick={handleGoBack}>
-              Go Back
+            <button 
+              style={{
+                ...styles.primaryButton,
+                ...(isGoingBack ? styles.goingBackButton : {})
+              }} 
+              onClick={handleGoBack}
+              disabled={isGoingBack}
+            >
+              {isGoingBack ? (
+                <div style={styles.loadingContainer}>
+                  <div style={styles.spinner}></div>
+                  <span style={styles.loadingText}>Going Back...</span>
+                </div>
+              ) : (
+                'GO BACK'
+              )}
             </button>
           </div>
         </div>
@@ -432,15 +497,39 @@ export default function PreExamPage() {
 
   if (!isExamStarted) {
     return (
-      <div className={inter.className} style={styles.container}>
+      <div 
+        className={inter.className} 
+        style={{
+          ...styles.container,
+          ...(isGoingBack && {
+            opacity: 0.7,
+            transform: 'scale(0.98)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          })
+        }}
+      >
         <div style={styles.card}>
           <div style={styles.warningContainer}>
             <h2 style={styles.warningTitle}>Exam Not Started</h2>
             <p style={styles.warningMessage}>
               This exam has not started yet. It will begin at {dayjs(quizDetails.start_time).format('MMMM DD, YYYY [at] h:mm A')}.
             </p>
-            <button style={styles.primaryButton} onClick={handleGoBack}>
-              Go Back
+            <button 
+              style={{
+                ...styles.primaryButton,
+                ...(isGoingBack ? styles.goingBackButton : {})
+              }} 
+              onClick={handleGoBack}
+              disabled={isGoingBack}
+            >
+              {isGoingBack ? (
+                <div style={styles.loadingContainer}>
+                  <div style={styles.spinner}></div>
+                  <span style={styles.loadingText}>Going Back...</span>
+                </div>
+              ) : (
+                'GO BACK'
+              )}
             </button>
           </div>
         </div>
@@ -450,15 +539,39 @@ export default function PreExamPage() {
 
   if (isExamEnded) {
     return (
-      <div className={inter.className} style={styles.container}>
+      <div 
+        className={inter.className} 
+        style={{
+          ...styles.container,
+          ...(isGoingBack && {
+            opacity: 0.7,
+            transform: 'scale(0.98)',
+            transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          })
+        }}
+      >
         <div style={styles.card}>
           <div style={styles.errorContainer}>
             <h2 style={styles.errorTitle}>Exam Ended</h2>
             <p style={styles.errorMessage}>
               This exam has ended at {dayjs(quizDetails.end_time).format('MMMM DD, YYYY [at] h:mm A')}.
             </p>
-            <button style={styles.primaryButton} onClick={handleGoBack}>
-              Go Back
+            <button 
+              style={{
+                ...styles.primaryButton,
+                ...(isGoingBack ? styles.goingBackButton : {})
+              }} 
+              onClick={handleGoBack}
+              disabled={isGoingBack}
+            >
+              {isGoingBack ? (
+                <div style={styles.loadingContainer}>
+                  <div style={styles.spinner}></div>
+                  <span style={styles.loadingText}>Going Back...</span>
+                </div>
+              ) : (
+                'GO BACK'
+              )}
             </button>
           </div>
         </div>
@@ -467,7 +580,17 @@ export default function PreExamPage() {
   }
 
   return (
-    <div className={inter.className} style={styles.container}>
+    <div 
+      className={inter.className} 
+      style={{
+        ...styles.container,
+        ...(isGoingBack && {
+          opacity: 0.7,
+          transform: 'scale(0.98)',
+          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+        })
+      }}
+    >
       <div style={styles.card}>
         {/* Header Section */}
         <div style={styles.header}>
@@ -629,18 +752,40 @@ export default function PreExamPage() {
           </div>
           
           <div style={styles.buttonContainer}>
-            <button style={styles.secondaryButton} onClick={handleGoBack}>
-              Go Back
+            <button 
+              style={{
+                ...styles.secondaryButton,
+                ...(isGoingBack ? styles.goingBackButton : {})
+              }} 
+              onClick={handleGoBack}
+              disabled={isGoingBack}
+            >
+              {isGoingBack ? (
+                <div style={styles.loadingContainer}>
+                  <div style={styles.spinner}></div>
+                  <span style={styles.loadingText}>Going Back...</span>
+                </div>
+              ) : (
+                'GO BACK'
+              )}
             </button>
             <button 
               style={{
                 ...styles.primaryButton,
-                ...(hasReadInstructions ? {} : styles.disabledButton)
+                ...(hasReadInstructions && !isStarting ? {} : styles.disabledButton),
+                ...(isStarting ? styles.startingButton : {})
               }}
               onClick={handleStartExam}
-              disabled={!hasReadInstructions}
+              disabled={!hasReadInstructions || isStarting}
             >
-              Start Exam
+              {isStarting ? (
+                <div style={styles.loadingContainer}>
+                  <div style={styles.spinner}></div>
+                  <span style={styles.loadingText}>Starting Exam...</span>
+                </div>
+              ) : (
+                'START EXAM'
+              )}
             </button>
           </div>
         </div>
@@ -652,95 +797,96 @@ export default function PreExamPage() {
 const styles = {
   container: {
     minHeight: '100vh',
-    backgroundColor: '#f8fafc',
-    padding: '24px',
+    backgroundColor: '#f1f5f9',
+    padding: '32px',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    paddingTop: '40px',
+    paddingTop: '60px',
   },
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: '12px',
-    border: '1px solid #d1d5db',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-    maxWidth: '900px',
+    borderRadius: '8px',
+    border: '2px solid #e2e8f0',
+    boxShadow: '0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+    maxWidth: '1000px',
     width: '100%',
     overflow: 'hidden',
     position: 'relative' as const,
   },
   header: {
     textAlign: 'center' as const,
-    padding: '48px 48px 24px 48px',
-    borderBottom: '2px solid #e5e7eb',
-    backgroundColor: '#fafbfc',
+    padding: '40px 60px 30px 60px',
+    borderBottom: '3px solid #1e40af',
+    backgroundColor: '#ffffff',
+    position: 'relative' as const,
   },
   quizTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#64748b',
     textTransform: 'uppercase' as const,
-    letterSpacing: '1.2px',
-    margin: '0 0 20px 0',
+    letterSpacing: '2px',
+    margin: '0 0 16px 0',
   },
   mainTitle: {
-    fontSize: '36px',
-    fontWeight: '800',
-    color: '#111827',
-    letterSpacing: '-0.8px',
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#1e293b',
+    letterSpacing: '-0.5px',
     margin: '0',
-    lineHeight: '1.1',
+    lineHeight: '1.2',
   },
   mainContent: {
-    padding: '48px',
+    padding: '60px',
   },
   detailsSection: {
-    marginBottom: '48px',
+    marginBottom: '40px',
   },
   sectionTitle: {
-    fontSize: '22px',
-    fontWeight: '700',
-    color: '#111827',
-    margin: '0 0 24px 0',
-    paddingBottom: '16px',
-    borderBottom: '3px solid #e5e7eb',
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#1e293b',
+    margin: '0 0 20px 0',
+    paddingBottom: '12px',
+    borderBottom: '2px solid #1e40af',
+    position: 'relative' as const,
   },
   detailsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '0',
-    border: '2px solid #d1d5db',
-    borderRadius: '12px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '1px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
     overflow: 'hidden',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f8fafc',
   },
   detailItem: {
     display: 'flex',
     alignItems: 'center',
-    padding: '24px',
-    borderRight: '2px solid #d1d5db',
-    borderBottom: '2px solid #d1d5db',
+    padding: '28px',
+    borderRight: '1px solid #e2e8f0',
+    borderBottom: '1px solid #e2e8f0',
     backgroundColor: '#ffffff',
     transition: 'background-color 0.2s ease',
   },
   iconContainer: {
-    width: '48px',
-    height: '48px',
-    backgroundColor: '#f1f5f9',
-    borderRadius: '10px',
+    width: '44px',
+    height: '44px',
+    backgroundColor: '#1e40af',
+    borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: '20px',
+    marginRight: '16px',
     flexShrink: 0,
-    border: '1px solid #e2e8f0',
   },
   icon: {
-    width: '24px',
-    height: '24px',
-    color: '#475569',
-    strokeWidth: '2.5',
+    width: '20px',
+    height: '20px',
+    color: '#ffffff',
+    strokeWidth: '2',
   },
   detailContent: {
     display: 'flex',
@@ -748,17 +894,17 @@ const styles = {
     flex: 1,
   },
   detailLabel: {
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#475569',
+    fontSize: '12px',
+    fontWeight: '500',
+    color: '#64748b',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.8px',
-    marginBottom: '6px',
+    letterSpacing: '1px',
+    marginBottom: '4px',
   },
   detailValue: {
-    fontSize: '18px',
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#1e293b',
   },
   rulesSection: {
     marginBottom: '0',
@@ -766,24 +912,24 @@ const styles = {
   alertBox: {
     display: 'flex',
     alignItems: 'center',
-    padding: '20px',
-    backgroundColor: '#fef3c7',
-    border: '2px solid #f59e0b',
-    borderRadius: '10px',
-    marginBottom: '28px',
-    boxShadow: '0 2px 4px rgba(245, 158, 11, 0.1)',
+    padding: '24px',
+    backgroundColor: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
+    marginBottom: '32px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
   },
   alertIcon: {
-    width: '24px',
-    height: '24px',
-    color: '#d97706',
-    marginRight: '16px',
+    width: '20px',
+    height: '20px',
+    color: '#dc2626',
+    marginRight: '12px',
     flexShrink: 0,
   },
   alertContent: {
-    fontSize: '15px',
-    color: '#92400e',
-    fontWeight: '600',
+    fontSize: '14px',
+    color: '#991b1b',
+    fontWeight: '500',
   },
   rulesList: {
     marginBottom: '32px',
@@ -791,23 +937,24 @@ const styles = {
   ruleItem: {
     display: 'flex',
     alignItems: 'flex-start',
-    marginBottom: '16px',
+    marginBottom: '12px',
+    padding: '8px 0',
   },
   ruleDot: {
-    width: '8px',
-    height: '8px',
-    backgroundColor: '#475569',
+    width: '6px',
+    height: '6px',
+    backgroundColor: '#1e40af',
     borderRadius: '50%',
-    marginTop: '10px',
-    marginRight: '18px',
+    marginTop: '8px',
+    marginRight: '16px',
     flexShrink: 0,
   },
   ruleText: {
-    fontSize: '15px',
+    fontSize: '14px',
     color: '#374151',
-    lineHeight: '1.7',
+    lineHeight: '1.6',
     flex: 1,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   descriptionSection: {
     marginBottom: '32px',
@@ -854,8 +1001,8 @@ const styles = {
   },
   footer: {
     backgroundColor: '#f8fafc',
-    padding: '32px 48px',
-    borderTop: '2px solid #e5e7eb',
+    padding: '40px 60px',
+    borderTop: '1px solid #e2e8f0',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -890,39 +1037,69 @@ const styles = {
     flexShrink: 0,
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#1e40af',
     color: '#ffffff',
     border: 'none',
-    padding: '14px 28px',
-    borderRadius: '10px',
-    fontSize: '15px',
-    fontWeight: '700',
+    padding: '16px 32px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    boxShadow: '0 2px 4px rgba(0, 122, 255, 0.2)',
+    boxShadow: '0 2px 4px rgba(30, 64, 175, 0.2)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   secondaryButton: {
     backgroundColor: 'transparent',
-    color: '#475569',
-    border: '2px solid #d1d5db',
-    padding: '14px 28px',
-    borderRadius: '10px',
-    fontSize: '15px',
-    fontWeight: '700',
+    color: '#64748b',
+    border: '1px solid #cbd5e1',
+    padding: '16px 32px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    position: 'relative' as const,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   disabledButton: {
     backgroundColor: '#e5e7eb',
     color: '#9ca3af',
     cursor: 'not-allowed',
   },
+  goingBackButton: {
+    backgroundColor: '#f1f5f9',
+    color: '#6b7280',
+    border: '2px solid #9ca3af',
+    cursor: 'not-allowed',
+    transform: 'scale(0.98)',
+    opacity: 0.8,
+  },
+  startingButton: {
+    backgroundColor: '#007AFF',
+    color: '#ffffff',
+    cursor: 'not-allowed',
+    transform: 'scale(0.98)',
+    boxShadow: '0 4px 12px rgba(0, 122, 255, 0.3)',
+  },
   loadingContainer: {
     display: 'flex',
-    flexDirection: 'column' as const,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: '60px 40px',
+    gap: '12px',
+  },
+  spinner: {
+    width: '20px',
+    height: '20px',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+    borderTop: '2px solid #ffffff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: {
+    fontSize: '15px',
+    fontWeight: '700',
   },
   loadingSpinner: {
     width: '40px',
@@ -931,11 +1108,6 @@ const styles = {
     borderTop: '3px solid #007AFF',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
-  },
-  loadingText: {
-    marginTop: '16px',
-    fontSize: '14px',
-    color: '#6b7280',
   },
   errorContainer: {
     textAlign: 'center' as const,
@@ -971,14 +1143,40 @@ const styles = {
   },
 };
 
-// Add CSS for the loading spinner animation and hover effects
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+// Add CSS keyframes for animations
+const keyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes bounceIn {
+    0% { 
+      transform: scale(0.3);
+      opacity: 0;
     }
+    50% { 
+      transform: scale(1.1);
+      opacity: 1;
+    }
+    100% { 
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  
+`;
+
+// Inject CSS keyframes and styles into the document
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = keyframes + `
     
     .detailItem:hover {
       background-color: #f8fafc !important;
@@ -993,7 +1191,14 @@ if (typeof document !== 'undefined') {
     .secondaryButton:hover {
       background-color: #f1f5f9 !important;
       border-color: #9ca3af !important;
-      transform: translateY(-1px);
+      transform: translateY(-2px) translateZ(0);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    
+    .secondaryButton:active {
+      transform: translateY(0px) translateZ(0);
+      transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
     .checkbox:hover {
@@ -1012,5 +1217,5 @@ if (typeof document !== 'undefined') {
       .timeGrid { grid-template-columns: 1fr; }
     }
   `;
-  document.head.appendChild(style);
+  document.head.appendChild(styleSheet);
 }

@@ -52,8 +52,8 @@ import {
   Zoom
 } from '@mui/material';
 import { useClerk, useUser } from '@clerk/nextjs';
-import { ThemeToggleButton } from '@/components/ThemeToggleButton';
-import { supabase } from '@/utils/supabaseClient';
+import { ThemeToggleButton } from '../../../src/components/ThemeToggleButton';
+import { supabase } from '../../../src/utils/supabaseClient';
 import { format } from 'date-fns';
 import DeleteIcon from '@mui/icons-material/Delete';
 import {
@@ -67,7 +67,9 @@ import {
   Send as PaperPlaneIcon,
   ShowChart as LineAxisIcon,
   Edit as EditIcon,
+  Security as SecurityIcon,
   Add as AddIcon,
+  Refresh as RefreshIcon,
   Visibility as VisibilityIcon,
   ContentCopy as ContentCopyIcon,
   CheckCircle as CheckCircleIcon,
@@ -102,54 +104,72 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { withRole } from "../../../components/withRole";
 import { SettingsDrawer } from '../../../components/settings/SettingsDrawer';
-import { useSettingsContext } from '@/context/settings-context';
-import Iconify from '@/components/iconify/Iconify';
+import { useSettingsContext } from '../../../src/context/settings-context';
+import Iconify from '../../../src/components/iconify/Iconify';
 import { useTheme } from '@mui/material/styles';
+
 import Skeleton from '@mui/material/Skeleton';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import LoadingScreen from '@/components/loading-screen';
+import LogoutSplash from '../../../components/LogoutSplash';
 
 // Lazy load components
-const QuizTable = lazy(() => import('@/components/dashboard/QuizTable'));
-const QuizAnalytics = lazy(() => import('@/components/dashboard/QuizAnalytics'));
-const AppWelcome = lazy(() => import('@/sections/overview/app-welcome'));
-const AppWidgetSummary = lazy(() => import('@/sections/overview/app-widget-summary'));
+const QuizTable = lazy(() => import('../../../src/components/dashboard/QuizTable'));
+const QuizAnalytics = lazy(() => import('../../../src/components/dashboard/QuizAnalytics'));
+const AppWelcome = lazy(() => import('../../../src/sections/overview/app-welcome'));
+const AppWidgetSummary = lazy(() => import('../../../src/sections/overview/app-widget-summary'));
 
 // Styled Components for Enhanced UI
 const StyledCard = styled(Card)(({ theme }) => ({
   borderRadius: 16,
   boxShadow: theme.palette.mode === 'dark' 
     ? '0 4px 20px rgba(0,0,0,0.3)' 
-    : '0 4px 20px rgba(0,0,0,0.08)',
-  border: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.background.paper,
+    : '0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.04)',
+  border: `1px solid ${theme.palette.mode === 'dark' ? theme.palette.divider : '#E6E8EC'}`,
+  backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF',
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   overflow: 'hidden',
   fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   '&:hover': {
-    transform: 'translateY(-4px)',
+    transform: 'translateY(1px)',
     boxShadow: theme.palette.mode === 'dark' 
       ? '0 8px 32px rgba(0,0,0,0.4)' 
-      : '0 8px 32px rgba(0,0,0,0.12)',
-    borderColor: theme.palette.primary.main,
+      : '0 8px 24px rgba(16,24,40,.08), 0 2px 6px rgba(16,24,40,.06)',
+    borderColor: theme.palette.mode === 'dark' ? theme.palette.primary.main : '#2563EB',
   },
+  '&:focus-visible': {
+    outline: '2px solid #2563EB',
+    outlineOffset: '2px'
+  }
 }));
 
 
 
 const MetricCard = styled(Card)(({ theme }) => ({
-  borderRadius: 20,
-  background: 'linear-gradient(135deg, #f8fafc 0%, #e3eafc 100%)',
-  border: `2px solid ${theme.palette.primary.light}`,
-  boxShadow: '0 4px 24px 0 rgba(30,64,175,0.07)',
+  borderRadius: 16,
+  background: theme.palette.mode === 'dark' 
+    ? 'linear-gradient(135deg, #1A1A1A 0%, #2A2A2A 100%)'
+    : '#FFFFFF',
+  border: `1px solid ${theme.palette.mode === 'dark' ? '#3A3A3A' : '#E6E8EC'}`,
+  boxShadow: theme.palette.mode === 'dark' 
+    ? '0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)' 
+    : '0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.04)',
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   overflow: 'hidden',
   position: 'relative',
   fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   '&:hover': {
-    transform: 'translateY(-6px)',
-    boxShadow: '0 12px 40px 0 rgba(30,64,175,0.15)',
-    borderColor: theme.palette.primary.main,
+    transform: 'translateY(1px)',
+    background: theme.palette.mode === 'dark' 
+      ? 'linear-gradient(135deg, #2A2A2A 0%, #3A3A3A 100%)'
+      : '#FFFFFF',
+    boxShadow: theme.palette.mode === 'dark' 
+      ? '0 12px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.1)' 
+      : '0 8px 24px rgba(16,24,40,.08), 0 2px 6px rgba(16,24,40,.06)',
+    borderColor: theme.palette.mode === 'dark' ? theme.palette.primary.main : '#2563EB',
+  },
+  '&:focus-visible': {
+    outline: '2px solid #2563EB',
+    outlineOffset: '2px'
   },
   '&::before': {
     content: '""',
@@ -159,6 +179,7 @@ const MetricCard = styled(Card)(({ theme }) => ({
     right: 0,
     height: 4,
     background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4)',
+    borderRadius: '16px 16px 0 0',
   },
 }));
 
@@ -202,6 +223,11 @@ function TeacherDashboardPage() {
   const searchParams = useSearchParams();
   const settings = useSettingsContext();
   const theme = useTheme();
+  
+  // Inter font configuration
+  const interFont = {
+    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+  };
 
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [results, setResults] = useState<any[]>([]);
@@ -256,11 +282,19 @@ function TeacherDashboardPage() {
 
   // Determine the current tab from the URL, default to 'dashboard'
   const currentTab = searchParams?.get('tab') || 'dashboard';
+  
+  console.log('🔍 Current tab:', currentTab);
 
   // Announcements state
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
   const [createAnnouncementOpen, setCreateAnnouncementOpen] = useState(false);
+
+  // Notification state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const [examPage, setExamPage] = useState(1);
   const examsPerPage = 10;
@@ -276,6 +310,7 @@ function TeacherDashboardPage() {
   );
 
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [showLogoutSplash, setShowLogoutSplash] = useState(false);
   const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -427,6 +462,61 @@ function TeacherDashboardPage() {
     }
   };
 
+  const fetchAllResults = async () => {
+    if (!user?.id) {
+      console.log('🔍 fetchAllResults - No user ID, skipping');
+      return;
+    }
+    
+    try {
+      console.log('🔍 fetchAllResults - Starting fetch for user:', user.id);
+      
+      // Get all quiz IDs for this teacher
+      const { data: teacherQuizzes, error: quizError } = await supabase
+        .from('quizzes')
+        .select('id')
+        .eq('user_id', user.id);
+      
+      if (quizError) {
+        console.error('🔍 fetchAllResults - Error fetching quizzes:', quizError);
+        return;
+      }
+      
+      const quizIds = teacherQuizzes?.map(q => q.id) || [];
+      
+      console.log('🔍 fetchAllResults - Quiz IDs:', quizIds);
+      
+      if (quizIds.length > 0) {
+        const { data: allAttempts, error: attemptsError } = await supabase
+          .from('attempts')
+          .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, answers, quizzes:quiz_id(quiz_title, total_marks, user_id)`)
+          .in('quiz_id', quizIds)
+          .order('submitted_at', { ascending: false });
+        
+        if (attemptsError) {
+          console.error('🔍 fetchAllResults - Error fetching attempts:', attemptsError);
+          return;
+        }
+        
+        console.log('🔍 fetchAllResults - All attempts:', allAttempts?.length || 0);
+        
+        // Filter to only show results from this teacher's quizzes
+        const filteredResults = (allAttempts || [])
+          .filter((r: any) => r.quizzes?.user_id === user.id);
+        
+        console.log('🔍 fetchAllResults - Filtered results:', filteredResults.length);
+        console.log('🔍 fetchAllResults - Sample results:', filteredResults.slice(0, 2));
+        
+        setResults(filteredResults);
+      } else {
+        console.log('🔍 fetchAllResults - No quiz IDs found');
+        setResults([]);
+      }
+    } catch (error) {
+      console.error('🔍 fetchAllResults - Unexpected error:', error);
+    }
+  };
+
   const fetchQuizzes = async () => {
     if (!user?.id) return;
 
@@ -530,6 +620,7 @@ function TeacherDashboardPage() {
 
       // Refresh the quiz list
       await fetchQuizzes();
+      await fetchAllResults();
       setDeleteDialogOpen(false);
       setQuizToDelete(null);
     } catch (err) {
@@ -617,27 +708,47 @@ function TeacherDashboardPage() {
     if (!user?.id) return;
     
     const fetchStats = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        console.log('🔍 fetchStats - No user ID, skipping');
+        return;
+      }
+      console.log('🔍 fetchStats - Starting stats calculation for user:', user.id);
       try {
-        // Fetch student count from Clerk API instead of Supabase
-        const [clerkUsersRes, examsResult, announcementsResult] = await Promise.all([
-          fetch('/api/clerk-users?limit=1000'),
-          supabase.from('quizzes').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-          supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('sender_id', user.id)
+        console.log('🔍 fetchStats - About to fetch quizzes and announcements');
+        // Fetch teacher's quizzes first
+        const [examsResult, announcementsResult] = await Promise.all([
+          supabase.from('quizzes').select('id').eq('user_id', user.id),
+          supabase.from('announcements').select('id').eq('sender_id', user.id)
         ]);
         
+        console.log('🔍 fetchStats - Queries completed, examsResult:', examsResult);
+        console.log('🔍 fetchStats - announcementsResult:', announcementsResult);
+        
+        // Get total number of students from Clerk
+        const clerkUsersRes = await fetch('/api/clerk-users?limit=1000');
         const clerkUsers = await clerkUsersRes.json();
         const studentCount = Array.isArray(clerkUsers) ? clerkUsers.filter((u: any) => u.role === 'student').length : 0;
 
+        console.log('📊 Teacher stats calculated:', {
+          studentCount,
+          examCount: examsResult.data?.length || 0,
+          announcementCount: announcementsResult.data?.length || 0,
+          totalClerkUsers: Array.isArray(clerkUsers) ? clerkUsers.length : 0
+        });
+        
         setStudentCount(studentCount);
-        setExamCount(examsResult.count || 0);
-        setAnnouncementCount(announcementsResult.count || 0);
-
+        setExamCount(examsResult.data?.length || 0);
+        setAnnouncementCount(announcementsResult.data?.length || 0);
+        
         // Get quiz IDs for results count
         const quizIds = examsResult.data?.map(q => q.id) || [];
         
+        console.log('🔍 fetchStats - Quiz IDs from examsResult:', quizIds.length, quizIds);
+        console.log('🔍 fetchStats - examsResult.data:', examsResult.data);
+        
         if (quizIds.length > 0) {
-          const [resultsResult, recentResults] = await Promise.all([
+          console.log('🔍 fetchStats - Found quiz IDs, fetching results:', quizIds.length);
+          const [resultsResult, recentResults, allResults] = await Promise.all([
             supabase
               .from('attempts')
               .select('id', { count: 'exact', head: true })
@@ -647,7 +758,12 @@ function TeacherDashboardPage() {
               .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, answers, quizzes:quiz_id(quiz_title, total_marks, user_id)`)
               .in('quiz_id', quizIds)
               .order('submitted_at', { ascending: false })
-              .limit(10)
+              .limit(10),
+            supabase
+              .from('attempts')
+              .select(`id, user_name, score, submitted_at, marked_for_review, quiz_id, start_time, answers, quizzes:quiz_id(quiz_title, total_marks, user_id)`)
+              .in('quiz_id', quizIds)
+              .order('submitted_at', { ascending: false })
           ]);
           
           setResultCount(resultsResult.count || 0);
@@ -658,9 +774,63 @@ function TeacherDashboardPage() {
             .slice(0, 8); // Take the 8 most recent
           
           setRecentResults(filteredRecentResults);
+          
+          // Filter all results to only include this teacher's quizzes
+          const filteredAllResults = (allResults.data || [])
+            .filter((r: any) => r.quizzes?.user_id === user.id);
+          
+          console.log('🔍 fetchStats - Filtered all results:', filteredAllResults.length);
+          console.log('🔍 fetchStats - Sample filtered results:', filteredAllResults.slice(0, 2));
+          
+          // Calculate performance data using ALL results, not just recent ones
+          const totalAttempts = filteredAllResults.length;
+          const totalMarks = filteredAllResults.reduce((sum, r) => sum + (r.score || 0), 0);
+          const totalPossibleMarks = filteredAllResults.reduce((sum, r) => sum + ((r.quizzes as any)?.total_marks || 100), 0);
+          const averageScore = totalAttempts > 0 ? Math.round((totalMarks / totalPossibleMarks) * 100) : 0;
+          
+          console.log('🔍 fetchStats - Calculation details:', {
+            totalAttempts,
+            totalMarks,
+            totalPossibleMarks,
+            averageScore,
+            sampleResults: filteredAllResults.slice(0, 2)
+          });
+          
+          // Calculate pass rate (assuming 60% is passing)
+          const passingAttempts = filteredAllResults.filter(r => {
+            const score = r.score || 0;
+            const totalMarks = (r.quizzes as any)?.total_marks || 100;
+            return (score / totalMarks) >= 0.6;
+          }).length;
+          const passRate = totalAttempts > 0 ? Math.round((passingAttempts / totalAttempts) * 100) : 0;
+          
+          console.log('📊 Performance data calculated:', {
+            totalAttempts,
+            averageScore,
+            passRate,
+            totalMarks,
+            totalPossibleMarks,
+            filteredAllResultsCount: filteredAllResults.length,
+            sampleResults: filteredAllResults.slice(0, 2)
+          });
+          
+          setPerformanceData({
+            averageScore,
+            passRate,
+            totalAttempts,
+            activeStudents: studentCount
+          });
+          
+          console.log('📊 Performance data set successfully');
         } else {
           setResultCount(0);
           setRecentResults([]);
+          setPerformanceData({
+            averageScore: 0,
+            passRate: 0,
+            totalAttempts: 0,
+            activeStudents: studentCount
+          });
         }
         
         // Also fetch recent results separately to ensure we get the latest
@@ -675,6 +845,7 @@ function TeacherDashboardPage() {
     // Load stats and recent results immediately without blocking UI
     fetchStats();
     fetchRecentResults();
+    fetchAllResults();
     
     // Set up polling for real-time stats updates
     const interval = setInterval(fetchStats, 15000); // Poll every 15 seconds
@@ -692,6 +863,7 @@ function TeacherDashboardPage() {
         (payload) => {
           // Refresh recent results when new attempts are added
           fetchStats();
+          fetchAllResults();
         }
       )
       .subscribe();
@@ -748,7 +920,67 @@ function TeacherDashboardPage() {
     fetchExams();
   }, [user?.id]);
 
+  // Fetch notifications
+  useEffect(() => {
+    if (!user) return;
+    const fetchNotifications = async () => {
+      setNotificationsLoading(true);
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .in('target_audience', ['all', 'teachers'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (error) {
+        console.error('Error fetching notifications:', error);
+      } else {
+        setNotifications(data || []);
+        // Count unread notifications (for demo, we'll consider all as unread)
+        setUnreadNotifications(data?.length || 0);
+      }
+      setNotificationsLoading(false);
+    };
+    fetchNotifications();
+  }, [user]);
 
+  // Handle profile button click
+  const handleProfileClick = () => {
+    setSelectedSection('settings');
+  };
+
+  // Handle notification button click
+  const handleNotificationClick = () => {
+    setNotificationDropdownOpen(!notificationDropdownOpen);
+  };
+
+  // Handle notification item click
+  const handleNotificationItemClick = (notification: any) => {
+    // Mark as read (you can implement this logic)
+    console.log('Notification clicked:', notification);
+    // Close dropdown after a short delay
+    setTimeout(() => {
+      setNotificationDropdownOpen(false);
+    }, 200);
+  };
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationDropdownOpen) {
+        const target = event.target as Element;
+        if (!target.closest('[data-notification-dropdown]')) {
+          setNotificationDropdownOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notificationDropdownOpen]);
 
   const helpContent = (
     <Box p={{ xs: 2, sm: 3 }} borderRadius={3} boxShadow={1} sx={{ background: theme.palette.background.paper, maxWidth: 900, mx: 'auto', border: 'none', fontFamily: 'Poppins, sans-serif' }}>
@@ -784,7 +1016,7 @@ function TeacherDashboardPage() {
         display="flex"
         flexDirection="column"
         sx={{
-          background: '#fff',
+          background: theme.palette.background.default,
           minHeight: '100vh',
           width: '100vw',
           position: 'fixed',
@@ -906,7 +1138,7 @@ function TeacherDashboardPage() {
         alignItems="center"
         justifyContent="center"
         sx={{
-          background: '#fff',
+          background: theme.palette.background.default,
           minHeight: '100vh',
           width: '100vw',
           position: 'fixed',
@@ -933,20 +1165,24 @@ function TeacherDashboardPage() {
   }
 
   return (
-    <Box sx={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' }}>
+    <Box sx={{ 
+      ...interFont,
+      background: theme.palette.mode === 'dark' ? theme.palette.background.default : '#F7F8FA',
+      color: theme.palette.mode === 'dark' ? theme.palette.text.primary : '#111827'
+    }}>
       {/* Main Content */}
       <Box component="main" className="dashboard-inter-font" sx={{ 
         flexGrow: 1, 
         minHeight: '100vh', 
-        background: '#fafbfc'
+        background: theme.palette.mode === 'dark' ? theme.palette.background.default : '#F7F8FA'
       }}>
         {/* Top Navigation Bar */}
         <Box sx={{ position: 'sticky', top: 0, zIndex: 100 }}>
           {/* Top Strip - Greeting and Controls */}
           <Box
             sx={{
-              background: '#ffffff',
-              borderBottom: '1px solid #E5E7EB',
+              background: theme.palette.background.paper,
+              borderBottom: `1px solid ${theme.palette.divider}`,
               px: { xs: 3, sm: 4, md: 6 },
               py: 2.5,
               display: 'flex',
@@ -962,39 +1198,48 @@ function TeacherDashboardPage() {
               {/* Portal Logo and Name */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                  width: 48,
+                  height: 48,
+                  borderRadius: '10px',
+                  background: theme.palette.background.paper,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                  boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
+                  border: '3px solid #3B82F6'
                 }}>
-                  <SchoolIcon sx={{ color: 'white', fontSize: 18 }} />
+                  <img 
+                    src="/Logo.svg" 
+                    alt="OctoMind Logo" 
+                    style={{ 
+                      width: '36px', 
+                      height: '36px',
+                      filter: 'brightness(0) saturate(100%) invert(0%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(0%) contrast(100%)'
+                    }} 
+                  />
                 </Box>
                 <Box>
                   <Typography 
                     variant="h6" 
                     fontWeight={700} 
                     sx={{ 
-                      color: '#1a1a1a',
+                      color: 'text.primary',
                       fontSize: '1.125rem',
                       fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                       lineHeight: 1.2
                     }}
                   >
-                    OctaMind
+                    OctoMind
                   </Typography>
                   <Typography 
                     variant="body2" 
                     sx={{ 
-                      color: '#6b7280',
+                      color: 'text.secondary',
                       fontSize: '0.75rem',
                       fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
                     }}
                   >
-                    Powered by OctaMind
+                    Powered by OctoMind
                   </Typography>
                 </Box>
               </Box>
@@ -1005,7 +1250,7 @@ function TeacherDashboardPage() {
                   variant="h6" 
                   fontWeight={600} 
                   sx={{ 
-                    color: '#1a1a1a',
+                    color: 'text.primary',
                     fontSize: '1rem',
                     fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
                   }}
@@ -1015,7 +1260,7 @@ function TeacherDashboardPage() {
                 <Typography 
                   variant="body2" 
                   sx={{ 
-                    color: '#6b7280',
+                    color: 'text.secondary',
                     fontSize: '0.875rem',
                     fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
                   }}
@@ -1042,17 +1287,17 @@ function TeacherDashboardPage() {
                   gap: 1,
                   px: 2,
                   py: 1,
-                  background: '#f9fafb',
+                  background: theme.palette.mode === 'dark' ? '#1E1E1E' : '#f9fafb',
                   borderRadius: '8px',
-                  border: '1px solid #e5e7eb',
+                  border: `1px solid ${theme.palette.divider}`,
                   minWidth: 'fit-content'
                 }}
               >
-                <CalendarIcon size={16} color="#6b7280" />
+                <CalendarIcon size={16} color={theme.palette.text.secondary} />
                 <Typography 
                   variant="body2" 
                   sx={{ 
-                    color: '#374151',
+                    color: 'text.primary',
                     fontSize: '0.875rem',
                     fontWeight: 500,
                     fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
@@ -1073,9 +1318,9 @@ function TeacherDashboardPage() {
               {/* Theme Toggle */}
               <Box
                 sx={{
-                  color: '#6b7280',
+                  color: 'text.secondary',
                   '&:hover': {
-                    color: '#374151'
+                    color: 'text.primary'
                   }
                 }}
               >
@@ -1083,23 +1328,44 @@ function TeacherDashboardPage() {
               </Box>
 
               {/* Notification Bell */}
-              <IconButton
-                size="small"
-                sx={{
-                  color: '#6b7280',
-                  '&:hover': {
-                    background: '#f3f4f6',
-                    color: '#374151'
-                  }
-                }}
-              >
-                <BellIcon size={20} />
-              </IconButton>
+              <Box sx={{ position: 'relative' }} data-notification-dropdown>
+                <IconButton
+                  size="small"
+                  onClick={handleNotificationClick}
+                  sx={{
+                    color: 'text.secondary',
+                    '&:hover': {
+                      background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#f3f4f6',
+                      color: 'text.primary'
+                    }
+                  }}
+                >
+                  <BellIcon size={20} />
+                </IconButton>
+                {unreadNotifications > 0 && (
+                  <Badge
+                    badgeContent={unreadNotifications}
+                    color="error"
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      '& .MuiBadge-badge': {
+                        fontSize: '0.75rem',
+                        minWidth: '18px',
+                        height: '18px',
+                        borderRadius: '9px'
+                      }
+                    }}
+                  />
+                )}
+              </Box>
 
               {/* User Avatar */}
               <Avatar 
                 src={user?.imageUrl} 
                 alt="Profile" 
+                onClick={handleProfileClick}
                 sx={{ 
                   width: 36, 
                   height: 36, 
@@ -1119,16 +1385,118 @@ function TeacherDashboardPage() {
             </Box>
           </Box>
 
+          {/* Notification Dropdown */}
+          {notificationDropdownOpen && (
+            <Box
+              data-notification-dropdown
+              sx={{
+                position: 'absolute',
+                top: '100%',
+                right: { xs: 16, sm: 24, md: 32 },
+                zIndex: 1000,
+                width: 320,
+                maxHeight: 400,
+                background: theme.palette.mode === 'dark' ? '#1A1A1A' : '#FFFFFF',
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 2,
+                boxShadow: theme.palette.mode === 'dark' 
+                  ? '0 10px 25px rgba(0, 0, 0, 0.5)' 
+                  : '0 10px 25px rgba(0, 0, 0, 0.1)',
+                overflow: 'hidden',
+                mt: 1
+              }}
+            >
+              {/* Header */}
+              <Box
+                sx={{
+                  p: 2,
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#F8FAFC'
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                  Notifications
+                </Typography>
+              </Box>
+
+              {/* Notifications List */}
+              <Box sx={{ maxHeight: 300, overflowY: 'auto' }}>
+                {notificationsLoading ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : notifications.length > 0 ? (
+                  notifications.map((notification, index) => (
+                    <Box
+                      key={notification.id || index}
+                      onClick={() => handleNotificationItemClick(notification)}
+                      sx={{
+                        p: 2,
+                        borderBottom: index < notifications.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                        '&:hover': {
+                          background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#F8FAFC'
+                        }
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 0.5 }}>
+                        {notification.title || 'Announcement'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.875rem', mb: 1 }}>
+                        {notification.content?.substring(0, 100)}
+                        {notification.content?.length > 100 ? '...' : ''}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {new Date(notification.created_at).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      No notifications
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Footer */}
+              {notifications.length > 0 && (
+                <Box
+                  sx={{
+                    p: 2,
+                    borderTop: `1px solid ${theme.palette.divider}`,
+                    background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#F8FAFC',
+                    textAlign: 'center'
+                  }}
+                >
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setSelectedSection('announcements');
+                      setNotificationDropdownOpen(false);
+                    }}
+                    sx={{ fontSize: '0.875rem' }}
+                  >
+                    View All Announcements
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          )}
+
           {/* Menu Strip - Navigation Items */}
           <Box
             sx={{
-              background: '#0F172A',
-              px: { xs: 3, sm: 4, md: 6 },
-              py: 2.5,
+              background: theme.palette.mode === 'dark' ? '#1A1A1A' : '#0B1220',
+              borderBottom: theme.palette.mode === 'dark' ? 'none' : '1px solid #0E1A30',
+              px: { xs: 4, sm: 6, md: 8 },
+              py: 4,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 2,
+              gap: 3,
               width: '100%'
             }}
           >
@@ -1137,7 +1505,7 @@ function TeacherDashboardPage() {
               sx={{ 
                 display: { xs: 'none', md: 'flex' },
                 alignItems: 'center',
-                gap: 4
+                gap: 6
               }}
             >
               {[
@@ -1146,25 +1514,49 @@ function TeacherDashboardPage() {
                 { text: 'Results', tab: 'results', icon: <BarChartIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Records', tab: 'records', icon: <GroupIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Messages', tab: 'messages', icon: <BellIcon size={18} /> },
+                { text: 'Proctoring', tab: 'proctoring', icon: <SecurityIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Settings', tab: 'settings', icon: <SettingsIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Help', tab: 'help', icon: <HelpIcon sx={{ fontSize: 18 }} /> }
               ].map((item) => (
                 <Box
                   key={item.text}
                   onClick={() => router.push(`/dashboard/teacher?tab=${item.tab}`)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Navigate to ${item.text} section`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      router.push(`/dashboard/teacher?tab=${item.tab}`);
+                    }
+                  }}
                   sx={{
                     display: 'flex',
                     flexDirection: { xs: 'column', sm: 'row' },
                     alignItems: 'center',
                     gap: 0.5,
                     cursor: 'pointer',
-                    color: currentTab === item.tab ? '#3B82F6' : '#FFFFFF',
-                    borderBottom: currentTab === item.tab ? '2px solid #3B82F6' : '2px solid transparent',
-                    pb: 0.5,
+                    color: currentTab === item.tab ? '#FFFFFF' : '#E5E7EB',
+                    borderBottom: currentTab === item.tab ? '2px solid #2563EB' : '2px solid transparent',
+                    backgroundColor: currentTab === item.tab ? 'rgba(37, 99, 235, 0.15)' : 'transparent',
+                    borderRadius: '8px',
+                    px: 2,
+                    py: 1,
+                    minHeight: 40,
                     transition: 'all 0.2s ease',
+                    border: currentTab === item.tab ? `1px solid ${theme.palette.primary.main}` : '1px solid transparent',
                     '&:hover': {
-                      color: '#60A5FA',
-                      borderBottomColor: currentTab === item.tab ? '#3B82F6' : '#60A5FA'
+                      color: '#FFFFFF',
+                      backgroundColor: currentTab === item.tab ? 'rgba(37, 99, 235, 0.2)' : '#2A2A2A',
+                      borderBottomColor: currentTab === item.tab ? theme.palette.primary.main : theme.palette.primary.light,
+                      border: currentTab === item.tab ? `1px solid ${theme.palette.primary.main}` : '1px solid #2A2A2A',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                    },
+                    '&:focus-visible': {
+                      outline: `2px solid ${theme.palette.primary.main}`,
+                      outlineOffset: '2px',
+                      backgroundColor: 'rgba(37, 99, 235, 0.12)'
                     }
                   }}
                 >
@@ -1173,7 +1565,8 @@ function TeacherDashboardPage() {
                     variant="body2" 
                     sx={{ 
                       fontSize: '0.875rem',
-                      fontWeight: 500,
+                      fontWeight: currentTab === item.tab ? 600 : 500,
+                      letterSpacing: '0.025em',
                       fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
                     }}
                   >
@@ -1193,9 +1586,13 @@ function TeacherDashboardPage() {
               <IconButton
                 size="small"
                 sx={{
-                  color: '#FFFFFF',
+                  color: theme.palette.mode === 'dark' ? '#E5E7EB' : '#FFFFFF',
                   '&:hover': {
-                    background: 'rgba(255,255,255,0.1)'
+                    backgroundColor: theme.palette.mode === 'dark' ? '#2A2A2A' : 'rgba(255,255,255,0.1)'
+                  },
+                  '&:focus-visible': {
+                    outline: `2px solid ${theme.palette.primary.main}`,
+                    outlineOffset: '2px'
                   }
                 }}
               >
@@ -1205,23 +1602,29 @@ function TeacherDashboardPage() {
 
             {/* Right: Log Out Button */}
             <Button
-              variant="outlined"
+              variant="contained"
               size="small"
               onClick={() => setLogoutDialogOpen(true)}
               startIcon={<LogOutIcon size={16} />}
               sx={{
                 color: '#FFFFFF',
-                borderColor: '#FFFFFF',
+                backgroundColor: '#EF4444',
+                border: '1px solid #EF4444',
                 borderRadius: '8px',
                 px: 2,
                 py: 0.75,
                 fontSize: '0.875rem',
                 fontWeight: 500,
                 fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                transition: 'all 0.2s ease',
                 '&:hover': {
-                  background: 'rgba(255,255,255,0.1)',
-                  borderColor: '#FFFFFF',
+                  backgroundColor: '#DC2626',
+                  borderColor: '#DC2626',
                   color: '#FFFFFF'
+                },
+                '&:focus-visible': {
+                  outline: `2px solid #EF4444`,
+                  outlineOffset: '2px'
                 }
               }}
             >
@@ -1246,7 +1649,7 @@ function TeacherDashboardPage() {
                           Total Students
                         </Typography>
                         <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
-                          {statsLoading ? <Skeleton variant="text" width={80} height={60} /> : '125'}
+                          {statsLoading ? <Skeleton variant="text" width={80} height={60} /> : studentCount}
                         </Typography>
                       </Box>
                       <Box sx={{
@@ -1274,7 +1677,7 @@ function TeacherDashboardPage() {
                           Active Exams
                         </Typography>
                         <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
-                          {statsLoading ? <Skeleton variant="text" width={60} height={60} /> : '7'}
+                          {statsLoading ? <Skeleton variant="text" width={60} height={60} /> : examCount}
                         </Typography>
                       </Box>
                       <Box sx={{
@@ -1302,7 +1705,7 @@ function TeacherDashboardPage() {
                           Results Graded
                         </Typography>
                         <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
-                          {statsLoading ? <Skeleton variant="text" width={80} height={60} /> : '530'}
+                          {statsLoading ? <Skeleton variant="text" width={80} height={60} /> : resultCount}
                         </Typography>
                       </Box>
                       <Box sx={{
@@ -1333,8 +1736,23 @@ function TeacherDashboardPage() {
                           Average Score
                         </Typography>
                         <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
-                          {statsLoading ? <Skeleton variant="text" width={70} height={60} /> : '88%'}
+                          {statsLoading ? <Skeleton variant="text" width={70} height={60} /> : `${performanceData.averageScore}%`}
                         </Typography>
+                        <Box sx={{ mt: 1, width: '100%' }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={performanceData.averageScore} 
+                            sx={{ 
+                              height: 6, 
+                              borderRadius: 3,
+                              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                              '& .MuiLinearProgress-bar': {
+                                backgroundColor: theme.palette.warning.main,
+                                borderRadius: 3
+                              }
+                            }} 
+                          />
+                        </Box>
                       </Box>
                       <Box sx={{
                         width: 48,
@@ -1361,8 +1779,23 @@ function TeacherDashboardPage() {
                           Passing Rate
                         </Typography>
                         <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
-                          {statsLoading ? <Skeleton variant="text" width={70} height={60} /> : '92%'}
+                          {statsLoading ? <Skeleton variant="text" width={70} height={60} /> : `${performanceData.passRate}%`}
                         </Typography>
+                        <Box sx={{ mt: 1, width: '100%' }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={performanceData.passRate} 
+                            sx={{ 
+                              height: 6, 
+                              borderRadius: 3,
+                              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                              '& .MuiLinearProgress-bar': {
+                                backgroundColor: theme.palette.success.main,
+                                borderRadius: 3
+                              }
+                            }} 
+                          />
+                        </Box>
                       </Box>
                       <Box sx={{
                         width: 48,
@@ -1389,7 +1822,7 @@ function TeacherDashboardPage() {
                           Announcements
                         </Typography>
                         <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.5rem', color: 'text.primary' }}>
-                          {statsLoading ? <Skeleton variant="text" width={60} height={60} /> : '4'}
+                          {statsLoading ? <Skeleton variant="text" width={60} height={60} /> : announcementCount}
                         </Typography>
                       </Box>
                       <Box sx={{
@@ -1414,18 +1847,35 @@ function TeacherDashboardPage() {
               <CardHeader
                 title="Recent Results"
                 subheader="Latest submissions from your students"
-                titleTypographyProps={{ variant: 'h6', fontWeight: 700, color: 'text.primary' }}
-                subheaderTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
-                sx={{ pb: 2 }}
+                titleTypographyProps={{ 
+                  variant: 'h6', 
+                  fontWeight: 700, 
+                  color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary',
+                  fontSize: '1.25rem'
+                }}
+                subheaderTypographyProps={{ 
+                  variant: 'body2', 
+                  color: theme.palette.mode === 'dark' ? '#E5E7EB' : 'text.secondary',
+                  fontSize: '0.875rem'
+                }}
+                sx={{ 
+                  pb: 2,
+                  backgroundColor: theme.palette.mode === 'dark' ? '#1E1E1E' : 'transparent'
+                }}
               />
-              <TableContainer>
+              <TableContainer sx={{ 
+                overflow: 'hidden', 
+                borderRadius: '16px', 
+                border: `1px solid ${theme.palette.mode === 'dark' ? theme.palette.divider : '#E6E8EC'}`, 
+                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF'
+              }}>
                 <Table>
                   <TableHead>
-                    <TableRow sx={{ background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#f9fafb' }}>
-                      <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Student</TableCell>
-                      <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Exam</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Score</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.primary', py: 2 }}>Date</TableCell>
+                    <TableRow sx={{ background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#FBFBFD' }}>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? 'text.primary' : '#0F172A', py: 2 }}>Student</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? 'text.primary' : '#0F172A', py: 2 }}>Exam</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? 'text.primary' : '#0F172A', py: 2 }}>Score</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? 'text.primary' : '#0F172A', py: 2 }}>Date</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1492,26 +1942,39 @@ function TeacherDashboardPage() {
                           key={idx} 
                           hover 
                           sx={{ 
+                            backgroundColor: theme.palette.mode === 'dark' 
+                              ? (idx % 2 === 0 ? '#1E1E1E' : '#2A2A2A')
+                              : (idx % 2 === 0 ? '#FFFFFF' : '#FBFBFD'),
                             transition: 'all 0.2s ease',
                             '&:hover': { 
-                              background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : '#f8fafc',
+                              background: theme.palette.mode === 'dark' ? '#2E2E2E' : '#F5F7FB',
                               transform: 'scale(1.001)'
                             },
-                            borderBottom: `1px solid ${theme.palette.divider}`
+                            borderBottom: `1px solid ${theme.palette.mode === 'dark' ? theme.palette.divider : '#EDEFF2'}`
                           }}
                         >
-                          <TableCell sx={{ py: 2, fontWeight: 500, color: 'text.primary' }}>
+                          <TableCell sx={{ py: 2, fontWeight: 500, color: theme.palette.mode === 'dark' ? 'text.primary' : '#111827' }}>
                             {studentName}
                           </TableCell>
-                          <TableCell sx={{ py: 2, color: 'text.primary' }}>
+                          <TableCell sx={{ py: 2, color: theme.palette.mode === 'dark' ? 'text.primary' : '#111827' }}>
                             {examName}
                           </TableCell>
                           <TableCell sx={{ py: 2, textAlign: 'right' }}>
-                            <Typography variant="body1" fontWeight={700} color="text.primary">
+                            <Typography 
+                              variant="body1" 
+                              fontWeight={700} 
+                              sx={{
+                                color: parseFloat(percentage) >= 80 
+                                  ? '#16A34A' // Success green
+                                  : parseFloat(percentage) >= 50 
+                                    ? '#F59E0B' // Warning yellow
+                                    : '#DC2626' // Danger red
+                              }}
+                            >
                               {percentage}%
                             </Typography>
                           </TableCell>
-                          <TableCell sx={{ py: 2, color: 'text.secondary', textAlign: 'right' }}>
+                          <TableCell sx={{ py: 2, color: theme.palette.mode === 'dark' ? 'text.secondary' : '#6B7280', textAlign: 'right' }}>
                             {row.submitted_at ? format(new Date(row.submitted_at), 'MMM dd, yyyy') : '-'}
                           </TableCell>
                         </TableRow>
@@ -1545,7 +2008,7 @@ function TeacherDashboardPage() {
                     py: 1,
                     fontWeight: 600,
                     borderColor: '#d1d5db',
-                    color: '#374151',
+                    color: 'text.primary',
                     '&:hover': {
                       borderColor: '#3b82f6',
                       color: '#3b82f6',
@@ -1564,22 +2027,34 @@ function TeacherDashboardPage() {
                 <StyledCard>
                   <CardHeader
                     title="Manage Quizzes"
-                    subheader="Create, edit, and monitor your assessments"
-                    titleTypographyProps={{ variant: 'h6', fontWeight: 700, color: '#1a1a1a' }}
-                    subheaderTypographyProps={{ variant: 'body2', color: '#6b7280' }}
-                    sx={{ pb: 2 }}
+                    subheader="Create, edit, and monitor your OctoMind assessments"
+                    titleTypographyProps={{ 
+                      variant: 'h6', 
+                      fontWeight: 700, 
+                      color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary',
+                      fontSize: '1.25rem'
+                    }}
+                    subheaderTypographyProps={{ 
+                      variant: 'body2', 
+                      color: theme.palette.mode === 'dark' ? '#E5E7EB' : 'text.secondary',
+                      fontSize: '0.875rem'
+                    }}
+                    sx={{ 
+                      pb: 2,
+                      backgroundColor: theme.palette.mode === 'dark' ? '#1E1E1E' : 'transparent'
+                    }}
                   />
                   <TableContainer>
                                       <Table size="medium">
                     <TableHead>
-                      <TableRow sx={{ background: '#f9fafb' }}>
-                        <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Exam No.</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Exam Name</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Description</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Questions</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Start Time</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>End Time</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', py: 2 }}>Actions</TableCell>
+                      <TableRow sx={{ background: theme.palette.mode === 'dark' ? '#2A2A2A' : '#f9fafb' }}>
+                        <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary', py: 2 }}>Exam No.</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary', py: 2 }}>Exam Name</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary', py: 2 }}>Description</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary', py: 2 }}>Questions</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary', py: 2 }}>Start Time</TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary', py: 2 }}>End Time</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.875rem', color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary', py: 2 }}>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                       <TableBody>
@@ -1593,26 +2068,29 @@ function TeacherDashboardPage() {
                               key={row.id} 
                               hover 
                               sx={{ 
+                                backgroundColor: theme.palette.mode === 'dark' 
+                                  ? (idx % 2 === 0 ? '#1E1E1E' : '#242424')
+                                  : (idx % 2 === 0 ? 'background.paper' : '#f8fafc'),
                                 transition: 'all 0.2s ease',
                                 '&:hover': { 
-                                  background: '#f8fafc',
+                                  background: theme.palette.mode === 'dark' ? '#2E2E2E' : '#f0f4f8',
                                   transform: 'scale(1.001)'
                                 },
-                                borderBottom: '1px solid #f1f5f9'
+                                borderBottom: `1px solid ${theme.palette.divider}`
                               }}
                             >
-                              <TableCell align="center" sx={{ py: 2, color: '#6b7280', fontWeight: 500 }}>
+                              <TableCell align="center" sx={{ py: 2, color: theme.palette.mode === 'dark' ? '#E5E7EB' : '#6b7280', fontWeight: 500 }}>
                                 {(dashboardExamPage - 1) * dashboardExamsPerPage + idx + 1}
                               </TableCell>
-                              <TableCell sx={{ fontWeight: 600, color: '#1a1a1a', py: 2 }}>{row.quiz_title}</TableCell>
-                              <TableCell sx={{ color: '#6b7280', py: 2 }}>{row.description || 'No description'}</TableCell>
-                              <TableCell align="center" sx={{ py: 2, color: '#374151', fontWeight: 500 }}>
+                              <TableCell sx={{ fontWeight: 600, color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#1a1a1a', py: 2 }}>{row.quiz_title}</TableCell>
+                              <TableCell sx={{ color: theme.palette.mode === 'dark' ? '#E5E7EB' : '#6b7280', py: 2 }}>{row.description || 'No description'}</TableCell>
+                              <TableCell align="center" sx={{ py: 2, color: theme.palette.mode === 'dark' ? '#FFFFFF' : '#374151', fontWeight: 500 }}>
                                 {row.questions_count ?? '-'}
                               </TableCell>
-                              <TableCell sx={{ py: 2, color: '#6b7280' }}>
+                              <TableCell sx={{ py: 2, color: theme.palette.mode === 'dark' ? '#E5E7EB' : '#6b7280' }}>
                                 {row.start_time ? format(new Date(row.start_time), 'MMM dd, HH:mm') : '-'}
                               </TableCell>
-                              <TableCell sx={{ py: 2, color: '#6b7280' }}>
+                              <TableCell sx={{ py: 2, color: theme.palette.mode === 'dark' ? '#E5E7EB' : '#6b7280' }}>
                                 {row.end_time ? format(new Date(row.end_time), 'MMM dd, HH:mm') : '-'}
                               </TableCell>
                               <TableCell align="center" sx={{ py: 2 }}>
@@ -1622,8 +2100,12 @@ function TeacherDashboardPage() {
                                       size="small" 
                                       onClick={() => handleEditExam(row.id, row.nq)}
                                       sx={{ 
-                                        color: '#3b82f6',
-                                        '&:hover': { background: 'rgba(59, 130, 246, 0.1)' }
+                                        color: theme.palette.mode === 'dark' ? '#60A5FA' : '#3b82f6',
+                                        '&:hover': { 
+                                          background: theme.palette.mode === 'dark' ? 'rgba(96, 165, 250, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+                                          transform: 'scale(1.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
                                       }}
                                     >
                                       <EditIcon fontSize="small" />
@@ -1634,8 +2116,12 @@ function TeacherDashboardPage() {
                                       size="small" 
                                       onClick={() => router.push(`/preview-quiz/${row.id}`)}
                                       sx={{ 
-                                        color: '#10b981',
-                                        '&:hover': { background: 'rgba(16, 185, 129, 0.1)' }
+                                        color: theme.palette.mode === 'dark' ? '#34D399' : '#10b981',
+                                        '&:hover': { 
+                                          background: theme.palette.mode === 'dark' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+                                          transform: 'scale(1.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
                                       }}
                                     >
                                       <VisibilityIcon fontSize="small" />
@@ -1646,8 +2132,12 @@ function TeacherDashboardPage() {
                                       size="small" 
                                       onClick={() => handleDeleteExam(row.id)}
                                       sx={{ 
-                                        color: '#ef4444',
-                                        '&:hover': { background: 'rgba(239, 68, 68, 0.1)' }
+                                        color: theme.palette.mode === 'dark' ? '#F87171' : '#ef4444',
+                                        '&:hover': { 
+                                          background: theme.palette.mode === 'dark' ? 'rgba(248, 113, 113, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+                                          transform: 'scale(1.1)'
+                                        },
+                                        transition: 'all 0.2s ease'
                                       }}
                                     >
                                       <DeleteIcon fontSize="small" />
@@ -1661,11 +2151,11 @@ function TeacherDashboardPage() {
                           <TableRow>
                             <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                               <Box textAlign="center">
-                                <BookIcon sx={{ fontSize: 48, color: '#d1d5db', mb: 2 }} />
-                                <Typography variant="body1" color="#6b7280" fontWeight={500}>
+                                <BookIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                                <Typography variant="body1" color="text.secondary" fontWeight={500}>
                                   No exams found
                                 </Typography>
-                                <Typography variant="body2" color="#9ca3af" sx={{ mt: 1, mb: 3 }}>
+                                <Typography variant="body2" color="text.disabled" sx={{ mt: 1, mb: 3 }}>
                                   Create your first quiz to get started
                                 </Typography>
                                 <Button
@@ -1757,6 +2247,11 @@ function TeacherDashboardPage() {
             <AnnouncementsSection user={user} />
           </Box>
         )}
+        {currentTab === 'proctoring' && user && (
+          <Box>
+            <ProctoringSection user={user} />
+          </Box>
+        )}
         {currentTab === 'settings' && (
           <Box>
             <Typography variant="h5" fontWeight={700} mb={2}>Settings Section</Typography>
@@ -1766,6 +2261,11 @@ function TeacherDashboardPage() {
         {currentTab === 'analytics' && (
           <Box>
             <Typography variant="h5" fontWeight={700} mb={3}>Analytics & Insights</Typography>
+            <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+              <Typography variant="body2">
+                Debug: Current tab: {currentTab}, Results: {results.length}, PerformanceData: {JSON.stringify(performanceData)}
+              </Typography>
+            </Box>
             <EnhancedAnalytics 
               results={results}
               quizzes={quizzes}
@@ -1795,25 +2295,34 @@ function TeacherDashboardPage() {
             {/* Left: Portal Info */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '6px',
-                background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                width: 32,
+                height: 32,
+                borderRadius: '8px',
+                background: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                border: '3px solid #3B82F6'
               }}>
-                <SchoolIcon sx={{ color: 'white', fontSize: 14 }} />
+                <img 
+                  src="/Logo.svg" 
+                  alt="OctoMind Logo" 
+                  style={{ 
+                    width: '24px', 
+                    height: '24px',
+                    filter: 'brightness(0) saturate(100%) invert(0%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(0%) contrast(100%)'
+                  }} 
+                />
               </Box>
               <Typography 
                 variant="body2" 
                 sx={{ 
-                  color: '#6b7280',
+                  color: 'text.secondary',
                   fontSize: '0.875rem',
                   fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
                 }}
               >
-                OctaMind
+                OctoMind
               </Typography>
             </Box>
             
@@ -1821,19 +2330,19 @@ function TeacherDashboardPage() {
             <Typography 
               variant="body2" 
               sx={{ 
-                color: '#9ca3af',
+                color: 'text.disabled',
                 fontSize: '0.875rem',
                 fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
               }}
             >
-              © {new Date().getFullYear()} OctaMind. All rights reserved.
+              © {new Date().getFullYear()} OctoMind. All rights reserved.
             </Typography>
             
             {/* Right: Version/Support */}
             <Typography 
               variant="body2" 
               sx={{ 
-                color: '#9ca3af',
+                color: 'text.disabled',
                 fontSize: '0.875rem',
                 fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
               }}
@@ -1882,17 +2391,33 @@ function TeacherDashboardPage() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setLogoutDialogOpen(false)} color="primary">
+          <Button 
+            onClick={() => setLogoutDialogOpen(false)} 
+            color="primary"
+            sx={{
+              color: theme.palette.mode === 'dark' ? '#E5E7EB' : 'inherit',
+              borderColor: theme.palette.mode === 'dark' ? '#2A2A2A' : 'inherit',
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark' ? '#2A2A2A' : 'inherit'
+              }
+            }}
+          >
             Cancel
           </Button>
           <Button
             onClick={() => {
               setLogoutDialogOpen(false);
-              setLoggingOut(true); // Set loggingOut to true
-              signOut();
+              setShowLogoutSplash(true);
             }}
             color="error"
             variant="contained"
+            sx={{
+              backgroundColor: theme.palette.error.main,
+              color: '#FFFFFF',
+              '&:hover': {
+                backgroundColor: theme.palette.error.dark
+              }
+            }}
           >
             Yes, Log me out
           </Button>
@@ -1916,6 +2441,13 @@ function TeacherDashboardPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {showLogoutSplash && (
+        <LogoutSplash
+          name={user?.firstName || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress || 'User'}
+          onComplete={() => signOut({ redirectUrl: "/sign-in" })}
+        />
+      )}
     </Box>
   );
 }
@@ -2277,7 +2809,7 @@ function ExamResultsTable({
                   const overallPercent = overallTotal > 0 ? Math.round((overallObtained / overallTotal) * 100) : 0;
                   return (
                     <Box mb={3}>
-                      <Paper elevation={3} sx={{ p: 3, borderRadius: 4, mb: 3, background: 'linear-gradient(120deg, #f8fafc 60%, #e3e8ef 100%)', boxShadow: '0 4px 24px 0 rgba(30,64,175,0.07)' }}>
+                      <Paper elevation={3} sx={{ p: 3, borderRadius: 4, mb: 3, background: theme.palette.mode === 'dark' ? 'linear-gradient(120deg, rgba(30, 41, 59, 0.8) 60%, rgba(51, 65, 85, 0.6) 100%)' : 'linear-gradient(120deg, #f8fafc 60%, #e3e8ef 100%)', boxShadow: theme.palette.mode === 'dark' ? '0 4px 24px 0 rgba(0,0,0,0.3)' : '0 4px 24px 0 rgba(30,64,175,0.07)' }}>
                         <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" mb={2} gap={2}>
                           <Box>
                             <Typography variant="h5" fontWeight={800} color="primary.main" sx={{ mb: 0.5, letterSpacing: 0.5 }}>
@@ -2307,7 +2839,7 @@ function ExamResultsTable({
                               <Box
                                 key={section}
                                 sx={{
-                                  background: 'linear-gradient(120deg, #e3f2fd 60%, #f1f8e9 100%)',
+                                  background: theme.palette.mode === 'dark' ? 'linear-gradient(120deg, rgba(30, 41, 59, 0.6) 60%, rgba(51, 65, 85, 0.4) 100%)' : 'linear-gradient(120deg, #e3f2fd 60%, #f1f8e9 100%)',
                                   borderRadius: 3,
                                   boxShadow: 3,
                                   p: 2.5,
@@ -3107,7 +3639,7 @@ function RecordsSection({ onDeleteStudent, onStudentDeleted }: { onDeleteStudent
           sx: {
             borderRadius: 4,
             boxShadow: 6,
-            background: '#fff',
+            background: theme.palette.background.paper,
             p: 0,
             maxWidth: 540,
             width: '100%',
@@ -3974,10 +4506,10 @@ function TeacherSettings({ user }: { user: any }) {
           sx={{ 
             fontWeight: 600, 
             borderRadius: 2, 
-            background: '#002366', 
-            color: '#fff', 
+            background: theme.palette.primary.main, 
+            color: theme.palette.primary.contrastText, 
             py: 1.5,
-            '&:hover': { background: '#001b4e' } 
+            '&:hover': { background: theme.palette.primary.dark } 
           }}
           disabled={loading}
         >
@@ -4078,20 +4610,74 @@ function ExamsSection({ handleDeleteExam }: { handleDeleteExam: (quizId: number)
 
   return (
     <Box>
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ 
+        p: 3, 
+        mb: 3, 
+        background: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#FFFFFF',
+        border: `1px solid ${theme.palette.mode === 'dark' ? theme.palette.divider : '#E6E8EC'}`,
+        borderRadius: '16px',
+        boxShadow: theme.palette.mode === 'dark' 
+          ? '0 4px 20px rgba(0,0,0,0.3)' 
+          : '0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.04)'
+      }}>
         <Button 
           variant="contained" 
-          startIcon={<AddIcon />} 
+          startIcon={<AddIcon sx={{ fontSize: 20 }} />} 
           onClick={async () => {
             await router.push('/create-quiz');
           }}
           sx={{ 
-            background: '#002366', 
-            color: '#fff', 
-            fontWeight: 600, 
-            borderRadius: 2, 
-            fontFamily: 'Poppins, sans-serif',
-            '&:hover': { background: '#001b4e' } 
+            background: theme.palette.mode === 'dark' 
+              ? 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)'
+              : 'linear-gradient(135deg, #2563EB 0%, #1E48D6 100%)',
+            color: '#FFFFFF',
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            borderRadius: '12px',
+            px: 4,
+            py: 1.5,
+            minHeight: 48,
+            fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            textTransform: 'none',
+            letterSpacing: '0.025em',
+            boxShadow: theme.palette.mode === 'dark'
+              ? '0 4px 16px rgba(37, 99, 235, 0.4)'
+              : '0 4px 16px rgba(37, 99, 235, 0.25)',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            overflow: 'hidden',
+            '&:hover': { 
+              background: theme.palette.mode === 'dark'
+                ? 'linear-gradient(135deg, #1E48D6 0%, #1E40AF 100%)'
+                : 'linear-gradient(135deg, #1E48D6 0%, #1D4ED8 100%)',
+              transform: 'translateY(-2px)',
+              boxShadow: theme.palette.mode === 'dark'
+                ? '0 8px 24px rgba(37, 99, 235, 0.5)'
+                : '0 8px 24px rgba(37, 99, 235, 0.35)',
+            },
+            '&:active': {
+              transform: 'translateY(0px)',
+              boxShadow: theme.palette.mode === 'dark'
+                ? '0 2px 8px rgba(37, 99, 235, 0.4)'
+                : '0 2px 8px rgba(37, 99, 235, 0.25)',
+            },
+            '&:focus-visible': {
+              outline: '2px solid #2563EB',
+              outlineOffset: '2px'
+            },
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: '-100%',
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+              transition: 'left 0.5s',
+            },
+            '&:hover::before': {
+              left: '100%',
+            }
           }}
         >
           Create Quiz
@@ -4370,6 +4956,7 @@ function AnnouncementsSection({ user }: { user: any }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [announcementToDelete, setAnnouncementToDelete] = useState<any>(null);
   const [deleteSuccessOpen, setDeleteSuccessOpen] = useState(false);
+  const [tabSwitchData, setTabSwitchData] = useState<any[]>([]);
   const theme = useTheme();
 
   const fetchAnnouncements = async () => {
@@ -4396,8 +4983,9 @@ function AnnouncementsSection({ user }: { user: any }) {
     }
   };
 
+
   useEffect(() => {
-    // Load announcements immediately without blocking UI
+    // Load announcements and tab switch data immediately without blocking UI
     fetchAnnouncements();
   }, []);
 
@@ -4472,12 +5060,12 @@ function AnnouncementsSection({ user }: { user: any }) {
           startIcon={<AddIcon />}
           onClick={() => setCreateOpen(true)}
           sx={{ 
-            background: '#002366', 
-            color: '#fff', 
+            background: theme.palette.primary.main, 
+            color: theme.palette.primary.contrastText, 
             borderRadius: 2, 
             fontWeight: 600, 
             fontFamily: 'Poppins, sans-serif',
-            '&:hover': { background: '#001b4e' }
+            '&:hover': { background: theme.palette.primary.dark }
           }}
         >
           Create Announcement
@@ -4774,51 +5362,96 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
   students: any[];
   performanceData: any;
 }) {
+  console.log('🔍 EnhancedAnalytics component is rendering!');
   const theme = useTheme();
 
   // Calculate analytics data
   const calculateAnalytics = () => {
-    if (!results.length) return {};
-
-    const totalAttempts = results.length;
-    const totalMarks = results.reduce((sum, r) => sum + (r.score || 0), 0);
-    const averageScore = totalAttempts > 0 ? totalMarks / totalAttempts : 0;
-    
-    // Calculate pass rate (assuming 60% is passing)
-    const passingAttempts = results.filter(r => {
-      const score = r.score || 0;
-      const totalMarks = r.quizzes?.total_marks || 100;
-      return (score / totalMarks) >= 0.6;
-    }).length;
-    const passRate = totalAttempts > 0 ? (passingAttempts / totalAttempts) * 100 : 0;
-
-    // Quiz performance breakdown
-    const quizPerformance = quizzes.map(quiz => {
-      const quizResults = results.filter(r => r.quiz_id === quiz.id);
-      const avgScore = quizResults.length > 0 
-        ? quizResults.reduce((sum, r) => sum + (r.score || 0), 0) / quizResults.length 
-        : 0;
-      return {
-        id: quiz.id,
-        title: quiz.quiz_title,
-        attempts: quizResults.length,
-        averageScore: avgScore,
-        totalMarks: quiz.total_marks || 100
-      };
+    console.log('🔍 EnhancedAnalytics - Data received:', {
+      resultsLength: results.length,
+      quizzesLength: quizzes.length,
+      performanceData,
+      resultsSample: results.slice(0, 2),
+      hasResults: results.length > 0,
+      hasPerformanceData: performanceData && performanceData.totalAttempts > 0
     });
+    
+    // Use results if available, otherwise fall back to performanceData
+    if (results.length > 0) {
+      console.log('🔍 Using results data for calculation');
+      const totalAttempts = results.length;
+      const totalMarks = results.reduce((sum, r) => sum + (r.score || 0), 0);
+      const totalPossibleMarks = results.reduce((sum, r) => sum + ((r.quizzes as any)?.total_marks || 100), 0);
+      const averageScore = totalAttempts > 0 ? (totalMarks / totalPossibleMarks) * 100 : 0;
+      
+      // Calculate pass rate (assuming 60% is passing)
+      const passingAttempts = results.filter(r => {
+        const score = r.score || 0;
+        const totalMarks = (r.quizzes as any)?.total_marks || 100;
+        return (score / totalMarks) >= 0.6;
+      }).length;
+      const passRate = totalAttempts > 0 ? (passingAttempts / totalAttempts) * 100 : 0;
 
-    return {
-      totalAttempts,
-      averageScore,
-      passRate,
-      quizPerformance
-    };
+      // Quiz performance breakdown
+      const quizPerformance = quizzes.map(quiz => {
+        const quizResults = results.filter(r => r.quiz_id === quiz.id);
+        const totalQuizMarks = quizResults.reduce((sum, r) => sum + (r.score || 0), 0);
+        const totalPossibleMarks = quizResults.reduce((sum, r) => sum + ((r.quizzes as any)?.total_marks || 100), 0);
+        const avgScore = quizResults.length > 0 && totalPossibleMarks > 0
+          ? (totalQuizMarks / totalPossibleMarks) * 100
+          : 0;
+        return {
+          id: quiz.id,
+          title: quiz.quiz_title,
+          attempts: quizResults.length,
+          averageScore: avgScore,
+          totalMarks: quiz.total_marks || 100
+        };
+      });
+
+      const analyticsResult = {
+        totalAttempts,
+        averageScore,
+        passRate,
+        quizPerformance
+      };
+      
+      console.log('🔍 EnhancedAnalytics - Calculated from results:', analyticsResult);
+      
+      return analyticsResult;
+    } else {
+      // Fall back to performanceData when results are not available
+      console.log('🔍 Using performanceData fallback for calculation');
+      const fallbackResult = {
+        totalAttempts: performanceData.totalAttempts || 0,
+        averageScore: performanceData.averageScore || 0,
+        passRate: performanceData.passRate || 0,
+        quizPerformance: []
+      };
+      
+      console.log('🔍 EnhancedAnalytics - Using fallback performanceData:', fallbackResult);
+      
+      return fallbackResult;
+    }
   };
 
   const analytics = calculateAnalytics();
 
   return (
     <Box>
+      {/* Debug Information */}
+      <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          Debug: Results: {results.length}, PerformanceData: {JSON.stringify(performanceData)}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Direct values: totalAttempts={analytics?.totalAttempts || 0}, averageScore={analytics?.averageScore || 0}, passRate={analytics?.passRate || 0}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Raw performanceData: totalAttempts={performanceData?.totalAttempts || 0}, averageScore={performanceData?.averageScore || 0}, passRate={performanceData?.passRate || 0}
+        </Typography>
+      </Box>
+      
       {/* Analytics Overview Cards */}
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} sm={6} md={3}>
@@ -4828,22 +5461,28 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
                 width: 60, 
                 height: 60, 
                 borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                background: theme.palette.mode === 'dark' 
+                  ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)'
+                  : '#F3F6FF',
+                border: theme.palette.mode === 'dark' ? 'none' : '1px solid #DCE6FF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 mx: 'auto',
                 mb: 2
               }}>
-                <TrendingUpIcon sx={{ color: 'white', fontSize: 28 }} />
+                <TrendingUpIcon sx={{ 
+                  color: theme.palette.mode === 'dark' ? 'white' : '#2563EB', 
+                  fontSize: 28 
+                }} />
               </Box>
-              <Typography variant="h4" fontWeight={800} color="primary.main" gutterBottom>
-                {analytics.totalAttempts || 0}
+              <Typography variant="h4" fontWeight={800} color={theme.palette.mode === 'dark' ? '#60A5FA' : '#2563EB'} gutterBottom sx={{ fontSize: '2rem', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
+                {analytics?.totalAttempts || performanceData?.totalAttempts || 0}
               </Typography>
-              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
-                Total Attempts
+              <Typography variant="subtitle1" fontWeight={600} color={theme.palette.mode === 'dark' ? '#FFFFFF' : '#0F172A'}>
+                Results Graded
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color={theme.palette.mode === 'dark' ? '#E5E7EB' : '#6B7280'}>
                 Across all quizzes
               </Typography>
             </CardContent>
@@ -4857,22 +5496,28 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
                 width: 60, 
                 height: 60, 
                 borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #10b981, #059669)',
+                background: theme.palette.mode === 'dark' 
+                  ? 'linear-gradient(135deg, #10b981, #059669)'
+                  : '#F0FDF4',
+                border: theme.palette.mode === 'dark' ? 'none' : '1px solid #DCFCE7',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 mx: 'auto',
                 mb: 2
               }}>
-                <GradeIcon sx={{ color: 'white', fontSize: 28 }} />
+                <GradeIcon sx={{ 
+                  color: theme.palette.mode === 'dark' ? 'white' : '#16A34A', 
+                  fontSize: 28 
+                }} />
               </Box>
-              <Typography variant="h4" fontWeight={800} color="success.main" gutterBottom>
-                {analytics.averageScore ? Math.round(analytics.averageScore) : 0}
+              <Typography variant="h4" fontWeight={800} color={theme.palette.mode === 'dark' ? '#34D399' : '#16A34A'} gutterBottom sx={{ fontSize: '2rem', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
+                {analytics?.averageScore ? Math.round(analytics.averageScore) : (performanceData?.averageScore || 0)}%
               </Typography>
-              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
+              <Typography variant="subtitle1" fontWeight={600} color={theme.palette.mode === 'dark' ? '#FFFFFF' : '#0F172A'}>
                 Average Score
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color={theme.palette.mode === 'dark' ? '#E5E7EB' : '#6B7280'}>
                 Per attempt
               </Typography>
             </CardContent>
@@ -4886,22 +5531,28 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
                 width: 60, 
                 height: 60, 
                 borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                background: theme.palette.mode === 'dark' 
+                  ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                  : '#FFFBEB',
+                border: theme.palette.mode === 'dark' ? 'none' : '1px solid #FEF3C7',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 mx: 'auto',
                 mb: 2
               }}>
-                <SchoolIcon sx={{ color: 'white', fontSize: 28 }} />
+                <SchoolIcon sx={{ 
+                  color: theme.palette.mode === 'dark' ? 'white' : '#F59E0B', 
+                  fontSize: 28 
+                }} />
               </Box>
-              <Typography variant="h4" fontWeight={800} color="warning.main" gutterBottom>
-                {analytics.passRate ? Math.round(analytics.passRate) : 0}%
+              <Typography variant="h4" fontWeight={800} color={theme.palette.mode === 'dark' ? '#FACC15' : '#F59E0B'} gutterBottom sx={{ fontSize: '2rem', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
+                {analytics?.passRate ? Math.round(analytics.passRate) : (performanceData?.passRate || 0)}%
               </Typography>
-              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
-                Pass Rate
+              <Typography variant="subtitle1" fontWeight={600} color={theme.palette.mode === 'dark' ? '#FFFFFF' : '#0F172A'}>
+                Passing Rate
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color={theme.palette.mode === 'dark' ? '#E5E7EB' : '#6B7280'}>
                 Students passing
               </Typography>
             </CardContent>
@@ -4915,22 +5566,28 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
                 width: 60, 
                 height: 60, 
                 borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                background: theme.palette.mode === 'dark' 
+                  ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+                  : '#F3F6FF',
+                border: theme.palette.mode === 'dark' ? 'none' : '1px solid #DCE6FF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 mx: 'auto',
                 mb: 2
               }}>
-                <GroupIcon sx={{ color: 'white', fontSize: 28 }} />
+                <GroupIcon sx={{ 
+                  color: theme.palette.mode === 'dark' ? 'white' : '#2563EB', 
+                  fontSize: 28 
+                }} />
               </Box>
-              <Typography variant="h4" fontWeight={800} color="secondary.main" gutterBottom>
+              <Typography variant="h4" fontWeight={800} color={theme.palette.mode === 'dark' ? '#A78BFA' : '#2563EB'} gutterBottom sx={{ fontSize: '2rem', lineHeight: 1.2, letterSpacing: '-0.01em' }}>
                 {students.length}
               </Typography>
-              <Typography variant="subtitle1" fontWeight={600} color="text.primary">
+              <Typography variant="subtitle1" fontWeight={600} color={theme.palette.mode === 'dark' ? '#FFFFFF' : '#0F172A'}>
                 Active Students
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color={theme.palette.mode === 'dark' ? '#E5E7EB' : '#6B7280'}>
                 In your classes
               </Typography>
             </CardContent>
@@ -4943,8 +5600,20 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
         <CardHeader
           title="Quiz Performance Breakdown"
           subheader="Detailed analysis of each quiz's performance"
-          titleTypographyProps={{ variant: 'h6', fontWeight: 700 }}
-          subheaderTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
+          titleTypographyProps={{ 
+            variant: 'h6', 
+            fontWeight: 700,
+            color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary',
+            fontSize: '1.25rem'
+          }}
+          subheaderTypographyProps={{ 
+            variant: 'body2', 
+            color: theme.palette.mode === 'dark' ? '#E5E7EB' : 'text.secondary',
+            fontSize: '0.875rem'
+          }}
+          sx={{ 
+            backgroundColor: theme.palette.mode === 'dark' ? '#1E1E1E' : 'transparent'
+          }}
         />
         <CardContent>
           <TableContainer>
@@ -5025,8 +5694,20 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
         <CardHeader
           title="Recent Activity"
           subheader="Latest student attempts and submissions"
-          titleTypographyProps={{ variant: 'h6', fontWeight: 700 }}
-          subheaderTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
+          titleTypographyProps={{ 
+            variant: 'h6', 
+            fontWeight: 700,
+            color: theme.palette.mode === 'dark' ? '#FFFFFF' : 'text.primary',
+            fontSize: '1.25rem'
+          }}
+          subheaderTypographyProps={{ 
+            variant: 'body2', 
+            color: theme.palette.mode === 'dark' ? '#E5E7EB' : 'text.secondary',
+            fontSize: '0.875rem'
+          }}
+          sx={{ 
+            backgroundColor: theme.palette.mode === 'dark' ? '#1E1E1E' : 'transparent'
+          }}
         />
         <CardContent>
           {results.length > 0 ? (
@@ -5068,6 +5749,694 @@ function EnhancedAnalytics({ results, quizzes, students, performanceData }: {
           )}
         </CardContent>
       </StyledCard>
+    </Box>
+  );
+}
+
+function ProctoringSection({ user }: { user: any }) {
+  const [tabSwitchData, setTabSwitchData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const theme = useTheme();
+  
+  // Inter font configuration
+  const interFont = {
+    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+  };
+
+  const fetchTabSwitchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('🔍 Fetching tab switch data for teacher:', user?.id);
+      
+      // First, get quizzes created by this teacher
+      const { data: teacherQuizzes, error: quizzesError } = await supabase
+        .from('quizzes')
+        .select('id')
+        .eq('user_id', user?.id);
+      
+      if (quizzesError) {
+        console.error('Error fetching teacher quizzes:', quizzesError);
+        setError(`Failed to load teacher quizzes: ${quizzesError.message || 'Unknown error'}`);
+        setLoading(false);
+        return;
+      }
+      
+      const teacherQuizIds = teacherQuizzes?.map(q => q.id) || [];
+      console.log('📚 Teacher quiz IDs:', teacherQuizIds);
+      
+      if (teacherQuizIds.length === 0) {
+        console.log('ℹ️ No quizzes found for this teacher');
+        setTabSwitchData([]);
+        return;
+      }
+      
+      // Get attempts for quizzes created by this teacher
+      const { data: allAttempts, error: allError } = await supabase
+        .from('attempts')
+        .select(`
+          id,
+          user_name,
+          quiz_id,
+          score,
+          submitted_at
+        `)
+        .in('quiz_id', teacherQuizIds)
+        .order('submitted_at', { ascending: false });
+      
+      if (allError) {
+        console.error('Error fetching attempts:', allError);
+        setError(`Failed to load attempts: ${allError.message || 'Unknown error'}`);
+        setLoading(false);
+        return;
+      }
+      
+      
+      console.log('📊 Basic attempts data loaded:', allAttempts?.length || 0, 'attempts for teacher quizzes');
+      
+      // Check if tab switch columns exist by trying to query them
+      const { data: tabSwitchData, error: tabSwitchError } = await supabase
+        .from('attempts')
+        .select(`
+          id,
+          tab_switch_count,
+          last_tab_switch_time,
+          tab_switch_history
+        `)
+        .in('quiz_id', teacherQuizIds)
+        .not('id', 'is', null)
+        .limit(1);
+      
+      if (tabSwitchError) {
+        console.warn('Tab switch columns may not exist yet:', tabSwitchError);
+        // If tab switch columns don't exist, show basic data with default values
+        const basicData = (allAttempts || []).map(attempt => ({
+          ...attempt,
+          tab_switch_count: 0,
+          last_tab_switch_time: null,
+          tab_switch_history: null
+        }));
+        setTabSwitchData(basicData);
+        setError('Tab switch monitoring columns not yet added to database. Please run the SQL migration first.');
+        return;
+      }
+      
+      // If tab switch columns exist, get the full data for teacher's quizzes only
+      const { data: fullData, error: fullError } = await supabase
+        .from('attempts')
+        .select(`
+          id,
+          user_name,
+          quiz_id,
+          score,
+          submitted_at,
+          tab_switch_count,
+          last_tab_switch_time,
+          tab_switch_history
+        `)
+        .in('quiz_id', teacherQuizIds)
+        .order('submitted_at', { ascending: false });
+      
+      if (fullError) {
+        console.error('Error fetching full tab switch data:', fullError);
+        setError(`Failed to load tab switch data: ${fullError.message}`);
+        return;
+      }
+      
+      console.log('✅ Tab switch data loaded successfully:', fullData?.length || 0, 'attempts for teacher quizzes');
+      setTabSwitchData(fullData || []);
+      
+    } catch (err) {
+      console.error('Unexpected error fetching tab switch data:', err);
+      setError(`Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchTabSwitchData();
+    }
+  }, [user?.id]);
+
+  // Test database connection
+  const testDatabaseConnection = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('attempts')
+        .select('id')
+        .limit(1);
+      
+      if (error) {
+        console.error('Database connection test failed:', error);
+        return false;
+      }
+      
+      console.log('✅ Database connection successful');
+      return true;
+    } catch (err) {
+      console.error('Database connection test error:', err);
+      return false;
+    }
+  };
+
+  const getRiskLevel = (count: number) => {
+    if (count > 10) return { level: 'HIGH_RISK', color: '#d32f2f', label: 'HIGH RISK' };
+    if (count > 5) return { level: 'MEDIUM_RISK', color: '#f57c00', label: 'MEDIUM RISK' };
+    if (count > 2) return { level: 'LOW_RISK', color: '#f9a825', label: 'LOW RISK' };
+    return { level: 'SAFE', color: '#388e3c', label: 'COMPLIANT' };
+  };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" py={4}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ ...interFont }}>
+      {/* Professional Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontWeight: 700, 
+            color: theme.palette.text.primary,
+            mb: 1,
+            ...interFont
+          }}
+        >
+          Proctoring & Academic Integrity Monitoring
+        </Typography>
+        <Typography 
+          variant="body1" 
+          sx={{ 
+            color: theme.palette.text.secondary,
+            ...interFont
+          }}
+        >
+          Monitor student behavior and detect suspicious activity during your examinations
+        </Typography>
+      </Box>
+
+      {/* Summary Cards */}
+      <Grid container spacing={3} mb={4}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            borderRadius: 3,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            border: '1px solid rgba(0,0,0,0.05)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.12)'
+            }
+          }}>
+            <Typography 
+              variant="h3" 
+              color="primary" 
+              sx={{ 
+                fontWeight: 800,
+                mb: 1,
+                ...interFont
+              }}
+            >
+              {tabSwitchData.length}
+            </Typography>
+            <Typography 
+              variant="body1" 
+              color="text.secondary"
+              sx={{ 
+                fontWeight: 500,
+                ...interFont
+              }}
+            >
+              Total Exam Attempts
+            </Typography>
+            <Typography 
+              variant="caption" 
+              color="text.secondary"
+              sx={{ 
+                fontWeight: 400,
+                ...interFont
+              }}
+            >
+              {new Set(tabSwitchData.map(attempt => attempt.user_id || attempt.user_name)).size} unique students
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            borderRadius: 3,
+            boxShadow: '0 4px 20px rgba(244, 67, 54, 0.1)',
+            border: '1px solid rgba(244, 67, 54, 0.2)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 8px 30px rgba(244, 67, 54, 0.15)'
+            }
+          }}>
+            <Typography 
+              variant="h3" 
+              color="error" 
+              sx={{ 
+                fontWeight: 800,
+                mb: 1,
+                ...interFont
+              }}
+            >
+              {tabSwitchData.filter(item => item.tab_switch_count > 10).length}
+            </Typography>
+            <Typography 
+              variant="body1" 
+              color="text.secondary"
+              sx={{ 
+                fontWeight: 500,
+                ...interFont
+              }}
+            >
+              High Risk Students
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            borderRadius: 3,
+            boxShadow: '0 4px 20px rgba(255, 152, 0, 0.1)',
+            border: '1px solid rgba(255, 152, 0, 0.2)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 8px 30px rgba(255, 152, 0, 0.15)'
+            }
+          }}>
+            <Typography 
+              variant="h3" 
+              color="warning.main" 
+              sx={{ 
+                fontWeight: 800,
+                mb: 1,
+                ...interFont
+              }}
+            >
+              {tabSwitchData.filter(item => item.tab_switch_count > 5 && item.tab_switch_count <= 10).length}
+            </Typography>
+            <Typography 
+              variant="body1" 
+              color="text.secondary"
+              sx={{ 
+                fontWeight: 500,
+                ...interFont
+              }}
+            >
+              Medium Risk Students
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            borderRadius: 3,
+            boxShadow: '0 4px 20px rgba(76, 175, 80, 0.1)',
+            border: '1px solid rgba(76, 175, 80, 0.2)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 8px 30px rgba(76, 175, 80, 0.15)'
+            }
+          }}>
+            <Typography 
+              variant="h3" 
+              color="success.main" 
+              sx={{ 
+                fontWeight: 800,
+                mb: 1,
+                ...interFont
+              }}
+            >
+              {tabSwitchData.filter(item => item.tab_switch_count <= 2).length}
+            </Typography>
+            <Typography 
+              variant="body1" 
+              color="text.secondary"
+              sx={{ 
+                fontWeight: 500,
+                ...interFont
+              }}
+            >
+              Compliant Students
+            </Typography>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Professional Data Table */}
+      <Card sx={{ 
+        borderRadius: 3,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        border: '1px solid rgba(0,0,0,0.05)'
+      }}>
+        <CardHeader 
+          title={
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 700,
+                color: theme.palette.text.primary,
+                ...interFont
+              }}
+            >
+              Student Behavior Analysis
+            </Typography>
+          }
+          subheader={
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: theme.palette.text.secondary,
+                ...interFont
+              }}
+            >
+              Comprehensive monitoring of student activity during examinations
+            </Typography>
+          }
+          action={
+            <Button 
+              variant="outlined" 
+              onClick={async () => {
+                console.log('🔄 Refreshing tab switch data...');
+                await testDatabaseConnection();
+                await fetchTabSwitchData();
+              }}
+              startIcon={<RefreshIcon />}
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                py: 1,
+                ...interFont
+              }}
+            >
+              Refresh Data
+            </Button>
+          }
+        />
+        <CardContent sx={{ p: 0 }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: theme.palette.grey[50] }}>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    ...interFont
+                  }}>
+                    Student Information
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    ...interFont
+                  }}>
+                    Exam Details
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    ...interFont
+                  }}>
+                    Performance
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    ...interFont
+                  }}>
+                    Tab Activity
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    ...interFont
+                  }}>
+                    Risk Assessment
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    ...interFont
+                  }}>
+                    Timeline
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontWeight: 700, 
+                    color: theme.palette.text.primary,
+                    ...interFont
+                  }}>
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {tabSwitchData.map((attempt) => {
+                  const risk = getRiskLevel(attempt.tab_switch_count);
+                  return (
+                    <TableRow 
+                      key={attempt.id} 
+                      hover
+                      sx={{ 
+                        '&:hover': {
+                          backgroundColor: theme.palette.action.hover
+                        }
+                      }}
+                    >
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={2}>
+                          <Avatar sx={{ 
+                            width: 40, 
+                            height: 40, 
+                            bgcolor: theme.palette.primary.main,
+                            fontWeight: 600,
+                            ...interFont
+                          }}>
+                            {attempt.user_name?.charAt(0)?.toUpperCase() || 'U'}
+                          </Avatar>
+                          <Box>
+                            <Typography 
+                              variant="body1" 
+                              fontWeight={600}
+                              sx={{ ...interFont }}
+                            >
+                              {attempt.user_name || 'Unknown Student'}
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              color="text.secondary"
+                              sx={{ ...interFont }}
+                            >
+                              Student ID: {attempt.id}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography 
+                          variant="body2" 
+                          fontWeight={500}
+                          sx={{ ...interFont }}
+                        >
+                          Quiz #{attempt.quiz_id}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography 
+                          variant="h6" 
+                          fontWeight={700}
+                          color={attempt.score >= 80 ? 'success.main' : attempt.score >= 60 ? 'warning.main' : 'error.main'}
+                          sx={{ ...interFont }}
+                        >
+                          {attempt.score || 0}%
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Typography 
+                            variant="h6" 
+                            fontWeight={700}
+                            color={attempt.tab_switch_count > 5 ? 'error.main' : 'text.primary'}
+                            sx={{ ...interFont }}
+                          >
+                            {attempt.tab_switch_count}
+                          </Typography>
+                          <Typography 
+                            variant="caption" 
+                            color="text.secondary"
+                            sx={{ ...interFont }}
+                          >
+                            switches
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={risk.label}
+                          size="medium"
+                          sx={{
+                            backgroundColor: risk.color,
+                            color: 'white',
+                            fontWeight: 600,
+                            borderRadius: 2,
+                            ...interFont
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography 
+                            variant="body2" 
+                            fontWeight={500}
+                            sx={{ ...interFont }}
+                          >
+                            {attempt.last_tab_switch_time ? 
+                              new Date(attempt.last_tab_switch_time).toLocaleDateString() : 
+                              'N/A'
+                            }
+                          </Typography>
+                          <Typography 
+                            variant="caption" 
+                            color="text.secondary"
+                            sx={{ ...interFont }}
+                          >
+                            {attempt.submitted_at ? 
+                              new Date(attempt.submitted_at).toLocaleTimeString() : 
+                              'Not submitted'
+                            }
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="View detailed analysis">
+                          <IconButton 
+                            size="medium"
+                            sx={{ 
+                              borderRadius: 2,
+                              '&:hover': {
+                                backgroundColor: theme.palette.primary.light,
+                                color: 'white'
+                              }
+                            }}
+                          >
+                            <VisibilityIcon fontSize="medium" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          {error && (
+            <Box textAlign="center" py={8}>
+              <Typography 
+                variant="h6" 
+                color="error.main"
+                sx={{ 
+                  fontWeight: 600,
+                  mb: 2,
+                  ...interFont
+                }}
+              >
+                Database Setup Required
+              </Typography>
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                sx={{ 
+                  mb: 3,
+                  maxWidth: '600px',
+                  mx: 'auto',
+                  ...interFont
+                }}
+              >
+                {error}
+              </Typography>
+              {error.includes('Tab switch monitoring columns not yet added') && (
+                <Box sx={{ 
+                  backgroundColor: 'grey.100', 
+                  p: 3, 
+                  borderRadius: 2, 
+                  textAlign: 'left',
+                  maxWidth: '800px',
+                  mx: 'auto',
+                  fontFamily: 'monospace',
+                  fontSize: '0.875rem'
+                }}>
+                  <Typography variant="subtitle2" fontWeight={600} mb={2} sx={{ ...interFont }}>
+                    Run this SQL in your Supabase SQL Editor:
+                  </Typography>
+                  <Box component="pre" sx={{ whiteSpace: 'pre-wrap', overflow: 'auto' }}>
+{`-- Add tab switch monitoring columns to attempts table
+ALTER TABLE attempts 
+ADD COLUMN IF NOT EXISTS tab_switch_count INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS last_tab_switch_time TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS tab_switch_history JSONB DEFAULT '[]'::jsonb;
+
+-- Add tab switch monitoring columns to quiz_progress table  
+ALTER TABLE quiz_progress
+ADD COLUMN IF NOT EXISTS tab_switch_count INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS last_tab_switch_time TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS tab_switch_history JSONB DEFAULT '[]'::jsonb;
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_attempts_tab_switch_count 
+ON attempts(tab_switch_count DESC);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_progress_tab_switch_count 
+ON quiz_progress(tab_switch_count DESC);`}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+          
+          {!error && tabSwitchData.length === 0 && (
+            <Box textAlign="center" py={8}>
+              <Typography 
+                variant="h6" 
+                color="text.secondary"
+                sx={{ 
+                  fontWeight: 500,
+                  mb: 1,
+                  ...interFont
+                }}
+              >
+                No examination data available
+              </Typography>
+              <Typography 
+                variant="body2" 
+                color="text.secondary"
+                sx={{ ...interFont }}
+              >
+                Student activity will appear here once students complete your quizzes
+              </Typography>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
     </Box>
   );
 }

@@ -7,27 +7,42 @@ interface ErrorPopupProps {
 
 export default function ErrorPopup({ message, onClose }: ErrorPopupProps) {
   return (
-    <Box
+          <Box
       position="fixed"
-      top={0}
-      left={0}
-      width="100%"
-      height="100%"
-      bgcolor="rgba(0,0,0,0.5)"
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      zIndex={1300}
+      top="20px"
+      left="50%"
+      sx={{ transform: 'translateX(-50%)' }}
+      zIndex={999}
+      maxWidth="500px"
+      width="90%"
     >
-      <Card sx={{ minWidth: 300, padding: 3, borderRadius: 2, textAlign: 'center', boxShadow: 5 }}>
-        <CardContent>
-          <Typography variant="h6" color="error" gutterBottom>
+      <Card sx={{ 
+        padding: 2, 
+        borderRadius: 2, 
+        textAlign: 'center', 
+        boxShadow: 5,
+        backgroundColor: '#ffebee',
+        border: '1px solid #f44336'
+      }}>
+        <CardContent sx={{ p: 2 }}>
+          <Typography variant="h6" color="error" gutterBottom sx={{ fontSize: '16px', mb: 1 }}>
             ❌ Error
           </Typography>
-          <Typography variant="body1" gutterBottom>
+          <Typography variant="body2" gutterBottom sx={{ mb: 2, fontSize: '14px' }}>
             {message}
           </Typography>
-          <Button variant="contained" color="primary" onClick={onClose} sx={{ mt: 2 }}>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={onClose} 
+            size="small"
+            sx={{ 
+              mt: 1,
+              fontSize: '12px',
+              px: 2,
+              py: 0.5
+            }}
+          >
             Close
           </Button>
         </CardContent>
