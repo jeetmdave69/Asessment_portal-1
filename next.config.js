@@ -2,7 +2,7 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  outputFileTracingRoot: path.join(__dirname, '../../'),
+  // Remove outputFileTracingRoot to fix Vercel deployment
   eslint: {
     // ❌ Don't block builds if ESLint errors exist
     ignoreDuringBuilds: true,
