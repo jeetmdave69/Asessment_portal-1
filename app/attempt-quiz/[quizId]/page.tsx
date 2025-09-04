@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Box,
@@ -310,7 +310,30 @@ const QuestionButton = ({
   )
 }
 
-export default function AttemptQuizPage() {
+// Wrapper component to handle Suspense for useParams
+function AttemptQuizWrapper() {
+  return (
+    <Suspense fallback={
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <CircularProgress size={60} sx={{ color: 'white' }} />
+      </Box>
+    }>
+      <AttemptQuizPage />
+    </Suspense>
+  );
+}
+
+export default AttemptQuizWrapper;
+
+function AttemptQuizPage() {
   const params = useParams() as { quizId?: string } | null
   const quizId = params?.quizId
   const router = useRouter()

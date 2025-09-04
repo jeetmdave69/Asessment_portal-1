@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Box,
@@ -43,7 +43,30 @@ type SectionKey = string;
 type SectionQuestionsMap = { [section: SectionKey]: any[] };
 type SectionScoresMap = { [section: SectionKey]: { correct: number; total: number } };
 
-export default function ResultPage() {
+// Wrapper component to handle Suspense for useParams
+function ResultWrapper() {
+  return (
+    <Suspense fallback={
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <CircularProgress size={60} sx={{ color: 'white' }} />
+      </Box>
+    }>
+      <ResultPage />
+    </Suspense>
+  );
+}
+
+export default ResultWrapper;
+
+function ResultPage() {
   const params = useParams();
   const router = useRouter();
   const theme = useTheme();

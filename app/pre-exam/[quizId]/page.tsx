@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { supabase } from '@/lib/supabaseClient';
@@ -22,7 +22,29 @@ const defaultInstructions = [
   "Submit your exam before the time expires to avoid penalties.",
 ];
 
-export default function PreExamPage() {
+// Wrapper component to handle Suspense for useParams
+function PreExamWrapper() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+      }}>
+        <div style={{ color: 'white', fontSize: '18px' }}>Loading...</div>
+      </div>
+    }>
+      <PreExamPage />
+    </Suspense>
+  );
+}
+
+export default PreExamWrapper;
+
+function PreExamPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useUser();

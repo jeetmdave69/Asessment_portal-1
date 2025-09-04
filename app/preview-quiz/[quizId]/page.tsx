@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Box,
@@ -54,7 +54,30 @@ interface Quiz {
   title: string;
 }
 
-export default function PreviewQuizPage() {
+// Wrapper component to handle Suspense for useParams
+function PreviewQuizWrapper() {
+  return (
+    <Suspense fallback={
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <CircularProgress size={60} sx={{ color: 'white' }} />
+      </Box>
+    }>
+      <PreviewQuizPage />
+    </Suspense>
+  );
+}
+
+export default PreviewQuizWrapper;
+
+function PreviewQuizPage() {
   const params = useParams();
   const quizId = Array.isArray(params?.quizId) ? params.quizId[0] : params?.quizId;
   const router = useRouter();

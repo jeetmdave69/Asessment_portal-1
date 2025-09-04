@@ -27,7 +27,7 @@ import {
 } from "@mui/material";
 import { useForm, FormProvider, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { quizSchema, QuizFormValues } from "@/schemas/quizSchema";
@@ -103,7 +103,30 @@ function getQuestionErrorMessages(errors: any, qIdx: number) {
   return messages;
 }
 
-export default function EditQuizPage() {
+// Wrapper component to handle Suspense for useParams
+function EditQuizWrapper() {
+  return (
+    <Suspense fallback={
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <CircularProgress size={60} sx={{ color: 'white' }} />
+      </Box>
+    }>
+      <EditQuizPage />
+    </Suspense>
+  );
+}
+
+export default EditQuizWrapper;
+
+function EditQuizPage() {
   const params = useParams() as { quizId: string };
   const quizId = params.quizId;
 

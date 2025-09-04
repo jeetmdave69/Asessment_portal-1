@@ -214,7 +214,28 @@ function getGreeting() {
 
 const greetingImg = '/assets/images/background-4.jpg';
 
-export default withRole(TeacherDashboardPage, ["teacher"]);
+// Wrapper component to handle Suspense for useSearchParams
+function TeacherDashboardWrapper() {
+  return (
+    <Suspense fallback={
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+      >
+        <CircularProgress size={60} sx={{ color: 'white' }} />
+      </Box>
+    }>
+      <TeacherDashboardPage />
+    </Suspense>
+  );
+}
+
+export default withRole(TeacherDashboardWrapper, ["teacher"]);
 
 function TeacherDashboardPage() {
   const router = useRouter();
