@@ -2403,6 +2403,24 @@ function AttemptQuizPage() {
       // INSTANT selection
       handleOptionSelect(questionId, index, questionType);
     }, [questionId, index, questionType, handleOptionSelect]);
+
+    // INSTANT touch handler for mobile
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // INSTANT selection
+      handleOptionSelect(questionId, index, questionType);
+    }, [questionId, index, questionType, handleOptionSelect]);
+
+    // INSTANT mouse down handler
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // INSTANT selection
+      handleOptionSelect(questionId, index, questionType);
+    }, [questionId, index, questionType, handleOptionSelect]);
     
     // INSTANT key down handler
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -2418,8 +2436,8 @@ function AttemptQuizPage() {
         <Box 
           onClick={handleClick}
           onKeyDown={handleKeyDown}
-          onMouseDown={handleClick} // Add mouse down for instant response
-          onTouchStart={handleClick} // Add touch start for mobile instant response
+          onMouseDown={handleMouseDown} // Add mouse down for instant response
+          onTouchStart={handleTouchStart} // Add touch start for mobile instant response
           tabIndex={0}
           role="button"
           aria-pressed={isSelected}
@@ -3207,7 +3225,7 @@ function AttemptQuizPage() {
             position: 'fixed',
             bottom: '20px',
             right: '20px',
-            zIndex: 1000,
+            zIndex: 1002,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -3292,11 +3310,12 @@ function AttemptQuizPage() {
                     {/* Left Column - Content (75% width) */}
           <Box sx={{
             flex: '0 0 75%',
-            overflowY: 'auto',
+            overflowY: 'hidden',
             backgroundColor: 'transparent',
             display: 'flex',
             flexDirection: 'column',
-            p: 2
+            p: 2,
+            height: '100%'
           }}>
             {/* Question Card */}
             <Box sx={{
@@ -3306,8 +3325,7 @@ function AttemptQuizPage() {
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
               display: 'flex',
               flexDirection: 'column',
-              height: 'fit-content',
-              minHeight: 'calc(100vh - 200px)',
+              height: 'calc(100vh - 200px)',
               maxWidth: '100%',
               mx: 0,
               overflow: 'hidden'
@@ -3487,7 +3505,7 @@ function AttemptQuizPage() {
               </Box>
 
                             {/* Question Content */}
-              <Box sx={{ p: 5, flex: 1 }}>
+              <Box sx={{ p: 5, flex: 1, overflowY: 'auto' }}>
                 {currentQuestion && (
                   <Box>
                   {/* Question Text */}
@@ -3874,7 +3892,10 @@ function AttemptQuizPage() {
             pl: 2,
             position: 'sticky',
             top: 0,
-            height: 'fit-content'
+            height: '100%',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
 
 
@@ -3887,7 +3908,10 @@ function AttemptQuizPage() {
                       borderRadius: '12px',
                       boxShadow: '0 4px 12px rgba(17, 24, 39, 0.12)',
                       mb: 3,
-                      flex: 1
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden'
                     }}>
               {/* Palette Header */}
               <Box sx={{
