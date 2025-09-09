@@ -24,7 +24,8 @@ import {
   Snackbar,
   Select,
   MenuItem,
-  Avatar
+  Avatar,
+  Tooltip
 } from '@mui/material'
 import { Inter } from 'next/font/google'
 import { Roboto_Slab } from 'next/font/google'
@@ -3957,42 +3958,46 @@ function AttemptQuizPage() {
                     p: 0.5,
                       border: `1px solid ${UI.border}`
                     }}>
-                    <IconButton
-                      size="small"
-                      onClick={() => setPaletteView('grid')}
-                      sx={{
-                        color: paletteView === 'grid' ? UI.primary : UI.subtext,
-                        backgroundColor: paletteView === 'grid' ? '#FFFFFF' : 'transparent',
-                        borderRadius: '6px',
-                        width: 28,
-                        height: 28,
-                        transition: 'all 0.2s ease',
-                        boxShadow: paletteView === 'grid' ? '0 1px 3px rgba(46, 125, 109, 0.15)' : 'none',
-                        '&:hover': {
-                          backgroundColor: paletteView === 'grid' ? '#FFFFFF' : '#F1F5F9'
-                        }
-                      }}
-                    >
-                      <DashboardIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => setPaletteView('list')}
-                      sx={{
-                        color: paletteView === 'list' ? UI.primary : UI.subtext,
-                        backgroundColor: paletteView === 'list' ? '#FFFFFF' : 'transparent',
-                        borderRadius: '6px',
-                        width: 28,
-                        height: 28,
-                        transition: 'all 0.2s ease',
-                        boxShadow: paletteView === 'list' ? '0 1px 3px rgba(46, 125, 109, 0.15)' : 'none',
-                        '&:hover': {
-                          backgroundColor: paletteView === 'list' ? '#FFFFFF' : '#F1F5F9'
-                        }
-                      }}
-                    >
-                      <ListIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
+                    <Tooltip title="Grid View" arrow>
+                      <IconButton
+                        size="small"
+                        onClick={() => setPaletteView('grid')}
+                        sx={{
+                          color: paletteView === 'grid' ? UI.primary : UI.subtext,
+                          backgroundColor: paletteView === 'grid' ? '#FFFFFF' : 'transparent',
+                          borderRadius: '6px',
+                          width: 28,
+                          height: 28,
+                          transition: 'all 0.2s ease',
+                          boxShadow: paletteView === 'grid' ? '0 1px 3px rgba(46, 125, 109, 0.15)' : 'none',
+                          '&:hover': {
+                            backgroundColor: paletteView === 'grid' ? '#FFFFFF' : '#F1F5F9'
+                          }
+                        }}
+                      >
+                        <DashboardIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="List View" arrow>
+                      <IconButton
+                        size="small"
+                        onClick={() => setPaletteView('list')}
+                        sx={{
+                          color: paletteView === 'list' ? UI.primary : UI.subtext,
+                          backgroundColor: paletteView === 'list' ? '#FFFFFF' : 'transparent',
+                          borderRadius: '6px',
+                          width: 28,
+                          height: 28,
+                          transition: 'all 0.2s ease',
+                          boxShadow: paletteView === 'list' ? '0 1px 3px rgba(46, 125, 109, 0.15)' : 'none',
+                          '&:hover': {
+                            backgroundColor: paletteView === 'list' ? '#FFFFFF' : '#F1F5F9'
+                          }
+                        }}
+                      >
+                        <ListIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
                     </Box>
                 </Box>
                 
@@ -4041,7 +4046,7 @@ function AttemptQuizPage() {
             </Box>
 
                             {/* Question Groups */}
-              <Box ref={questionPaletteRef} sx={{ p: 3, maxHeight: '350px', overflowY: 'auto', position: 'relative' }}>
+              <Box ref={questionPaletteRef} sx={{ p: 3, flex: 1, minHeight: '300px', overflowY: 'auto', position: 'relative' }}>
                 {/* Top Fade Gradient with Scroll Up Indicator */}
                 <Box sx={{
                   position: 'absolute',
