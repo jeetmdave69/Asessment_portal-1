@@ -56,43 +56,74 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get teacher details - optimized single query approach
+    // Get teacher details - try multiple approaches
     let teacherData = null;
-    
+    let teacherError = null;
+
     console.log('🔍 Looking up teacher with user_id:', quizData.user_id);
 
+    // First, try the custom function if it exists
     try {
-      // Single optimized query - try direct lookup first (most common case)
-      const { data: directData, error: directError } = await supabase
-        .from('users')
-        .select('id, email')
-        .eq('id', quizData.user_id)
-        .single();
+      console.log('🔍 Method 1: Trying RPC function get_user_by_clerk_id...');
+      const { data: teacherDataArray, error: rpcError } = await supabase
+        .rpc('get_user_by_clerk_id', { p_clerk_id: quizData.user_id });
       
-      if (!directError && directData) {
-        teacherData = directData;
-        console.log('✅ Found teacher via direct query:', teacherData);
+      console.log('🔍 RPC result:', { data: teacherDataArray, error: rpcError });
+      
+      if (!rpcError && teacherDataArray && teacherDataArray.length > 0) {
+        teacherData = teacherDataArray[0];
+        console.log('✅ Found teacher via RPC function:', teacherData);
       } else {
-        // Fallback: try RPC function if direct query fails
-        const { data: teacherDataArray, error: rpcError } = await supabase
-          .rpc('get_user_by_clerk_id', { p_clerk_id: quizData.user_id });
+        console.log('❌ RPC function failed or returned no data, trying direct query...');
         
-        if (!rpcError && teacherDataArray && teacherDataArray.length > 0) {
-          teacherData = teacherDataArray[0];
-          console.log('✅ Found teacher via RPC function:', teacherData);
+        // Fallback: try direct query assuming users.id is the Clerk ID
+        console.log('🔍 Method 2: Trying direct query with users.id...');
+        const { data: directData, error: directError } = await supabase
+          .from('users')
+          .select('id, email')
+          .eq('id', quizData.user_id)
+          .single();
+        
+        console.log('🔍 Direct query result:', { data: directData, error: directError });
+        
+        if (!directError && directData) {
+          teacherData = directData;
+          console.log('✅ Found teacher via direct query:', teacherData);
         } else {
-          console.log('⚠️ Teacher not found, using fallback values');
-          teacherData = {
-            id: quizData.user_id,
-            email: 'teacher@example.com'
-          };
+          console.log('❌ Direct query also failed, trying with clerk_id column...');
+          
+          // Another fallback: try with a clerk_id column if it exists
+          console.log('🔍 Method 3: Trying query with clerk_id column...');
+          const { data: clerkData, error: clerkError } = await supabase
+            .from('users')
+            .select('id, email')
+            .eq('clerk_id', quizData.user_id)
+            .single();
+          
+          console.log('🔍 Clerk ID query result:', { data: clerkData, error: clerkError });
+          
+          if (!clerkError && clerkData) {
+            teacherData = clerkData;
+            console.log('✅ Found teacher via clerk_id column:', teacherData);
+          } else {
+            teacherError = clerkError || directError || rpcError;
+            console.log('❌ All methods failed. Final error:', teacherError);
+          }
         }
       }
     } catch (error) {
       console.log('❌ Exception in teacher lookup:', error);
+      teacherError = error;
+    }
+
+    if (teacherError || !teacherData) {
+      console.error('❌ Teacher not found for notification:', teacherError);
+      console.log('⚠️ Proceeding without teacher details - using fallback values');
+      
+      // Use fallback values when teacher lookup fails
       teacherData = {
-        id: quizData.user_id,
-        email: 'teacher@example.com'
+        id: quizData.user_id, // Use the Clerk ID as the ID
+        email: 'teacher@example.com' // Fallback email
       };
     }
 

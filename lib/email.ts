@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 'fallback-key');
 
 export interface ViolationEmailData {
   teacherName: string;
@@ -15,6 +15,12 @@ export interface ViolationEmailData {
 
 export async function sendViolationNotificationEmail(data: ViolationEmailData) {
   try {
+    // Check if Resend API key is properly configured
+    if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === 'fallback-key') {
+      console.warn('⚠️ RESEND_API_KEY not configured. Email notification will be skipped.');
+      return { success: false, message: 'Email service not configured' };
+    }
+
     console.log('📧 Sending violation notification email to:', data.teacherEmail);
     
     const { data: emailData, error } = await resend.emails.send({
@@ -34,7 +40,8 @@ export async function sendViolationNotificationEmail(data: ViolationEmailData) {
     return { success: true, messageId: emailData?.id };
   } catch (error) {
     console.error('❌ Email service error:', error);
-    throw error;
+    // Don't throw the error, just log it and return failure
+    return { success: false, message: 'Email service error' };
   }
 }
 

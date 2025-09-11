@@ -115,6 +115,7 @@ export async function PATCH(req: Request) {
 
   // ===== [QTS MERGE: quiz_progress] =====
   const incoming = question_time_spent ?? {};
+  // Handle both flat object format and nested format
   const incomingMap = incoming.questions ?? incoming ?? {};
 
   const { data: row } = await supabase
@@ -127,6 +128,7 @@ export async function PATCH(req: Request) {
   const existing = row?.question_time_spent ?? {};
   const existingMap = existing.questions ?? existing ?? {};
 
+  // Merge the question time spent data
   const merged_qts = { questions: { ...existingMap, ...incomingMap } };
   // Include merged_qts in your update:
 
