@@ -1283,6 +1283,66 @@ function StudentDashboardPageContent() {
               results.map((row, idx) => {
                 const studentName = row.user_name || user?.firstName || '-';
                 const examName = row.quizzes?.quiz_title || '-';
+                
+                // Check if this is a violation submission
+                const isViolationSubmission = row.violation_reason === 'TAB_SWITCHING_LIMIT_EXCEEDED';
+                
+                if (isViolationSubmission) {
+                  // Show "Results Under Review" row for violation submissions
+                  return (
+                    <TableRow
+                      key={idx}
+                      sx={{
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #f59e0b 100%)',
+                        borderBottom: `2px solid #f59e0b`,
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #fde68a 0%, #fbbf24 50%, #f59e0b 100%)',
+                        },
+                      }}
+                    >
+                      <TableCell colSpan={11} align="center" sx={{ py: 4, border: 'none', px: 3 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                          <Typography variant="h6" fontWeight={700} color="warning.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            ⚠️ Results Under Review
+                          </Typography>
+                          <Typography variant="body1" color="text.primary" sx={{ fontWeight: 600 }}>
+                            {examName} - Tab Switching Violation Detected
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 600 }}>
+                            Your quiz was automatically submitted due to excessive tab switching. 
+                            Your teacher will review your case and decide whether to release your marks, 
+                            allow a retake, or take other action. You will be notified once a decision is made.
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            <Chip 
+                              label="Release Marks" 
+                              color="success" 
+                              variant="outlined"
+                              size="small"
+                              sx={{ fontWeight: 600 }}
+                            />
+                            <Chip 
+                              label="Allow Retake" 
+                              color="info" 
+                              variant="outlined"
+                              size="small"
+                              sx={{ fontWeight: 600 }}
+                            />
+                            <Chip 
+                              label="Teacher Decision Pending" 
+                              color="warning" 
+                              variant="outlined"
+                              size="small"
+                              sx={{ fontWeight: 600 }}
+                            />
+                          </Box>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+                
+                // Normal result display for non-violation submissions
                 // Defensive: get questions array if available
                 const quizId = row.quiz_id || row.quizzes?.id;
                 const questions = questionsMap && questionsMap[quizId] ? questionsMap[quizId] : [];

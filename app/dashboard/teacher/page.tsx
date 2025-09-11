@@ -1534,6 +1534,7 @@ function TeacherDashboardPage() {
                 { text: 'Exams', tab: 'exams', icon: <BookIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Results', tab: 'results', icon: <BarChartIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Records', tab: 'records', icon: <GroupIcon sx={{ fontSize: 18 }} /> },
+                { text: 'Violations', tab: 'violations', icon: <WarningAmberIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Messages', tab: 'messages', icon: <BellIcon size={18} /> },
                 { text: 'Proctoring', tab: 'proctoring', icon: <SecurityIcon sx={{ fontSize: 18 }} /> },
                 { text: 'Settings', tab: 'settings', icon: <SettingsIcon sx={{ fontSize: 18 }} /> },
@@ -2260,6 +2261,34 @@ function TeacherDashboardPage() {
                 console.log('Student deleted:', deletedStudentId);
               }}
             />
+          </Box>
+        )}
+        {currentTab === 'violations' && user && (
+          <Box>
+            <Typography variant="h5" fontWeight={700} mb={2}>Student Violations</Typography>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+                Review and manage student violations including tab switching during quizzes.
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<WarningAmberIcon />}
+                onClick={() => router.push('/dashboard/teacher/violations')}
+                sx={{ borderRadius: '12px', px: 3, py: 1.5 }}
+              >
+                View All Violations
+              </Button>
+            </Box>
+            <Box sx={{ p: 3, bgcolor: 'warning.light', borderRadius: 2, border: '1px solid', borderColor: 'warning.main' }}>
+              <Typography variant="h6" color="warning.dark" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <WarningAmberIcon />
+                Violation Management
+              </Typography>
+              <Typography variant="body2" color="warning.dark">
+                Students who switch tabs 5 times during a quiz are automatically flagged and their quiz is submitted. 
+                You can review their explanations and decide whether to approve their results, allow a retake, or debar them.
+              </Typography>
+            </Box>
           </Box>
         )}
         {currentTab === 'messages' && user && (

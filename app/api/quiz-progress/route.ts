@@ -6,7 +6,16 @@ const supabase = createClient(
 );
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  let body;
+  try {
+    body = await req.json();
+  } catch (error) {
+    console.error('❌ Failed to parse JSON body:', error);
+    return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
   console.log('Received POST /api/quiz-progress body:', body);
   const { quiz_id, user_id, answers, flagged, bookmarked, marked_for_review, start_time, question_id, question_time_spent, tab_switch_count, last_tab_switch_time, tab_switch_history } = body;
   if (!quiz_id || !user_id) {
@@ -88,7 +97,16 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const body = await req.json();
+  let body;
+  try {
+    body = await req.json();
+  } catch (error) {
+    console.error('❌ Failed to parse JSON body:', error);
+    return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
   console.log('Received PATCH /api/quiz-progress body:', body);
   const { quiz_id, user_id, question_time_spent, tab_switch_count, last_tab_switch_time, tab_switch_history } = body;
   if (!quiz_id || !user_id) {

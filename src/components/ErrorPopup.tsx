@@ -3,9 +3,12 @@ import { Card, CardContent, Typography, Button, Box } from '@mui/material';
 interface ErrorPopupProps {
   message: string;
   onClose: () => void;
+  isViolation?: boolean;
+  onWriteQuery?: () => void;
+  onIgnore?: () => void;
 }
 
-export default function ErrorPopup({ message, onClose }: ErrorPopupProps) {
+export default function ErrorPopup({ message, onClose, isViolation = false, onWriteQuery, onIgnore }: ErrorPopupProps) {
   return (
           <Box
       position="fixed"
@@ -31,20 +34,51 @@ export default function ErrorPopup({ message, onClose }: ErrorPopupProps) {
           <Typography variant="body2" gutterBottom sx={{ mb: 2, fontSize: '14px' }}>
             {message}
           </Typography>
-          <Button 
-            variant="contained" 
-            color="error" 
-            onClick={onClose} 
-            size="small"
-            sx={{ 
-              mt: 1,
-              fontSize: '12px',
-              px: 2,
-              py: 0.5
-            }}
-          >
-            Close
-          </Button>
+          {isViolation ? (
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 2 }}>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={onWriteQuery} 
+                size="small"
+                sx={{ 
+                  fontSize: '12px',
+                  px: 2,
+                  py: 0.5
+                }}
+              >
+                Write Query
+              </Button>
+              <Button 
+                variant="outlined" 
+                color="secondary" 
+                onClick={onIgnore} 
+                size="small"
+                sx={{ 
+                  fontSize: '12px',
+                  px: 2,
+                  py: 0.5
+                }}
+              >
+                Ignore
+              </Button>
+            </Box>
+          ) : (
+            <Button 
+              variant="contained" 
+              color="error" 
+              onClick={onClose} 
+              size="small"
+              sx={{ 
+                mt: 1,
+                fontSize: '12px',
+                px: 2,
+                py: 0.5
+              }}
+            >
+              Close
+            </Button>
+          )}
         </CardContent>
       </Card>
     </Box>

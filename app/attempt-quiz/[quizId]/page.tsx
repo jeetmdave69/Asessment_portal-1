@@ -24,7 +24,9 @@ import {
   Snackbar,
   Select,
   MenuItem,
-  Avatar
+  Avatar,
+  Tooltip,
+  TextField
 } from '@mui/material'
 import { Inter } from 'next/font/google'
 import { Roboto_Slab } from 'next/font/google'
@@ -345,11 +347,58 @@ function AttemptQuizPage() {
   const [tickStart, setTickStart] = useState<number | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
 
-  // ===== [TAB SWITCHING DETECTION] =====
+  // ===== [TAB SWITCHING DETECTION & VIOLATION SYSTEM] =====
   const [tabSwitchCount, setTabSwitchCount] = useState<number>(0);
   const [lastTabSwitchTime, setLastTabSwitchTime] = useState<number | null>(null);
   const [isTabVisible, setIsTabVisible] = useState<boolean>(true);
   const [tabSwitchHistory, setTabSwitchHistory] = useState<Array<{timestamp: number, action: 'hidden' | 'visible'}>>([]);
+  
+  // Tab violation system states
+  const [showTabViolationDialog, setShowTabViolationDialog] = useState<boolean>(false);
+  const [tabViolationQuery, setTabViolationQuery] = useState<string>('');
+  const [isSubmittingViolationQuery, setIsSubmittingViolationQuery] = useState<boolean>(false);
+  const [sessionLocked, setSessionLocked] = useState<boolean>(false);
+  const [showQuerySubmittedCard, setShowQuerySubmittedCard] = useState<boolean>(false);
+  
+
+  // Security check - prevent access if session is locked
+  useEffect(() => {
+    if (sessionLocked) {
+      return;
+    }
+  }, [sessionLocked]);
+
+  // Session-based locking to prevent bypass attempts
+  useEffect(() => {
+    const checkSessionLock = () => {
+      const sessionData = sessionStorage.getItem(`quiz_session_${quizId}_${user?.id}`);
+      if (sessionData) {
+        const parsed = JSON.parse(sessionData);
+        if (parsed.tabSwitchCount >= 5 || parsed.sessionLocked) {
+          setSessionLocked(true);
+          setTabSwitchCount(parsed.tabSwitchCount);
+          setShowTabViolationDialog(true);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Check on component mount
+    if (checkSessionLock()) {
+      return;
+    }
+
+    // Store initial session data
+    const initialSessionData = {
+      tabSwitchCount: 0,
+      sessionLocked: false,
+      startTime: Date.now(),
+      quizId,
+      userId: user?.id
+    };
+    sessionStorage.setItem(`quiz_session_${quizId}_${user?.id}`, JSON.stringify(initialSessionData));
+  }, [quizId, user?.id]);
 
   // Tab switching detection and tracking
   useEffect(() => {
@@ -373,14 +422,35 @@ function AttemptQuizPage() {
         // Add to history
         setTabSwitchHistory(prev => [...prev, { timestamp: now, action: 'hidden' }]);
         
-        console.log('🚨 TAB SWITCH DETECTED! Count:', newCount);
+        
+        // Update session storage
+        const sessionData = {
+          tabSwitchCount: newCount,
+          sessionLocked: newCount >= 5,
+          startTime: Date.now(),
+          quizId,
+          userId: user?.id
+        };
+        sessionStorage.setItem(`quiz_session_${quizId}_${user?.id}`, JSON.stringify(sessionData));
         
         // Immediate sync of tab switch data
         syncTabSwitchData(newCount, now);
         
-        // Show warning to student
-        if (newCount > 0) {
+        // Handle violation system
+        console.log('🔍 VIOLATION CHECK: newCount =', newCount, 'tabSwitchCount =', tabSwitchCount);
+        if (newCount === 5) {
+          // 5th violation - trigger auto-submit and removal
+          console.log('🚨 TAB VIOLATION: 5th tab switch detected! Auto-submitting quiz...');
+          console.log('🚨 TAB VIOLATION: Quiz data:', { quizId, user: user?.id, quiz: quiz?.quiz_title });
+          setSessionLocked(true);
+          setShowTabViolationDialog(true);
+          
+          // Auto-submit the quiz
+          handleTabViolationSubmit();
+        } else if (newCount > 0 && newCount < 5) {
           console.warn(`⚠️ Tab switch detected! Total switches: ${newCount}`);
+        } else if (newCount > 5) {
+          console.warn(`⚠️ Tab switch detected! Total switches: ${newCount} (already locked)`);
         }
       } else if (!isTabVisible && isCurrentlyVisible) {
         // Tab became visible again
@@ -412,6 +482,16 @@ function AttemptQuizPage() {
         setTabSwitchHistory(prev => [...prev, { timestamp: now, action: 'hidden' }]);
         
         console.log('🚨 WINDOW BLUR - TAB SWITCH DETECTED! Count:', newCount);
+        console.log('🔍 BLUR VIOLATION CHECK: newCount =', newCount, 'tabSwitchCount =', tabSwitchCount);
+        
+        // Handle violation system for blur
+        if (newCount === 5) {
+          console.log('🚨 BLUR VIOLATION: 5th tab switch detected! Auto-submitting quiz...');
+          setSessionLocked(true);
+          setShowTabViolationDialog(true);
+          handleTabViolationSubmit();
+        }
+        
         syncTabSwitchData(newCount, now);
       }
     };
@@ -691,11 +771,10 @@ function AttemptQuizPage() {
   const [showLastMinuteWarning, setShowLastMinuteWarning] = useState(false)
   const [restoredNotification, setRestoredNotification] = useState(false)
   const [showSubmitThankYou, setShowSubmitThankYou] = useState(false)
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false)
-  const [showMoreQuestionsIndicator, setShowMoreQuestionsIndicator] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [paletteView, setPaletteView] = useState<'grid' | 'list'>('grid')
+  const [paletteFilter, setPaletteFilter] = useState<'All' | 'Unanswered' | 'Marked' | 'Flagged'>('All')
   // Removed clickingOption state for instant selection
 
   // Refs
@@ -910,6 +989,42 @@ function AttemptQuizPage() {
     return ((totalTime - timeLeft) / totalTime) * 100
   }, [timeLeft, totalTime])
 
+  // Filter questions based on palette filter
+  const filteredQuestionsBySection = useMemo(() => {
+    if (paletteFilter === 'All') return questionsBySection;
+    
+    const filtered: Record<number, Question[]> = {};
+    
+    Object.entries(questionsBySection).forEach(([sectionId, sectionQuestions]) => {
+      const filteredQuestions = sectionQuestions.filter(question => {
+        const questionAnswers = answers[question.id];
+        const isAnswered = questionAnswers && 
+                          Array.isArray(questionAnswers) && 
+                          questionAnswers.length > 0 &&
+                          questionAnswers.some(answer => answer !== null && answer !== undefined);
+        const isMarked = !!markedForReview[question.id];
+        const isFlagged = !!flagged[question.id];
+        
+        switch (paletteFilter) {
+          case 'Unanswered':
+            return !isAnswered;
+          case 'Marked':
+            return isMarked;
+          case 'Flagged':
+            return isFlagged;
+          default:
+            return true;
+        }
+      });
+      
+      if (filteredQuestions.length > 0) {
+        filtered[Number(sectionId)] = filteredQuestions;
+      }
+    });
+    
+    return filtered;
+  }, [questionsBySection, paletteFilter, answers, markedForReview, flagged])
+
   // Format time display
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -1071,6 +1186,12 @@ function AttemptQuizPage() {
 
   // Answer handlers - INSTANT selection with zero delay
   const handleOptionSelect = useCallback((questionId: number, optionIdx: number, questionType: string) => {
+    // Don't allow option selection if violation dialog is shown or session is locked
+    if (showTabViolationDialog || sessionLocked) {
+      console.log('🚫 Option selection disabled - violation dialog shown or session locked');
+      return;
+    }
+    
     // INSTANT UI update - no delays, no loading states
     setAnswers(prev => {
       let newAnswers;
@@ -1102,18 +1223,30 @@ function AttemptQuizPage() {
     });
     
     // No loading state delays - selection is instant
-  }, [saveProgressDebounced]);
+  }, [saveProgressDebounced, showTabViolationDialog, sessionLocked]);
 
   // Flag and bookmark handlers
   const toggleFlag = (questionId: number) => {
+    if (showTabViolationDialog || sessionLocked) {
+      console.log('🚫 Flag toggle disabled - violation dialog shown or session locked');
+      return;
+    }
     setFlagged(prev => ({ ...prev, [questionId]: !prev[questionId] }))
   }
 
   const toggleBookmark = (questionId: number) => {
+    if (showTabViolationDialog || sessionLocked) {
+      console.log('🚫 Bookmark toggle disabled - violation dialog shown or session locked');
+      return;
+    }
     setBookmarked(prev => ({ ...prev, [questionId]: !prev[questionId] }))
   }
 
   const toggleMarkForReview = (questionId: number) => {
+    if (showTabViolationDialog || sessionLocked) {
+      console.log('🚫 Mark for review toggle disabled - violation dialog shown or session locked');
+      return;
+    }
     setMarkedForReview(prev => ({ ...prev, [questionId]: !prev[questionId] }))
   }
 
@@ -1159,7 +1292,7 @@ function AttemptQuizPage() {
         setViolationCount((prev) => {
           const next = prev + 1;
           setErrorPopup('You switched tabs/windows. This is not allowed during the exam.');
-          if (next >= 3 && !submitted) {
+          if (next >= 5 && !submitted) {
             handleSubmit();
           }
           return next;
@@ -1176,12 +1309,17 @@ function AttemptQuizPage() {
   useEffect(() => {
     const prevent = (e: Event) => e.preventDefault();
     const preventKey = (e: KeyboardEvent) => {
+      // Only prevent specific security-related keys, allow navigation keys to pass through
       if ((e.ctrlKey || e.metaKey) && ['c', 'x', 'v', 'p'].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
       // Prevent Print
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
+      }
+      // Don't prevent navigation keys
+      if (['s', 'S', 'Enter', 'Tab', 'ArrowRight', 'ArrowLeft', 'r', 'R', 'b', 'B', 'f', 'F'].includes(e.key)) {
+        return; // Let navigation keys pass through
       }
     };
     document.addEventListener('contextmenu', prevent);
@@ -1625,6 +1763,212 @@ function AttemptQuizPage() {
     }
   }
 
+  // Tab violation auto-submit function
+  const handleTabViolationSubmit = async () => {
+    try {
+      console.log('🚨 TAB VIOLATION: Starting auto-submit process...');
+      
+      // Capture final QTS data
+      captureFinalQTS();
+      
+      // Calculate score and prepare submission data
+      const { score, totalMarks, obtainedMarks, percentage, passed } = calculateScore();
+      
+      // Prepare timing data
+      const startTimeStr = localStorage.getItem(`quiz-${quizId}-startTime`);
+      const start_time = startTimeStr ? new Date(Number(startTimeStr)).toISOString() : undefined;
+      
+      // Ensure all questions have time data (0 for unvisited questions)
+      const completeQts: Record<string, number> = {};
+      questions.forEach((q) => {
+        const questionTime = qts[String(q.id)] || 0;
+        completeQts[String(q.id)] = questionTime;
+      });
+      
+      // Calculate correct answers for submission
+      const correctAnswers: Record<string, number[]> = {};
+      questions.forEach(q => {
+        const correctIndices = q.options
+          .map((o, idx) => (o.isCorrect ? idx : -1))
+          .filter(idx => idx !== -1);
+        correctAnswers[q.id] = correctIndices;
+      });
+
+      const submissionData = {
+        quiz_id: Number(quizId),
+        user_id: user?.id,
+        user_name: user?.fullName || user?.firstName || 'Unknown Student',
+        answers,
+        correct_answers: correctAnswers,
+        score,
+        total_marks: totalMarks,
+        obtained_marks: obtainedMarks,
+        percentage: Math.round(percentage),
+        status: Math.round(percentage), // Use percentage as status
+        marked_for_review: markedForReview,
+        start_time,
+        question_time_spent: completeQts,
+        tab_switch_count: tabSwitchCount,
+        last_tab_switch_time: lastTabSwitchTime ? new Date(lastTabSwitchTime).toISOString() : null,
+        tab_switch_history: tabSwitchHistory,
+        submitted_at: new Date().toISOString(),
+        violation_reason: 'TAB_SWITCHING_LIMIT_EXCEEDED',
+        violation_count: 5
+      };
+      
+      console.log('🚨 TAB VIOLATION: Submitting quiz with data:', submissionData);
+      console.log('🚨 TAB VIOLATION: Required fields check:', {
+        quiz_id: typeof submissionData.quiz_id,
+        user_id: typeof submissionData.user_id,
+        user_name: typeof submissionData.user_name,
+        answers: typeof submissionData.answers,
+        correct_answers: typeof submissionData.correct_answers,
+        score: typeof submissionData.score,
+        submitted_at: typeof submissionData.submitted_at,
+        total_marks: typeof submissionData.total_marks
+      });
+      
+      const response = await fetch('/api/submit-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionData),
+      });
+
+      if (response.ok) {
+        console.log('✅ TAB VIOLATION: Quiz auto-submitted successfully');
+        setSubmitted(true);
+        
+        // Send teacher notification
+        await sendTeacherViolationNotification();
+        
+        // Redirect to student dashboard after a short delay
+        setTimeout(() => {
+          window.location.href = '/dashboard/student';
+        }, 2000);
+      } else {
+        console.error('❌ TAB VIOLATION: Failed to auto-submit quiz');
+        console.error('Response status:', response.status);
+        console.error('Response headers:', response.headers);
+        
+        let errorData = {};
+        try {
+          errorData = await response.json();
+        } catch (jsonError) {
+          console.error('Failed to parse error response as JSON:', jsonError);
+          const textResponse = await response.text();
+          console.error('Raw response text:', textResponse);
+        }
+        console.error('Error details:', errorData);
+      }
+    } catch (error) {
+      console.error('❌ TAB VIOLATION: Auto-submit error:', error);
+    }
+  };
+
+  // Send teacher notification for tab violation
+  const sendTeacherViolationNotification = async () => {
+    try {
+      const notificationData = {
+        quiz_id: Number(quizId),
+        student_id: user?.id,
+        student_name: user?.fullName || user?.firstName || 'Unknown Student',
+        violation_type: 'TAB_SWITCHING',
+        violation_count: 5,
+        violation_timestamp: new Date().toISOString(),
+        quiz_title: quiz?.quiz_title || quiz?.quiz_name || 'Unknown Quiz',
+        student_query: tabViolationQuery || 'No query submitted'
+      };
+      
+      await fetch('/api/teacher-violation-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notificationData),
+      });
+      
+      console.log('✅ Teacher notification sent for tab violation');
+    } catch (error) {
+      console.error('❌ Failed to send teacher notification:', error);
+    }
+  };
+
+  // Handle violation query submission
+  const handleViolationQuerySubmit = async () => {
+    if (!tabViolationQuery.trim()) {
+      alert('Please provide an explanation for your actions.');
+      return;
+    }
+
+    setIsSubmittingViolationQuery(true);
+    
+    try {
+      const queryData = {
+        quiz_id: Number(quizId),
+        student_id: user?.id,
+        student_name: user?.fullName || user?.firstName || 'Unknown Student',
+        violation_type: 'TAB_SWITCHING',
+        violation_count: 5,
+        violation_timestamp: new Date().toISOString(),
+        quiz_title: quiz?.quiz_title || quiz?.quiz_name || 'Unknown Quiz',
+        student_query: tabViolationQuery.trim(),
+        query_submitted: true
+      };
+      
+      console.log('📤 Sending violation query data:', queryData);
+      console.log('📤 JSON stringified:', JSON.stringify(queryData));
+      
+      const response = await fetch('/api/submit-violation-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queryData),
+      });
+
+      if (response.ok) {
+        console.log('✅ Violation query submitted successfully');
+        
+        // Update teacher notification with query
+        await sendTeacherViolationNotification();
+        
+        // Close dialog and show success card
+        setShowTabViolationDialog(false);
+        setShowQuerySubmittedCard(true);
+        
+        // Redirect after showing the card
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 3000);
+      } else {
+        console.error('❌ Failed to submit violation query');
+        console.error('Response status:', response.status);
+        console.error('Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        let errorData: { error?: string } = {};
+        try {
+          const responseText = await response.text();
+          console.error('Response text:', responseText);
+          errorData = responseText ? JSON.parse(responseText) : {};
+        } catch (parseError) {
+          console.error('Failed to parse response as JSON:', parseError);
+        }
+        
+        console.error('Error details:', errorData);
+        alert(`Failed to submit your query: ${errorData.error || 'Unknown error'}. Please try again.`);
+      }
+    } catch (error) {
+      console.error('❌ Error submitting violation query:', error);
+      alert('An error occurred while submitting your query. Please try again.');
+    } finally {
+      setIsSubmittingViolationQuery(false);
+    }
+  };
+
+  // Handle ignoring violation query
+  const handleIgnoreViolationQuery = () => {
+    setShowTabViolationDialog(false);
+    setTimeout(() => {
+      window.location.href = '/dashboard';
+    }, 1000);
+  };
+
   // Score calculation
   const calculateScore = () => {
     let score = 0;
@@ -2040,24 +2384,6 @@ function AttemptQuizPage() {
     };
   }, []);
 
-  // Scroll indicator effect
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-      
-      // Show scroll indicator if user is near the top and there's more content below
-      setShowScrollIndicator(scrollTop < 100 && documentHeight > windowHeight + 200);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Initial check
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
 
   // Set current question to first answered or first question after questions and answers are loaded
   useEffect(() => {
@@ -2261,26 +2587,6 @@ function AttemptQuizPage() {
     }
   }, [timeLeft]);
 
-  // Handle question palette scroll to hide/show "More Questions" indicator
-  useEffect(() => {
-    const paletteElement = questionPaletteRef.current;
-    if (!paletteElement) return;
-
-    const handlePaletteScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = paletteElement;
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
-      setShowMoreQuestionsIndicator(!isAtBottom);
-    };
-
-    paletteElement.addEventListener('scroll', handlePaletteScroll);
-    
-    // Initial check
-    handlePaletteScroll();
-
-    return () => {
-      paletteElement.removeEventListener('scroll', handlePaletteScroll);
-    };
-  }, []);
 
   // Toast notifications for exam progress (reduced frequency)
   useEffect(() => {
@@ -2322,8 +2628,15 @@ function AttemptQuizPage() {
   }, [toastMessage]);
 
   // Enhanced Keyboard navigation with tooltips and accessibility
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+  const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+    console.log('🎹 Keyboard event detected:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Shift:', e.shiftKey);
+    
+    // Don't handle keyboard events if quiz is submitted or violation dialog is shown
+    if (submitted || showTabViolationDialog || sessionLocked) {
+      console.log('🚫 Keyboard navigation disabled - quiz submitted or violation dialog shown');
+      return;
+    }
+    
       // Navigation shortcuts
       if (e.key === 'ArrowRight') {
         e.preventDefault();
@@ -2369,13 +2682,19 @@ function AttemptQuizPage() {
         goToNextQuestionFlat();
       }
       if (e.key === 's' || e.key === 'S' || e.key === 'Enter') {
+      console.log('🎹 Keyboard shortcut triggered:', e.key);
         e.preventDefault();
         goToNextQuestionFlat();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [currentQuestionId, questions, currentQuestion]);
+      
+      // Show visual feedback
+      setToastMessage('Next question (S key pressed)');
+    }
+  }, [submitted, showTabViolationDialog, sessionLocked, reviewMode, reviewQuestions, currentQuestion, goToNextQuestionFlat, goToPrevQuestionFlat, navigateReviewQuestion, handleOptionSelect, toggleMarkForReview, toggleBookmark, toggleFlag]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyboardNavigation);
+    return () => window.removeEventListener('keydown', handleKeyboardNavigation);
+  }, [handleKeyboardNavigation]);
 
 
 
@@ -2403,6 +2722,24 @@ function AttemptQuizPage() {
       // INSTANT selection
       handleOptionSelect(questionId, index, questionType);
     }, [questionId, index, questionType, handleOptionSelect]);
+
+    // INSTANT touch handler for mobile
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // INSTANT selection
+      handleOptionSelect(questionId, index, questionType);
+    }, [questionId, index, questionType, handleOptionSelect]);
+
+    // INSTANT mouse down handler
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // INSTANT selection
+      handleOptionSelect(questionId, index, questionType);
+    }, [questionId, index, questionType, handleOptionSelect]);
     
     // INSTANT key down handler
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -2418,8 +2755,8 @@ function AttemptQuizPage() {
         <Box 
           onClick={handleClick}
           onKeyDown={handleKeyDown}
-          onMouseDown={handleClick} // Add mouse down for instant response
-          onTouchStart={handleClick} // Add touch start for mobile instant response
+          onMouseDown={handleMouseDown} // Add mouse down for instant response
+          onTouchStart={handleTouchStart} // Add touch start for mobile instant response
           tabIndex={0}
           role="button"
           aria-pressed={isSelected}
@@ -2683,7 +3020,7 @@ function AttemptQuizPage() {
                   size="small"
                   variant="contained"
                   onClick={() => goToQuestion(q.id)}
-                  disabled={submitted}
+                  disabled={submitted || showTabViolationDialog || sessionLocked}
                   aria-label={`Question ${idx + 1}, ${statusText}`}
                   sx={{
                     width: 40,
@@ -2892,6 +3229,7 @@ function AttemptQuizPage() {
           variant="contained"
           fullWidth
           onClick={handleSubmit}
+          disabled={showTabViolationDialog || sessionLocked}
           startIcon={<CheckCircleIcon />}
           sx={{ 
             backgroundColor: UI.primary,
@@ -3201,87 +3539,6 @@ function AttemptQuizPage() {
           </Box>
                   </Box>
 
-        {/* Floating Scroll Indicator */}
-        {showScrollIndicator && (
-          <Box sx={{
-            position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 1,
-            backgroundColor: UI.card,
-            border: `1px solid ${UI.border}`,
-            borderRadius: '12px',
-            padding: '12px 16px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            animation: 'pulse 2s infinite',
-            '@keyframes pulse': {
-              '0%, 100%': { transform: 'scale(1)', opacity: 0.9 },
-              '50%': { transform: 'scale(1.05)', opacity: 1 }
-            },
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'scale(1.05)',
-              boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)'
-            }
-          }}
-          onClick={() => {
-            window.scrollTo({
-              top: window.innerHeight,
-              behavior: 'smooth'
-            });
-          }}
-          >
-            <Typography sx={{
-              fontSize: '12px',
-              fontWeight: '600',
-              color: UI.text,
-              fontFamily: inter.style.fontFamily,
-              textAlign: 'center',
-              mb: 0.5
-            }}>
-              Scroll down for more questions
-            </Typography>
-            <Box sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 0.25,
-              animation: 'bounce 1.5s infinite',
-              '@keyframes bounce': {
-                '0%, 20%, 50%, 80%, 100%': { transform: 'translateY(0)' },
-                '40%': { transform: 'translateY(-4px)' },
-                '60%': { transform: 'translateY(-2px)' }
-              }
-            }}>
-              <Box sx={{
-                width: '8px',
-                height: '8px',
-                backgroundColor: UI.primary,
-                borderRadius: '50%',
-                opacity: 0.8
-              }} />
-              <Box sx={{
-                width: '6px',
-                height: '6px',
-                backgroundColor: UI.primary,
-                borderRadius: '50%',
-                opacity: 0.6
-              }} />
-              <Box sx={{
-                width: '4px',
-                height: '4px',
-                backgroundColor: UI.primary,
-                borderRadius: '50%',
-                opacity: 0.4
-              }} />
-            </Box>
-          </Box>
-        )}
 
         {/* Main Content Area - 2-column grid, full height */}
                   <Box sx={{
@@ -3292,25 +3549,30 @@ function AttemptQuizPage() {
                     {/* Left Column - Content (75% width) */}
           <Box sx={{
             flex: '0 0 75%',
-            overflowY: 'auto',
+            overflowY: 'hidden',
             backgroundColor: 'transparent',
             display: 'flex',
             flexDirection: 'column',
-            p: 2
+            p: 2,
+            height: '100%'
           }}>
             {/* Question Card */}
             <Box sx={{
               background: `linear-gradient(135deg, ${UI.card} 0%, ${UI.primaryTint} 100%)`,
-                          border: `1px solid ${UI.border}`,
-              borderRadius: '12px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+              border: `2px solid ${UI.border}`,
+              borderRadius: '16px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1)',
               display: 'flex',
               flexDirection: 'column',
-              height: 'fit-content',
-              minHeight: 'calc(100vh - 200px)',
+              height: 'calc(100vh - 200px)',
               maxWidth: '100%',
               mx: 0,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.15)',
+                transform: 'translateY(-2px)'
+              }
             }}>
               {/* Card Header Row */}
               <Box sx={{
@@ -3323,14 +3585,30 @@ function AttemptQuizPage() {
                 alignItems: 'center'
               }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 0.5
+                  }}>
                     <Typography sx={{ 
-                      fontSize: '20px', 
+                      fontSize: '22px', 
                       fontWeight: '700', 
                       color: UI.text,
-                      fontFamily: robotoSlab.style.fontFamily
+                      fontFamily: robotoSlab.style.fontFamily,
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.2
                     }}>
-                      Question {questions.findIndex(q => q.id === currentQuestion?.id) + 1} of {questions.length} · {sections.find(s => s.id === currentQuestion?.section_id)?.name || 'Section'}
+                      Question {questions.findIndex(q => q.id === currentQuestion?.id) + 1} of {questions.length}
+                    </Typography>
+                    <Typography sx={{
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: UI.subtext,
+                      fontFamily: inter.style.fontFamily,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      {sections.find(s => s.id === currentQuestion?.section_id)?.name || 'Section'}
                     </Typography>
                   </Box>
                   {markedForReview[currentQuestion?.id || 0] && (
@@ -3351,63 +3629,6 @@ function AttemptQuizPage() {
                 </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  {/* Scroll Down Hint */}
-                  {showScrollIndicator && (
-                    <Box sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      opacity: 0.6,
-                      transition: 'opacity 0.3s ease'
-                    }}>
-                      <Typography sx={{
-                        fontSize: '10px',
-                        fontWeight: '500',
-                        color: UI.subtext,
-                        fontFamily: inter.style.fontFamily,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        Scroll ↓
-                      </Typography>
-                      <Box sx={{
-                        width: '12px',
-                        height: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: 0.25,
-                        animation: 'bounce 2s infinite',
-                        '@keyframes bounce': {
-                          '0%, 20%, 50%, 80%, 100%': { transform: 'translateY(0)' },
-                          '40%': { transform: 'translateY(-2px)' },
-                          '60%': { transform: 'translateY(-1px)' }
-                        }
-                      }}>
-                        <Box sx={{
-                          width: '3px',
-                          height: '3px',
-                          backgroundColor: UI.primary,
-                          borderRadius: '50%',
-                          opacity: 0.7
-                        }} />
-                        <Box sx={{
-                          width: '2px',
-                          height: '2px',
-                          backgroundColor: UI.primary,
-                          borderRadius: '50%',
-                          opacity: 0.5
-                        }} />
-                        <Box sx={{
-                          width: '1px',
-                          height: '1px',
-                          backgroundColor: UI.primary,
-                          borderRadius: '50%',
-                          opacity: 0.3
-                        }} />
-                      </Box>
-                    </Box>
-                  )}
 
                   {/* Marks Chip */}
                   <Box sx={{
@@ -3487,7 +3708,7 @@ function AttemptQuizPage() {
               </Box>
 
                             {/* Question Content */}
-              <Box sx={{ p: 5, flex: 1 }}>
+              <Box sx={{ p: 5, flex: 1, overflowY: 'auto' }}>
                 {currentQuestion && (
                   <Box>
                   {/* Question Text */}
@@ -3583,28 +3804,42 @@ function AttemptQuizPage() {
               }}>
                 <Box sx={{
                   display: 'flex',
-                  gap: 2.5,
+                  gap: 2,
                   justifyContent: 'center',
-                  flexWrap: 'wrap'
+                  flexWrap: 'wrap',
+                  pt: 2,
+                  borderTop: `1px solid ${UI.border}`,
+                  background: 'linear-gradient(135deg, #FAFBFC 0%, #F8FAFF 100%)'
                 }}>
                                       {/* Previous Button - Outlined, neutral */}
                   <Button
                     variant="outlined"
                     onClick={goToPrevQuestionFlat}
-                    disabled={questions.findIndex(q => q.id === currentQuestion?.id) === 0}
+                    disabled={questions.findIndex(q => q.id === currentQuestion?.id) === 0 || showTabViolationDialog || sessionLocked}
                     sx={{
-                      height: 44,
+                      height: 48,
                       fontSize: '14px',
                       fontWeight: '600',
                       textTransform: 'none',
                       borderColor: UI.border,
                       color: UI.subtext,
                       fontFamily: inter.style.fontFamily,
-                      borderRadius: '10px',
-                      px: 3,
+                      borderRadius: '12px',
+                      px: 4,
+                      minWidth: '120px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                       '&:hover': {
-                        backgroundColor: '#F9FAFB',
-                        borderColor: UI.border
+                        backgroundColor: '#F8FAFF',
+                        borderColor: UI.primary,
+                        color: UI.primary,
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 12px rgba(40, 53, 147, 0.15)'
+                      },
+                      '&:disabled': {
+                        opacity: 0.5,
+                        transform: 'none',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                       },
                       '&:focus-visible': {
                         outline: `2px solid ${UI.focus}`,
@@ -3621,6 +3856,7 @@ function AttemptQuizPage() {
                   <Button
                     variant="outlined"
                     onClick={goToNextQuestionFlat}
+                    disabled={showTabViolationDialog || sessionLocked}
                     sx={{
                       height: 44,
                       fontSize: '14px',
@@ -3715,17 +3951,29 @@ function AttemptQuizPage() {
                     <Button
                       variant="contained"
                       onClick={goToNextQuestionFlat}
+                      disabled={showTabViolationDialog || sessionLocked}
                       sx={{
-                        height: 44,
-                      fontSize: '14px',
-                      fontWeight: '600',
+                        height: 48,
+                        fontSize: '15px',
+                        fontWeight: '700',
                         textTransform: 'none',
                         backgroundColor: UI.primary,
                         fontFamily: inter.style.fontFamily,
-                      borderRadius: '10px',
-                      px: 3,
+                        borderRadius: '12px',
+                        px: 4,
+                        minWidth: '140px',
+                        boxShadow: '0 4px 14px rgba(40, 53, 147, 0.25)',
+                        background: `linear-gradient(135deg, ${UI.primary} 0%, ${UI.primaryHover} 100%)`,
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         '&:hover': {
-                          backgroundColor: UI.primaryHover
+                          backgroundColor: UI.primaryHover,
+                          background: `linear-gradient(135deg, ${UI.primaryHover} 0%, ${UI.primary} 100%)`,
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 20px rgba(40, 53, 147, 0.35)'
+                        },
+                        '&:active': {
+                          transform: 'translateY(0px)',
+                          boxShadow: '0 2px 8px rgba(40, 53, 147, 0.25)'
                       },
                       '&:focus-visible': {
                         outline: `2px solid ${UI.focus}`,
@@ -3874,7 +4122,10 @@ function AttemptQuizPage() {
             pl: 2,
             position: 'sticky',
             top: 0,
-            height: 'fit-content'
+            height: '100%',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
           }}>
 
 
@@ -3884,16 +4135,24 @@ function AttemptQuizPage() {
                     <Box sx={{ 
                       background: `linear-gradient(135deg, ${UI.card} 0%, ${UI.primaryTint} 100%)`,
                       border: `2px solid ${UI.border}`,
-                      borderRadius: '12px',
-                      boxShadow: '0 4px 12px rgba(17, 24, 39, 0.12)',
+                      borderRadius: '16px',
+                      boxShadow: '0 6px 24px rgba(17, 24, 39, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08)',
                       mb: 3,
-                      flex: 1
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        boxShadow: '0 8px 32px rgba(17, 24, 39, 0.2), 0 4px 12px rgba(0, 0, 0, 0.12)',
+                        transform: 'translateY(-1px)'
+                      }
                     }}>
               {/* Palette Header */}
               <Box sx={{
                 p: 3,
                 borderBottom: `1px solid ${UI.border}`,
-                backgroundColor: '#F8FAFF',
+                background: 'linear-gradient(135deg, #F8FAFF 0%, #F1F5F9 100%)',
                 borderTopLeftRadius: '12px',
                 borderTopRightRadius: '12px',
                 display: 'flex',
@@ -3906,10 +4165,13 @@ function AttemptQuizPage() {
                   alignItems: 'center'
                 }}>
                   <Typography sx={{ 
-                    fontSize: '16px', 
-                    fontWeight: '600', 
+                    fontSize: '18px', 
+                    fontWeight: '700', 
                     color: UI.text,
-                      fontFamily: inter.style.fontFamily
+                    fontFamily: inter.style.fontFamily,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    position: 'relative'
                     }}>
                     {reviewMode ? 'Review Mode' : 'Question Palette'}
                     </Typography>
@@ -3933,6 +4195,7 @@ function AttemptQuizPage() {
                     p: 0.5,
                       border: `1px solid ${UI.border}`
                     }}>
+                    <Tooltip title="Grid View" arrow>
                     <IconButton
                       size="small"
                       onClick={() => setPaletteView('grid')}
@@ -3951,6 +4214,8 @@ function AttemptQuizPage() {
                     >
                       <DashboardIcon sx={{ fontSize: 18 }} />
                     </IconButton>
+                    </Tooltip>
+                    <Tooltip title="List View" arrow>
                     <IconButton
                       size="small"
                       onClick={() => setPaletteView('list')}
@@ -3969,6 +4234,7 @@ function AttemptQuizPage() {
                     >
                       <ListIcon sx={{ fontSize: 16 }} />
                     </IconButton>
+                    </Tooltip>
                     </Box>
                 </Box>
                 
@@ -3978,26 +4244,30 @@ function AttemptQuizPage() {
                   gap: 1,
                   flexWrap: 'wrap'
                 }}>
-                  {['All', 'Unanswered', 'Marked', 'Flagged'].map((filter) => (
+                  {['All', 'Unanswered', 'Marked', 'Flagged'].map((filter) => {
+                    const isActive = paletteFilter === filter;
+                    return (
                     <Chip
                       key={filter}
                       label={filter}
                       size="small"
-                      variant="outlined"
+                        variant={isActive ? "filled" : "outlined"}
+                        onClick={() => setPaletteFilter(filter as 'All' | 'Unanswered' | 'Marked' | 'Flagged')}
                       sx={{
                         fontSize: '11px',
                         height: '24px',
                         fontFamily: inter.style.fontFamily,
-                        borderColor: UI.border,
-                        color: UI.subtext,
-                        backgroundColor: '#FFFFFF',
+                          borderColor: isActive ? UI.primary : UI.border,
+                          color: isActive ? '#FFFFFF' : UI.subtext,
+                          backgroundColor: isActive ? UI.primary : '#FFFFFF',
                         borderRadius: '8px',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
                         '&:hover': {
-                          backgroundColor: UI.primaryTint,
+                            backgroundColor: isActive ? UI.primary : UI.primaryTint,
                           borderColor: UI.primary,
-                          transform: 'translateY(-1px)'
+                            transform: 'translateY(-1px)',
+                            color: isActive ? '#FFFFFF' : UI.primary
                         },
                         '&:active': {
                           transform: 'translateY(0px)',
@@ -4011,13 +4281,14 @@ function AttemptQuizPage() {
                         }
                       }}
                     />
-                  ))}
+                    );
+                  })}
               </Box>
 
             </Box>
 
                             {/* Question Groups */}
-              <Box ref={questionPaletteRef} sx={{ p: 3, maxHeight: '350px', overflowY: 'auto', position: 'relative' }}>
+              <Box ref={questionPaletteRef} sx={{ p: 4, flex: 1, minHeight: '300px', overflowY: 'auto', position: 'relative' }}>
                 {/* Top Fade Gradient with Scroll Up Indicator */}
                 <Box sx={{
                   position: 'absolute',
@@ -4089,82 +4360,8 @@ function AttemptQuizPage() {
                   </Box>
                 </Box>
                 
-                {/* Bottom Fade Gradient with Scroll Indicator */}
-                {showMoreQuestionsIndicator && (
-                  <Box sx={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: '40px',
-                    background: 'linear-gradient(transparent, rgba(232, 234, 246, 0.95))',
-                    pointerEvents: 'none',
-                    zIndex: 1,
-                    display: 'flex',
-                    alignItems: 'flex-end',
-                    justifyContent: 'center',
-                    pb: 1,
-                    opacity: showMoreQuestionsIndicator ? 1 : 0,
-                    transition: 'opacity 0.3s ease'
-                  }}>
-                  {/* Scroll Down Indicator */}
-                  <Box sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    opacity: 0.8,
-                    animation: 'bounce 2s infinite',
-                    '@keyframes bounce': {
-                      '0%, 20%, 50%, 80%, 100%': { transform: 'translateY(0)' },
-                      '40%': { transform: 'translateY(-3px)' },
-                      '60%': { transform: 'translateY(-1px)' }
-                    }
-                  }}>
-                    <Typography sx={{
-                      fontSize: '10px',
-                      fontWeight: '600',
-                      color: UI.primary,
-                      fontFamily: inter.style.fontFamily,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: 'center'
-                    }}>
-                      More Questions
-                    </Typography>
-                    <Box sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 0.25
-                    }}>
-                      <Box sx={{
-                        width: '4px',
-                        height: '4px',
-                        backgroundColor: UI.primary,
-                        borderRadius: '50%',
-                        opacity: 0.8
-                      }} />
-                      <Box sx={{
-                        width: '3px',
-                        height: '3px',
-                        backgroundColor: UI.primary,
-                        borderRadius: '50%',
-                        opacity: 0.6
-                      }} />
-                      <Box sx={{
-                        width: '2px',
-                        height: '2px',
-                        backgroundColor: UI.primary,
-                        borderRadius: '50%',
-                        opacity: 0.4
-                      }} />
-                    </Box>
-                  </Box>
-                </Box>
-                )}
                 {sections.map((section) => {
-                  let sectionQuestions = questionsBySection[section.id] || [];
+                  let sectionQuestions = filteredQuestionsBySection[section.id] || [];
                   
                   // Filter to show only marked questions in review mode
                   if (reviewMode) {
@@ -4174,16 +4371,23 @@ function AttemptQuizPage() {
                   if (sectionQuestions.length === 0) return null;
 
                   return (
-                    <Box key={section.id} data-section-id={section.id} sx={{ mb: 4 }}>
+                    <Box key={section.id} data-section-id={section.id} sx={{ mb: 5 }}>
+                      <Box sx={{ 
+                        position: 'relative',
+                        mb: 4,
+                        pb: 2
+                      }}>
                       <Typography sx={{ 
-                        fontSize: '14px', 
-                        fontWeight: '600', 
+                          fontSize: '15px', 
+                          fontWeight: '700', 
                         color: UI.text,
-                        mb: 3,
-                        fontFamily: inter.style.fontFamily
+                          fontFamily: inter.style.fontFamily,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
                       }}>
                         {section.name}
                       </Typography>
+                      </Box>
                       
                       {paletteView === 'grid' ? (
                         /* Grid View - 5 questions per row with better spacing */
@@ -4207,38 +4411,43 @@ function AttemptQuizPage() {
                             const isFlagged = !!flagged[q.id];
                             const isBookmarked = !!bookmarked[q.id];
                             
-                            // Status determination - Following new design system
-                            let bgColor = '#F1F5F9';    // Not Visited - Light gray fill
-                            let textColor = UI.subtext;
-                            let borderColor = UI.border;
-                            let borderWidth = '1px solid';
-                            let ringStyle = {};
+                            // Status determination - Maximum visibility
+                            let bgColor = '#FFFFFF';    // Not Visited - White background for better contrast
+                            let textColor = '#1F2937';  // Much darker text for maximum readability
+                            let borderColor = '#6B7280'; // Much stronger border
+                            let borderWidth = '3px solid';
+                            let boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)';
                             
                             if (isCurrent) {
                               bgColor = UI.primary;
                               textColor = '#FFFFFF';
                               borderColor = UI.primary;
-                              borderWidth = '2px solid';
+                              borderWidth = '4px solid';
+                              boxShadow = '0 6px 20px rgba(59, 130, 246, 0.6), 0 4px 8px rgba(0, 0, 0, 0.15)';
                             } else if (isAnswered && isMarked) {
                               bgColor = UI.review;
                               textColor = '#FFFFFF';
                               borderColor = UI.review;
-                              borderWidth = '2px solid';
+                              borderWidth = '3px solid';
+                              boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1)';
                             } else if (isMarked) {
                               bgColor = UI.review;
                               textColor = '#FFFFFF';
                               borderColor = UI.review;
-                              borderWidth = '2px solid';
+                              borderWidth = '3px solid';
+                              boxShadow = '0 4px 12px rgba(147, 51, 234, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1)';
                             } else if (isAnswered) {
                               bgColor = UI.answered;
                               textColor = '#FFFFFF';
                               borderColor = UI.answered;
-                              borderWidth = '2px solid';
+                              borderWidth = '3px solid';
+                              boxShadow = '0 4px 12px rgba(34, 197, 94, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1)';
                             } else if (isVisited) {
                               bgColor = UI.notAnswered;
                               textColor = '#FFFFFF';
                               borderColor = UI.notAnswered;
-                              borderWidth: '2px solid';
+                              borderWidth = '3px solid';
+                              boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1)';
                             }
                             
                             return (
@@ -4247,35 +4456,38 @@ function AttemptQuizPage() {
                                   size="small"
                                   variant="contained"
                                   onClick={() => goToQuestion(q.id)}
-                                  disabled={submitted}
+                                  disabled={submitted || showTabViolationDialog || sessionLocked}
                                   aria-label={`Question ${idx + 1}, ${isCurrent ? 'Current' : isAnswered && isMarked ? 'Answered and Marked for Review' : isMarked ? 'Marked for Review' : isAnswered ? 'Answered' : isVisited ? 'Not Answered' : 'Not Visited'}${isFlagged ? ', Flagged' : ''}${isBookmarked ? ', Bookmarked' : ''}`}
               sx={{
                                     width: 40,
                                     height: 40,
                                     minWidth: 40,
                                     minHeight: 40,
-                                    borderRadius: '8px',
+                                    borderRadius: '10px',
                                     fontSize: 14,
                                     fontWeight: 700,
                                     lineHeight: 1,
                                     backgroundColor: bgColor,
                                     color: textColor,
                                     border: `${borderWidth} ${borderColor}`,
-                                    boxShadow: 'none',
+                                    boxShadow: boxShadow,
                                     fontVariantNumeric: 'tabular-nums',
                                     transition: 'all 0.2s ease',
                                     '&:hover': {
-                                      transform: 'scale(1.01)',
-                                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                      backgroundColor: bgColor
+                                      transform: 'scale(1.08)',
+                                      boxShadow: isCurrent 
+                                        ? '0 8px 24px rgba(59, 130, 246, 0.7), 0 4px 8px rgba(0, 0, 0, 0.2)'
+                                        : '0 6px 16px rgba(0, 0, 0, 0.25), 0 3px 6px rgba(0, 0, 0, 0.15)',
+                                      backgroundColor: bgColor,
+                                      borderColor: isCurrent ? UI.primary : '#4B5563'
                                     },
                                     '&:active': {
-                                      transform: 'scale(0.99)'
+                                      transform: 'scale(0.98)'
                                     },
                                     '&:focus-visible': { 
-                                      outline: `2px solid ${UI.focus}`, 
+                                      outline: `3px solid ${UI.focus}`, 
                                       outlineOffset: '2px',
-                                      boxShadow: `0 0 0 2px ${UI.focus}`
+                                      boxShadow: `0 0 0 3px ${UI.focus}`
                                     }
                                   }}
                                 >
@@ -4356,18 +4568,24 @@ function AttemptQuizPage() {
                                   justifyContent: 'space-between',
                                   alignItems: 'center',
                                   p: 2.5,
-                                  borderRadius: '8px',
+                                  borderRadius: '10px',
                                   cursor: 'pointer',
-                                  backgroundColor: isCurrent ? '#F8FAFF' : 'transparent',
-                                  border: isCurrent ? `2px solid ${UI.primary}` : `1px solid ${UI.border}`,
-                                  transition: 'all 0.15s ease',
+                                  backgroundColor: isCurrent ? '#F8FAFF' : '#FFFFFF',
+                                  border: isCurrent ? `4px solid ${UI.primary}` : `3px solid #6B7280`,
+                                  boxShadow: isCurrent 
+                                    ? '0 6px 20px rgba(59, 130, 246, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15)'
+                                    : '0 2px 8px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)',
+                                  transition: 'all 0.2s ease',
                                   '&:hover': {
-                                    backgroundColor: isCurrent ? '#F8FAFF' : '#F8FAFF',
-                                    transform: 'translateY(-1px)',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                                    backgroundColor: isCurrent ? '#F0F4FF' : '#F8FAFF',
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: isCurrent 
+                                      ? '0 6px 16px rgba(59, 130, 246, 0.3), 0 3px 6px rgba(0, 0, 0, 0.15)'
+                                      : '0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1)',
+                                    borderColor: isCurrent ? UI.primary : '#9CA3AF'
                                   },
                                   '&:focus-visible': {
-                                    outline: `2px solid ${UI.focus}`,
+                                    outline: `3px solid ${UI.focus}`,
                                     outlineOffset: '2px'
                                   }
                                 }}
@@ -4465,6 +4683,7 @@ function AttemptQuizPage() {
                   variant="contained"
                   fullWidth
                   onClick={handleSubmit}
+                  disabled={showTabViolationDialog || sessionLocked}
                   startIcon={<CheckCircleIcon />}
                   data-testid="submit-exam-button"
         sx={{
@@ -4489,6 +4708,8 @@ function AttemptQuizPage() {
                 </Button>
               </Stack>
             </Box>
+
+            {/* Test Button for Debugging */}
 
             {/* Question Status Legend - Under Submit Button */}
                   <Box sx={{
@@ -4836,6 +5057,157 @@ function AttemptQuizPage() {
         </Alert>
       </Snackbar>
 
+      {/* Tab Violation Dialog */}
+      <Dialog 
+        open={showTabViolationDialog} 
+        onClose={() => {}} // Prevent closing - student must submit query or ignore
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            border: '2px solid #ef4444'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          fontFamily: inter.style.fontFamily,
+          fontSize: '24px',
+          fontWeight: 700,
+          color: '#dc2626',
+          textAlign: 'center',
+          py: 3,
+          borderBottom: '2px solid #fecaca'
+        }}>
+          🚨 Quiz Violation Detected
+        </DialogTitle>
+        
+        <DialogContent sx={{ py: 4 }}>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography variant="h5" sx={{ 
+              fontFamily: inter.style.fontFamily,
+              fontWeight: 600,
+              color: '#dc2626',
+              mb: 2
+            }}>
+              You have been removed from the quiz.
+            </Typography>
+            
+            <Typography variant="body1" sx={{ 
+              fontFamily: inter.style.fontFamily,
+              fontSize: '16px',
+              lineHeight: 1.6,
+              color: '#374151',
+              mb: 3
+            }}>
+              You have exceeded the allowed tab switch limit (exactly 5 times). Your answers have been auto-submitted, and you are no longer allowed to continue the quiz.
+            </Typography>
+            
+            <Typography variant="body1" sx={{ 
+              fontFamily: inter.style.fontFamily,
+              fontSize: '16px',
+              lineHeight: 1.6,
+              color: '#374151',
+              mb: 4
+            }}>
+              You may <strong>issue a query</strong> to your teacher explaining your actions. The teacher will decide whether to:
+            </Typography>
+            
+            <Box sx={{ 
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: 2,
+              p: 3,
+              mb: 4,
+              textAlign: 'left'
+            }}>
+              <Typography variant="body2" sx={{ 
+                fontFamily: inter.style.fontFamily,
+                fontSize: '14px',
+                color: '#7f1d1d',
+                mb: 1
+              }}>
+                • Allow you to retake the quiz.
+              </Typography>
+              <Typography variant="body2" sx={{ 
+                fontFamily: inter.style.fontFamily,
+                fontSize: '14px',
+                color: '#7f1d1d'
+              }}>
+                • Debar you permanently from the quiz or even from the portal.
+              </Typography>
+            </Box>
+            
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              placeholder="Please explain your actions and why you switched tabs multiple times..."
+              value={tabViolationQuery}
+              onChange={(e) => setTabViolationQuery(e.target.value)}
+              sx={{
+                mb: 3,
+                '& .MuiOutlinedInput-root': {
+                  fontFamily: inter.style.fontFamily,
+                  fontSize: '14px'
+                }
+              }}
+            />
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          justifyContent: 'center', 
+          gap: 2, 
+          p: 3,
+          borderTop: '1px solid #fecaca'
+        }}>
+          <Button
+            onClick={handleIgnoreViolationQuery}
+            variant="outlined"
+            sx={{
+              fontFamily: inter.style.fontFamily,
+              fontSize: '14px',
+              fontWeight: 600,
+              px: 4,
+              py: 1.5,
+              borderColor: '#6b7280',
+              color: '#6b7280',
+              '&:hover': {
+                borderColor: '#4b5563',
+                backgroundColor: '#f9fafb'
+              }
+            }}
+          >
+            Ignore
+          </Button>
+          
+          <Button
+            onClick={handleViolationQuerySubmit}
+            disabled={isSubmittingViolationQuery || !tabViolationQuery.trim()}
+            variant="contained"
+            sx={{
+              fontFamily: inter.style.fontFamily,
+              fontSize: '14px',
+              fontWeight: 600,
+              px: 4,
+              py: 1.5,
+              backgroundColor: '#dc2626',
+              '&:hover': {
+                backgroundColor: '#b91c1c'
+              },
+              '&:disabled': {
+                backgroundColor: '#fca5a5',
+                color: '#ffffff'
+              }
+            }}
+          >
+            {isSubmittingViolationQuery ? 'Submitting...' : 'Submit Query'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Toast Notifications */}
       {toastMessage && (
         <Snackbar
@@ -4917,6 +5289,86 @@ function AttemptQuizPage() {
         onClearAllFlags={handleClearAllFlags}
         onSubmit={handleSubmit}
       />
+
+      {/* Query Submitted Success Card */}
+      {showQuerySubmittedCard && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <Box
+            sx={{
+              backgroundColor: 'white',
+              borderRadius: 3,
+              padding: 4,
+              maxWidth: 400,
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            }}
+          >
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                backgroundColor: '#4caf50',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px',
+              }}
+            >
+              <CheckCircleIcon sx={{ fontSize: 32, color: 'white' }} />
+            </Box>
+            
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 600,
+                color: '#2e7d32',
+                marginBottom: 2,
+                fontFamily: inter.style.fontFamily,
+              }}
+            >
+              Query Submitted Successfully
+            </Typography>
+            
+            <Typography
+              variant="body1"
+              sx={{
+                color: '#666',
+                marginBottom: 3,
+                lineHeight: 1.6,
+                fontFamily: inter.style.fontFamily,
+              }}
+            >
+              Your explanation has been sent to your teacher. They will review your case and decide on the appropriate action.
+            </Typography>
+            
+            <Typography
+              variant="body2"
+              sx={{
+                color: '#999',
+                fontStyle: 'italic',
+                fontFamily: inter.style.fontFamily,
+              }}
+            >
+              Redirecting to dashboard in a moment...
+            </Typography>
+          </Box>
+        </Box>
+      )}
       </Box>
     </>
   )

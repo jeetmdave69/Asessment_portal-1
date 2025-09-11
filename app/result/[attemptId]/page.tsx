@@ -87,7 +87,7 @@ function ResultPage() {
       setLoading(true);
       const { data: attemptData } = await supabase
         .from('attempts')
-        .select('id,quiz_id,user_name,score,correct_answers,answers,sections,marked_for_review,start_time,submitted_at,question_time_spent')
+        .select('id,quiz_id,user_name,score,correct_answers,answers,sections,marked_for_review,start_time,submitted_at,question_time_spent,violation_reason,violation_count,tab_switch_count')
         .eq('id', attemptId)
         .single();
       if (!attemptData) {
@@ -479,6 +479,56 @@ function ResultPage() {
               Score: {Math.round(obtainedMarks * 100) / 100} / {totalMarks} marks
               </Typography>
           </Paper>
+
+          {/* Violation Warning */}
+          {attempt?.violation_reason === 'TAB_SWITCHING_LIMIT_EXCEEDED' && (
+            <Paper sx={{
+              p: 4,
+              mb: 4,
+              borderRadius: 4,
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #f59e0b 100%)',
+              border: '2px solid #f59e0b',
+              boxShadow: '0 12px 40px rgba(245, 158, 11, 0.2)',
+            }}>
+              <Typography variant="h4" fontWeight={900} color="warning.main" sx={{ mb: 2 }}>
+                ⚠️ Results Under Review
+              </Typography>
+              <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                Your quiz was automatically submitted due to tab switching violations
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                You switched tabs {attempt?.tab_switch_count || attempt?.violation_count || 5} times during the quiz, 
+                which exceeds the allowed limit. Your responses have been saved and submitted automatically.
+              </Typography>
+              <Typography variant="body1" fontWeight={600} color="text.primary" sx={{ mb: 2 }}>
+                Your teacher will review your case and decide whether to:
+              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, flexWrap: 'wrap' }}>
+                <Chip 
+                  label="Release your marks" 
+                  color="success" 
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+                <Chip 
+                  label="Allow you to retake the quiz" 
+                  color="info" 
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+                <Chip 
+                  label="Debar you from the quiz" 
+                  color="error" 
+                  variant="outlined"
+                  sx={{ fontWeight: 600 }}
+                />
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 3, fontStyle: 'italic' }}>
+                You will be notified once your teacher makes a decision.
+              </Typography>
+            </Paper>
+          )}
 
           {/* Charts Grid */}
           {!reviewLoading && sectionBarData.length > 0 ? (

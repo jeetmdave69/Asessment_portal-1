@@ -26,8 +26,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <ClerkProvider
                     signInUrl="/sign-in"
                     signUpUrl="/sign-up"
-                    afterSignInUrl="/dashboard"
-                    afterSignUpUrl="/dashboard"
                   >
                     <html lang="en" className={inter.variable}>
                       <head>
