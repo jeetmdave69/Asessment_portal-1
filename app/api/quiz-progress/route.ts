@@ -69,7 +69,8 @@ export async function POST(req: Request) {
         start_time: start_time || existing?.start_time,
         updated_at: new Date().toISOString(),
       }
-    ], { onConflict: 'quiz_id,user_id' });
+    ], { onConflict: 'quiz_id,user_id' })
+    .select();
   console.log('Upsert result:', { data, error });
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
@@ -108,50 +109,66 @@ export async function PATCH(req: Request) {
     });
   }
   console.log('Received PATCH /api/quiz-progress body:', body);
-  const { quiz_id, user_id, question_time_spent, tab_switch_count, last_tab_switch_time, tab_switch_history } = body;
+  const { quiz_id, user_id, question_time_spent, tab_switch_count, last_tab_switch_time, tab_switch_history, submitted_due_to_violation, violation_timestamp } = body;
   if (!quiz_id || !user_id) {
     return new Response(JSON.stringify({ error: 'quiz_id and user_id required' }), { status: 400 });
   }
 
-  // ===== [QTS MERGE: quiz_progress] =====
-  const incoming = question_time_spent ?? {};
-  // Handle both flat object format and nested format
-  const incomingMap = incoming.questions ?? incoming ?? {};
-
-  const { data: row } = await supabase
+  // Fetch existing progress to merge data
+  const { data: existing, error: fetchError } = await supabase
     .from('quiz_progress')
-    .select('id, question_time_spent')
+    .select('*')
     .eq('quiz_id', quiz_id)
     .eq('user_id', user_id)
     .single();
 
-  const existing = row?.question_time_spent ?? {};
-  const existingMap = existing.questions ?? existing ?? {};
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    console.error('❌ Error fetching existing progress:', fetchError);
+    return new Response(JSON.stringify({ error: fetchError.message }), { status: 500 });
+  }
 
-  // Merge the question time spent data
-  const merged_qts = { questions: { ...existingMap, ...incomingMap } };
-  // Include merged_qts in your update:
+  // If no existing record, return error
+  if (!existing) {
+    return new Response(JSON.stringify({ error: 'No existing progress found to update' }), { status: 404 });
+  }
+
+  // Merge question_time_spent data
+  let mergedQuestionTimeSpent = existing.question_time_spent || {};
+  if (question_time_spent && typeof question_time_spent === 'object') {
+    // Handle both flat object format and nested format
+    const incomingMap = question_time_spent.questions ?? question_time_spent ?? {};
+    const existingMap = mergedQuestionTimeSpent.questions ?? mergedQuestionTimeSpent ?? {};
+    mergedQuestionTimeSpent = { ...existingMap, ...incomingMap };
+  }
 
   // Prepare update object
   const updateData: any = { 
-    question_time_spent: merged_qts,
     updated_at: new Date().toISOString()
   };
 
-  // Add tab switch data if provided
+  // Only update fields that are provided
+  if (question_time_spent !== undefined) {
+    updateData.question_time_spent = mergedQuestionTimeSpent;
+  }
   if (tab_switch_count !== undefined) updateData.tab_switch_count = tab_switch_count;
   if (last_tab_switch_time !== undefined) updateData.last_tab_switch_time = last_tab_switch_time;
   if (tab_switch_history !== undefined) updateData.tab_switch_history = tab_switch_history;
+  if (submitted_due_to_violation !== undefined) updateData.submitted_due_to_violation = submitted_due_to_violation;
+  if (violation_timestamp !== undefined) updateData.violation_timestamp = violation_timestamp;
 
   const { data, error } = await supabase
     .from('quiz_progress')
     .update(updateData)
     .eq('quiz_id', quiz_id)
-    .eq('user_id', user_id);
+    .eq('user_id', user_id)
+    .select();
 
   if (error) {
+    console.error('❌ Error updating progress:', error);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
+  
+  console.log('✅ Progress updated successfully:', data);
   return new Response(JSON.stringify({ success: true, data }), { status: 200 });
 }
 

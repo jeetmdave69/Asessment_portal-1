@@ -359,6 +359,9 @@ function AttemptQuizPage() {
   const [isSubmittingViolationQuery, setIsSubmittingViolationQuery] = useState<boolean>(false);
   const [sessionLocked, setSessionLocked] = useState<boolean>(false);
   const [showQuerySubmittedCard, setShowQuerySubmittedCard] = useState<boolean>(false);
+  const [rightClickViolations, setRightClickViolations] = useState<number>(0);
+  const [copyPasteViolations, setCopyPasteViolations] = useState<number>(0);
+  const [devToolsViolations, setDevToolsViolations] = useState<number>(0);
   
 
   // Security check - prevent access if session is locked
@@ -549,7 +552,11 @@ function AttemptQuizPage() {
         fetch('/api/quiz-progress', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question_time_spent: completeQtsForSync }),
+          body: JSON.stringify({ 
+            quiz_id: Number(quizId),
+            user_id: user?.id,
+            question_time_spent: completeQtsForSync 
+          }),
         }).then(() => {
           console.log('✅ Immediate QTS sync successful');
         }).catch((error) => {
@@ -580,7 +587,11 @@ function AttemptQuizPage() {
         fetch('/api/quiz-progress', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question_time_spent: completeQtsForSync }),
+          body: JSON.stringify({ 
+            quiz_id: Number(quizId),
+            user_id: user?.id,
+            question_time_spent: completeQtsForSync 
+          }),
         }).then(() => {
           console.log('✅ Immediate QTS sync successful');
         }).catch((error) => {
@@ -637,7 +648,11 @@ function AttemptQuizPage() {
       fetch('/api/quiz-progress', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question_time_spent: completeQtsForSync }),
+            body: JSON.stringify({ 
+            quiz_id: Number(quizId),
+            user_id: user?.id,
+            question_time_spent: completeQtsForSync 
+          }),
           }).then(() => {
             console.log('✅ QTS sync successful');
             setLastSyncTime(Date.now());
@@ -658,7 +673,11 @@ function AttemptQuizPage() {
         fetch('/api/quiz-progress', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question_time_spent: completeQtsForSync }),
+          body: JSON.stringify({ 
+            quiz_id: Number(quizId),
+            user_id: user?.id,
+            question_time_spent: completeQtsForSync 
+          }),
         }).then(() => {
           console.log('✅ QTS sync successful');
           setLastSyncTime(Date.now());
@@ -689,7 +708,11 @@ function AttemptQuizPage() {
               fetch('/api/quiz-progress', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question_time_spent: completeQtsForSync }),
+                body: JSON.stringify({ 
+            quiz_id: Number(quizId),
+            user_id: user?.id,
+            question_time_spent: completeQtsForSync 
+          }),
               }).then(() => {
                 console.log('✅ QTS sync on page hidden successful');
               }).catch((error) => {
@@ -883,34 +906,34 @@ function AttemptQuizPage() {
 
         setQuestions(parsedQuestions)
 
-        // Initialize timer (simplified and robust)
+        // Initialize timer - always start fresh from total duration for each user
         const rawDuration = quizData.duration;
         const validDuration = (rawDuration && rawDuration > 0) ? rawDuration : 30;
         const durationInSeconds = validDuration * 60;
         setTotalTime(durationInSeconds);
         
-        // Check if timer should be preserved
-        const existingStartTime = Number(localStorage.getItem(`quiz-${quizId}-startTime`));
-        const existingDuration = Number(localStorage.getItem(`quiz-${quizId}-duration`));
-        
-        if (shouldPreserveTimer(existingStartTime, existingDuration)) {
-          console.log('🕐 Preserving existing timer - quiz in progress');
-          // Calculate remaining time from existing timer
-          const elapsed = Date.now() - existingStartTime;
-          const remaining = Math.max(0, Math.floor((existingDuration - elapsed) / 1000));
-          setTimeLeft(remaining);
-          timerInitializedRef.current = true;
-          console.log('🕐 Timer preserved:', { remaining, elapsed, existingStartTime, existingDuration });
-        } else {
-          console.log('🕐 Initializing new timer');
+        // Always initialize new timer for each user session
+        console.log('🕐 Initializing fresh timer for user session');
         const startTimeMs = Date.now();
         const durationMs = durationInSeconds * 1000;
-          localStorage.setItem(`quiz-${quizId}-startTime`, startTimeMs.toString());
-        localStorage.setItem(`quiz-${quizId}-duration`, durationMs.toString());
+        
+        // Store timer data with user-specific key to ensure each user gets fresh timer
+        const userTimerKey = `quiz-${quizId}-${user?.id}-startTime`;
+        const userDurationKey = `quiz-${quizId}-${user?.id}-duration`;
+        
+        localStorage.setItem(userTimerKey, startTimeMs.toString());
+        localStorage.setItem(userDurationKey, durationMs.toString());
         setTimeLeft(durationInSeconds);
-          timerInitializedRef.current = true;
-          console.log('🕐 Timer initialized:', { startTimeMs, durationMs, durationInSeconds });
-        }
+        timerInitializedRef.current = true;
+        
+        console.log('🕐 Fresh timer initialized:', { 
+          startTimeMs, 
+          durationMs, 
+          durationInSeconds,
+          userTimerKey,
+          userDurationKey,
+          userId: user?.id
+        });
         
         console.log('Timer initialization:', {
           quizDataDuration: quizData.duration,
@@ -1305,36 +1328,138 @@ function AttemptQuizPage() {
     };
   }, [submitted]);
 
-  // Security: Prevent right-click, copy, cut, paste, and print
+  // Function to report violations
+  const reportViolation = useCallback(async (violationType: 'RIGHT_CLICK' | 'COPY_PASTE' | 'DEV_TOOLS', count: number) => {
+    if (!quizId || !user?.id || !quiz) return;
+
+    try {
+      console.log(`🚨 Reporting ${violationType} violation (count: ${count})`);
+      
+      const violationData = {
+        quiz_id: Number(quizId),
+        student_id: user.id,
+        student_name: user.fullName || 'Student',
+        violation_type: violationType,
+        violation_count: count,
+        violation_timestamp: new Date().toISOString(),
+        quiz_title: quiz.quiz_title || quiz.quiz_name || 'Quiz',
+        student_query: 'No query submitted'
+      };
+
+      // Send violation notification to teacher
+      const response = await fetch('/api/teacher-violation-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(violationData)
+      });
+
+      if (response.ok) {
+        console.log(`✅ ${violationType} violation reported successfully`);
+      } else {
+        console.error(`❌ Failed to report ${violationType} violation:`, response.status);
+      }
+    } catch (error) {
+      console.error(`❌ Error reporting ${violationType} violation:`, error);
+    }
+  }, [quizId, user?.id, quiz]);
+
+  // Security: Prevent right-click, copy, cut, paste, and print with violation tracking
   useEffect(() => {
-    const prevent = (e: Event) => e.preventDefault();
+    const handleRightClick = (e: Event) => {
+      e.preventDefault();
+      setRightClickViolations(prev => {
+        const newCount = prev + 1;
+        console.log(`🚫 Right-click detected (${newCount})`);
+        
+        // Report violation if count exceeds threshold
+        if (newCount >= 3) {
+          console.log('⚠️ Right-click violation threshold exceeded');
+          reportViolation('RIGHT_CLICK', newCount);
+        }
+        return newCount;
+      });
+    };
+
+    const handleCopyPaste = (e: Event) => {
+      e.preventDefault();
+      setCopyPasteViolations(prev => {
+        const newCount = prev + 1;
+        console.log(`🚫 Copy/Paste detected (${newCount})`);
+        
+        // Report violation if count exceeds threshold
+        if (newCount >= 3) {
+          console.log('⚠️ Copy/Paste violation threshold exceeded');
+          reportViolation('COPY_PASTE', newCount);
+        }
+        return newCount;
+      });
+    };
+
     const preventKey = (e: KeyboardEvent) => {
       // Only prevent specific security-related keys, allow navigation keys to pass through
       if ((e.ctrlKey || e.metaKey) && ['c', 'x', 'v', 'p'].includes(e.key.toLowerCase())) {
         e.preventDefault();
+        setCopyPasteViolations(prev => {
+          const newCount = prev + 1;
+          console.log(`🚫 Keyboard shortcut detected: ${e.key} (${newCount})`);
+          
+          // Report violation if count exceeds threshold
+          if (newCount >= 3) {
+            console.log('⚠️ Copy/Paste violation threshold exceeded');
+            reportViolation('COPY_PASTE', newCount);
+          }
+          return newCount;
+        });
       }
       // Prevent Print
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
+      }
+      // Prevent F12 and Ctrl+Shift+I (Dev Tools)
+      if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'i')) {
+        e.preventDefault();
+        setDevToolsViolations(prev => {
+          const newCount = prev + 1;
+          console.log(`🚫 Dev Tools shortcut detected (${newCount})`);
+          
+          // Report violation if count exceeds threshold
+          if (newCount >= 3) {
+            console.log('⚠️ Dev Tools violation threshold exceeded');
+            reportViolation('DEV_TOOLS', newCount);
+          }
+          return newCount;
+        });
       }
       // Don't prevent navigation keys
       if (['s', 'S', 'Enter', 'Tab', 'ArrowRight', 'ArrowLeft', 'r', 'R', 'b', 'B', 'f', 'F'].includes(e.key)) {
         return; // Let navigation keys pass through
       }
     };
-    document.addEventListener('contextmenu', prevent);
-    document.addEventListener('copy', prevent);
-    document.addEventListener('cut', prevent);
-    document.addEventListener('paste', prevent);
+
+    // Enhanced security event listeners
+    document.addEventListener('contextmenu', handleRightClick);
+    document.addEventListener('copy', handleCopyPaste);
+    document.addEventListener('cut', handleCopyPaste);
+    document.addEventListener('paste', handleCopyPaste);
     document.addEventListener('keydown', preventKey);
+    
+    // Additional security measures
+    document.addEventListener('selectstart', (e) => {
+      // Prevent text selection in some cases
+      if (e.target && (e.target as HTMLElement).tagName === 'INPUT') {
+        return; // Allow selection in input fields
+      }
+      // You can add more sophisticated selection prevention here
+    });
+
     return () => {
-      document.removeEventListener('contextmenu', prevent);
-      document.removeEventListener('copy', prevent);
-      document.removeEventListener('cut', prevent);
-      document.removeEventListener('paste', prevent);
+      document.removeEventListener('contextmenu', handleRightClick);
+      document.removeEventListener('copy', handleCopyPaste);
+      document.removeEventListener('cut', handleCopyPaste);
+      document.removeEventListener('paste', handleCopyPaste);
       document.removeEventListener('keydown', preventKey);
     };
-  }, []);
+  }, [quizId, user?.id, quiz, reportViolation]);
 
   // Add debug logs for answers, questions, and current question
   useEffect(() => {
@@ -1969,6 +2094,7 @@ function AttemptQuizPage() {
     }, 1000);
   };
 
+
   // Score calculation
   const calculateScore = () => {
     let score = 0;
@@ -2008,10 +2134,10 @@ function AttemptQuizPage() {
   // --- TIMER REFACTOR START ---
   // Robust timer state: only set start time if not already set, always use ms
   useEffect(() => {
-    if (!quizId || !quiz) return;
-    const startKey = `quiz-${quizId}-startTime`;
-    const durationKey = `quiz-${quizId}-duration`;
-    const pausedKey = `quiz-${quizId}-pausedDuration`;
+    if (!quizId || !quiz || !user?.id) return;
+    const startKey = `quiz-${quizId}-${user.id}-startTime`;
+    const durationKey = `quiz-${quizId}-${user.id}-duration`;
+    const pausedKey = `quiz-${quizId}-${user.id}-pausedDuration`;
     // Set start time only if not already set
     if (!localStorage.getItem(startKey)) {
       localStorage.setItem(startKey, Date.now().toString());
@@ -2220,10 +2346,11 @@ function AttemptQuizPage() {
     }
     let timerId: NodeJS.Timeout;
     function tick() {
-      const startKey = `quiz-${quizId}-startTime`;
-      const durationKey = `quiz-${quizId}-duration`;
-      const pausedKey = `quiz-${quizId}-pausedDuration`;
-      const pauseStartKey = `quiz-${quizId}-pauseStart`;
+      // Use user-specific keys for timer data
+      const startKey = `quiz-${quizId}-${user?.id}-startTime`;
+      const durationKey = `quiz-${quizId}-${user?.id}-duration`;
+      const pausedKey = `quiz-${quizId}-${user?.id}-pausedDuration`;
+      const pauseStartKey = `quiz-${quizId}-${user?.id}-pauseStart`;
       const startTime = Number(localStorage.getItem(startKey));
       const duration = Number(localStorage.getItem(durationKey));
       let pausedDuration = Number(localStorage.getItem(pausedKey) || '0');
@@ -2253,12 +2380,19 @@ function AttemptQuizPage() {
           console.log('Initializing timer in main timer useEffect');
           const durationInSeconds = quiz.duration * 60;
           const startTimeMs = Date.now();
-          localStorage.setItem(`quiz-${quizId}-startTime`, startTimeMs.toString());
           const durationMs = durationInSeconds * 1000;
-          localStorage.setItem(`quiz-${quizId}-duration`, durationMs.toString());
+          
+          // Use user-specific keys
+          localStorage.setItem(`quiz-${quizId}-${user?.id}-startTime`, startTimeMs.toString());
+          localStorage.setItem(`quiz-${quizId}-${user?.id}-duration`, durationMs.toString());
           setTimeLeft(durationInSeconds);
           timerInitializedRef.current = true;
-          console.log('🕐 Timer initialized in main useEffect:', { startTimeMs, durationMs, durationInSeconds });
+          console.log('🕐 Timer initialized in main useEffect:', { 
+            startTimeMs, 
+            durationMs, 
+            durationInSeconds,
+            userId: user?.id 
+          });
         } else {
           console.log('Timer data missing or corrupted, but not reinitializing to preserve existing timer');
         }
@@ -2311,9 +2445,9 @@ function AttemptQuizPage() {
 
   // Ensure timer starts immediately when quiz loads
   useEffect(() => {
-    if (quiz && !submitted && !timerInitializedRef.current) {
-      const existingStartTime = Number(localStorage.getItem(`quiz-${quizId}-startTime`));
-      const existingDuration = Number(localStorage.getItem(`quiz-${quizId}-duration`));
+    if (quiz && !submitted && !timerInitializedRef.current && user?.id) {
+      const existingStartTime = Number(localStorage.getItem(`quiz-${quizId}-${user.id}-startTime`));
+      const existingDuration = Number(localStorage.getItem(`quiz-${quizId}-${user.id}-duration`));
       
       if (shouldPreserveTimer(existingStartTime, existingDuration)) {
         console.log('🕐 Force preserving existing timer');
@@ -2326,12 +2460,19 @@ function AttemptQuizPage() {
         console.log('🕐 Force starting new timer on quiz load');
         const durationInSeconds = quiz.duration * 60;
         const startTimeMs = Date.now();
-        localStorage.setItem(`quiz-${quizId}-startTime`, startTimeMs.toString());
         const durationMs = durationInSeconds * 1000;
-        localStorage.setItem(`quiz-${quizId}-duration`, durationMs.toString());
+        
+        // Use user-specific keys
+        localStorage.setItem(`quiz-${quizId}-${user.id}-startTime`, startTimeMs.toString());
+        localStorage.setItem(`quiz-${quizId}-${user.id}-duration`, durationMs.toString());
         setTimeLeft(durationInSeconds);
         timerInitializedRef.current = true;
-        console.log('🕐 Timer force started:', { startTimeMs, durationMs, durationInSeconds });
+        console.log('🕐 Timer force started:', { 
+          startTimeMs, 
+          durationMs, 
+          durationInSeconds,
+          userId: user.id 
+        });
       }
     }
   }, [quiz, submitted, quizId]);
